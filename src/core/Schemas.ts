@@ -8,6 +8,8 @@ import {
   GameMode,
   GameType,
   PlayerType,
+  Quads,
+  Trios,
   UnitType,
 } from "./game/Game";
 import { PlayerStatsSchema } from "./StatsSchemas";
@@ -132,6 +134,14 @@ export enum LogSeverity {
 // Utility types
 //
 
+const TeamCountConfigSchema = z.union([
+  z.number(),
+  z.literal(Duos),
+  z.literal(Trios),
+  z.literal(Quads),
+]);
+export type TeamCountConfig = z.infer<typeof TeamCountConfigSchema>;
+
 export const GameConfigSchema = z.object({
   gameMap: z.enum(GameMapType),
   difficulty: z.enum(Difficulty),
@@ -144,7 +154,7 @@ export const GameConfigSchema = z.object({
   instantBuild: z.boolean(),
   maxPlayers: z.number().optional(),
   disabledUnits: z.enum(UnitType).array().optional(),
-  playerTeams: z.union([z.number(), z.literal(Duos)]).optional(),
+  playerTeams: TeamCountConfigSchema.optional(),
 });
 
 export const TeamSchema = z.string();

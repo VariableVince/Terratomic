@@ -1,7 +1,15 @@
 import { getServerConfigFromServer } from "../core/configuration/ConfigLoader";
-import { Difficulty, GameMapType, GameMode, GameType } from "../core/game/Game";
+import {
+  Difficulty,
+  Duos,
+  GameMapType,
+  GameMode,
+  GameType,
+  Quads,
+  Trios,
+} from "../core/game/Game";
 import { PseudoRandom } from "../core/PseudoRandom";
-import { GameConfig } from "../core/Schemas";
+import { GameConfig, TeamCountConfig } from "../core/Schemas";
 import { logger } from "./Logger";
 
 const log = logger.child({});
@@ -39,19 +47,31 @@ interface MapWithMode {
   mode: GameMode;
 }
 
+const TEAM_COUNTS = [
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  Duos,
+  Trios,
+  Quads,
+] as const satisfies TeamCountConfig[];
+
 export class MapPlaylist {
   private mapsPlaylist: MapWithMode[] = [];
 
   public gameConfig(): GameConfig {
     const { map, mode } = this.getNextMap();
 
-    const numPlayerTeams =
-      mode === GameMode.Team ? 2 + Math.floor(Math.random() * 5) : undefined;
+    const playerTeams =
+      mode === GameMode.Team ? this.getTeamCount() : undefined;
 
     // Create the default public game config (from your GameManager)
     return {
       gameMap: map,
-      maxPlayers: config.lobbyMaxPlayers(map, mode, numPlayerTeams),
+      maxPlayers: config.lobbyMaxPlayers(map, mode, playerTeams),
       gameType: GameType.Public,
       difficulty: Difficulty.Medium,
       infiniteGold: false,
@@ -59,9 +79,13 @@ export class MapPlaylist {
       instantBuild: false,
       disableNPCs: mode === GameMode.Team,
       gameMode: mode,
-      playerTeams: numPlayerTeams,
+      playerTeams,
       bots: 400,
     } satisfies GameConfig;
+  }
+
+  private getTeamCount(): TeamCountConfig {
+    return TEAM_COUNTS[Math.floor(Math.random() * TEAM_COUNTS.length)];
   }
 
   private getNextMap(): MapWithMode {
@@ -91,7 +115,6 @@ export class MapPlaylist {
 
     const ffa1: GameMapType[] = rand.shuffleArray([...maps]);
     const ffa2: GameMapType[] = rand.shuffleArray([...maps]);
-    const ffa3: GameMapType[] = rand.shuffleArray([...maps]);
     const team: GameMapType[] = rand.shuffleArray([...maps]);
 
     this.mapsPlaylist = [];
@@ -100,9 +123,6 @@ export class MapPlaylist {
         return false;
       }
       if (!this.addNextMap(this.mapsPlaylist, ffa2, GameMode.FFA)) {
-        return false;
-      }
-      if (!this.addNextMap(this.mapsPlaylist, ffa3, GameMode.FFA)) {
         return false;
       }
       if (!this.addNextMap(this.mapsPlaylist, team, GameMode.Team)) {
