@@ -136,8 +136,9 @@ export class UILayer implements Layer {
           unit.isCooldown() &&
           !this.allProgressBars.has(unit.id())
         ) {
-          const endTick = this.game.config().SiloCooldown();
-          this.drawLoadingBar(unit, endTick);
+          const totalCooldown =
+            unit.cooldownDuration() ?? this.game.config().SiloCooldown();
+          this.drawLoadingBar(unit, totalCooldown);
         }
         break;
       case UnitType.SAMLauncher:
@@ -146,8 +147,9 @@ export class UILayer implements Layer {
           unit.isCooldown() &&
           !this.allProgressBars.has(unit.id())
         ) {
-          const endTick = this.game.config().SAMCooldown();
-          this.drawLoadingBar(unit, endTick);
+          const totalCooldown =
+            unit.cooldownDuration() ?? this.game.config().SAMNukeCooldown();
+          this.drawLoadingBar(unit, totalCooldown);
         }
         break;
       default:
@@ -304,7 +306,8 @@ export class UILayer implements Layer {
     const currentTick = this.game.ticks();
     this.allProgressBars.forEach((progressBarInfo, unitId) => {
       const progress =
-        (currentTick - progressBarInfo.startTick) / progressBarInfo.endTick;
+        (currentTick - progressBarInfo.startTick) /
+        (progressBarInfo.endTick - progressBarInfo.startTick);
       if (progress >= 1 || !progressBarInfo.unit.isActive()) {
         this.allProgressBars.get(unitId)?.progressBar.clear();
         this.allProgressBars.delete(unitId);
@@ -314,7 +317,7 @@ export class UILayer implements Layer {
     });
   }
 
-  public drawLoadingBar(unit: UnitView, endTick: Tick) {
+  public drawLoadingBar(unit: UnitView, totalCooldownDuration: Tick) {
     if (!this.context) {
       return;
     }
@@ -328,10 +331,15 @@ export class UILayer implements Layer {
         PROGRESSBAR_HEIGHT,
         0,
       );
+      const currentTick = this.game.ticks();
+      const ticksLeft = unit.ticksLeftInCooldown() ?? 0;
+      const actualStartTick = currentTick - (totalCooldownDuration - ticksLeft);
+      const actualEndTick = currentTick + ticksLeft;
+
       this.allProgressBars.set(unit.id(), {
         unit,
-        startTick: this.game.ticks(),
-        endTick,
+        startTick: actualStartTick,
+        endTick: actualEndTick,
         progressBar,
       });
     }

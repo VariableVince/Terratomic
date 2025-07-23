@@ -190,14 +190,6 @@ export class DefaultConfig implements Config {
     return this._isReplay;
   }
 
-  samHittingChance(): number {
-    return 0.8;
-  }
-
-  samWarheadHittingChance(): number {
-    return 0.5;
-  }
-
   traitorDefenseDebuff(): number {
     return 0.5;
   }
@@ -245,9 +237,24 @@ export class DefaultConfig implements Config {
     // So defense modifier is between [3, 1]
     return 2 - 0.9 * falloutRatio;
   }
-  SAMCooldown(): number {
+
+  //SAMs
+  samNukeHittingChance(): number {
+    return 1;
+  }
+  samPlaneHittingChance(): number {
+    return 0.8;
+  }
+  samWarheadHittingChance(): number {
+    return 0.5;
+  }
+  SAMNukeCooldown(): number {
     return 75;
   }
+  SAMPlaneCooldown(): number {
+    return 40;
+  }
+
   SiloCooldown(): number {
     return 75;
   }

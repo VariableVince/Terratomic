@@ -119,9 +119,16 @@ export class UnitView {
   ticksLeftInCooldown(): Tick | undefined {
     return this.data.ticksLeftInCooldown;
   }
+  cooldownDuration(): Tick | undefined {
+    return this.data.cooldownDuration;
+  }
   isCooldown(): boolean {
     if (this.data.ticksLeftInCooldown === undefined) return false;
     return this.data.ticksLeftInCooldown > 0;
+  }
+
+  returning(): boolean {
+    return this.data.returning ?? false;
   }
 
   info(): UnitInfo {

@@ -13,7 +13,7 @@ export class TestConfig extends DefaultConfig {
   private _proximityBonusPortsNb: number = 0;
   private _defaultNukeSpeed: number = 4;
 
-  samHittingChance(): number {
+  samNukeHittingChance(): number {
     return 1;
   }
 

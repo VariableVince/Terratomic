@@ -64,7 +64,8 @@ export interface NukeMagnitude {
 }
 
 export interface Config {
-  samHittingChance(): number;
+  samNukeHittingChance(): number;
+  samPlaneHittingChance(): number;
   samWarheadHittingChance(): number;
   spawnImmunityDuration(): Tick;
   serverConfig(): ServerConfig;
@@ -138,7 +139,8 @@ export interface Config {
   bomberExplosionRadius(): number;
   safeFromPiratesCooldownMax(): number;
   defensePostRange(): number;
-  SAMCooldown(): number;
+  SAMNukeCooldown(): number;
+  SAMPlaneCooldown(): number;
   SiloCooldown(): number;
   defensePostLossMultiplier(): number;
   defensePostSpeedMultiplier(): number;

@@ -27,6 +27,8 @@ export class UnitImpl implements Unit {
   private _lastOwner: PlayerImpl | null = null;
   private _troops: number;
   private _cooldownStartTick: Tick | null = null;
+  private _cooldownDuration: Tick | null = null;
+  private _returning: boolean = false;
   private _patrolTile: TileRef | undefined;
   private _level: number = 1;
   private _targetable: boolean = true;
@@ -122,6 +124,8 @@ export class UnitImpl implements Unit {
       targetUnitId: this._targetUnit?.id() ?? undefined,
       targetTile: this.targetTile() ?? undefined,
       ticksLeftInCooldown: this.ticksLeftInCooldown() ?? undefined,
+      cooldownDuration: this._cooldownDuration ?? undefined,
+      returning: this.returning(),
     };
   }
 
@@ -307,33 +311,34 @@ export class UnitImpl implements Unit {
     return `Unit:${this._type},owner:${this.owner().name()}`;
   }
 
-  launch(): void {
+  launch(duration?: Tick): void {
     this._cooldownStartTick = this.mg.ticks();
+    if (duration !== undefined) {
+      this._cooldownDuration = duration;
+    } else {
+      this._cooldownDuration = this.mg.config().SAMNukeCooldown(); // Default for nukes
+    }
     this.mg.addUpdate(this.toUpdate());
   }
 
   ticksLeftInCooldown(): Tick | undefined {
-    let cooldownDuration = 0;
-    if (this.type() === UnitType.SAMLauncher) {
-      cooldownDuration = this.mg.config().SAMCooldown();
-      if (this.hasHealth()) {
-        const healthPercentage =
-          Number(this.health()) / (this.info().maxHealth ?? 1);
-        if (healthPercentage > 0) {
-          cooldownDuration /= healthPercentage;
-        }
-      }
-    } else if (this.type() === UnitType.MissileSilo) {
-      cooldownDuration = this.mg.config().SiloCooldown();
-      if (this.hasHealth()) {
-        const healthPercentage =
-          Number(this.health()) / (this.info().maxHealth ?? 1);
-        if (healthPercentage > 0) {
-          cooldownDuration /= healthPercentage;
-        }
-      }
-    } else {
+    let cooldownDuration = this._cooldownDuration;
+
+    if (cooldownDuration === null) {
       return undefined;
+    }
+
+    if (
+      this.type() === UnitType.SAMLauncher ||
+      this.type() === UnitType.MissileSilo
+    ) {
+      if (this.hasHealth()) {
+        const healthPercentage =
+          Number(this.health()) / (this.info().maxHealth ?? 1);
+        if (healthPercentage > 0) {
+          cooldownDuration /= healthPercentage;
+        }
+      }
     }
 
     if (!this._cooldownStartTick) {
@@ -343,8 +348,14 @@ export class UnitImpl implements Unit {
     return cooldownDuration - (this.mg.ticks() - this._cooldownStartTick);
   }
 
-  isInCooldown(): boolean {
+  isInCooldown(duration?: Tick): boolean {
     const ticksLeft = this.ticksLeftInCooldown();
+    if (duration !== undefined) {
+      return (
+        ticksLeft !== undefined &&
+        ticksLeft > this._cooldownDuration! - duration
+      );
+    }
     return ticksLeft !== undefined && ticksLeft > 0;
   }
 
@@ -370,6 +381,14 @@ export class UnitImpl implements Unit {
 
   targetedBySAM(): boolean {
     return this._targetedBySAM;
+  }
+
+  returning(): boolean {
+    return this._returning;
+  }
+
+  setReturning(returning: boolean): void {
+    this._returning = returning;
   }
 
   setReachedTarget(): void {

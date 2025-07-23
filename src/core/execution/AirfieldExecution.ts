@@ -86,22 +86,13 @@ export class AirfieldExecution implements Execution {
     if (this.spawnTicker < mg.config().bomberSpawnInterval()) return;
     this.spawnTicker = 0;
 
-    const busyTargets = new Set<TileRef>(
-      mg
-        .units(UnitType.Bomber)
-        .map((u) => u.targetTile())
-        .filter((t): t is TileRef => t !== undefined),
-    );
-
     // NEW: Use bomber intent if set
     const intent = this.player.getBomberIntent?.();
     if (intent?.targetPlayerID && intent?.structure) {
       const targetPlayer = mg.player(intent.targetPlayerID);
       if (targetPlayer) {
         const targets = targetPlayer.units(intent.structure);
-        const availableTargets = targets.filter(
-          (u) => !busyTargets.has(u.tile()),
-        );
+        const availableTargets = targets;
 
         if (availableTargets.length > 0) {
           const targetUnit = this.random.randElement(availableTargets);
@@ -134,8 +125,7 @@ export class AirfieldExecution implements Execution {
         return (
           o.isPlayer() &&
           o.id() !== this.player.id() &&
-          !this.player.isFriendly(o) &&
-          !busyTargets.has(t)
+          !this.player.isFriendly(o)
         );
       })
       .map(({ unit, distSquared }) => ({ unit, dist2: distSquared }));

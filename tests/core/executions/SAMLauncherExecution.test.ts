@@ -117,7 +117,7 @@ describe("SAM", () => {
     executeTicks(game, 3);
 
     expect(nuke.isActive()).toBeFalsy();
-    for (let i = 0; i < game.config().SAMCooldown() - 3; i++) {
+    for (let i = 0; i < game.config().SAMNukeCooldown() - 3; i++) {
       game.executeNextTick();
       expect(sam.isInCooldown()).toBeTruthy();
     }

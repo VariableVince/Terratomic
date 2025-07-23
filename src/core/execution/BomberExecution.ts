@@ -78,7 +78,10 @@ export class BomberExecution implements Execution {
       this.origOwner,
     );
     this.bombsLeft--;
-    if (this.bombsLeft === 0) this.returning = true;
+    if (this.bombsLeft === 0) {
+      this.returning = true;
+      this.bomber.setReturning(true);
+    }
   }
 
   isActive(): boolean {

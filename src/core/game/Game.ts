@@ -417,6 +417,8 @@ export interface Unit {
   reachedTarget(): boolean;
   isTargetable(): boolean;
   setTargetable(targetable: boolean): void;
+  returning(): boolean;
+  setReturning(returning: boolean): void;
 
   // Health
   hasHealth(): boolean;
@@ -431,9 +433,9 @@ export interface Unit {
   // --- UNIT SPECIFIC ---
 
   // SAMs & Missile Silos
-  launch(): void;
+  launch(duration?: Tick): void;
   ticksLeftInCooldown(): Tick | undefined;
-  isInCooldown(): boolean;
+  isInCooldown(duration?: Tick): boolean;
 
   // Trade Ships
   setSafeFromPirates(): void; // Only for trade ships

@@ -95,6 +95,8 @@ export interface UnitUpdate {
   health?: number;
   constructionType?: UnitType;
   ticksLeftInCooldown?: Tick;
+  returning?: boolean;
+  cooldownDuration?: Tick;
 }
 
 export interface AttackUpdate {

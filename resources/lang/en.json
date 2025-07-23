@@ -492,5 +492,9 @@
     "about_to_expire": "Your alliance with {name} is about to expire",
     "expired": "Your alliance with {name} expired",
     "no_alliance_to_extend": "No alliance to extend."
+  },
+  "messages": {
+    "airplane_intercepted": "Airplane intercepted",
+    "missile_failed_intercept": "Missile failed to intercept target"
   }
 }

@@ -90,6 +90,7 @@ describe("UILayer", () => {
       id: () => 2,
       tile: () => ({}),
       isActive: () => true,
+      ticksLeftInCooldown: (): number | undefined => 0, // Explicitly define return type
     } as unknown as UnitView;
     ui.drawLoadingBar(unit, 5);
     expect(ui["allProgressBars"].has(2)).toBe(true);
@@ -105,6 +106,7 @@ describe("UILayer", () => {
       owner: () => ({ id: () => 1 }),
       tile: () => ({}),
       isActive: () => true,
+      ticksLeftInCooldown: (): number | undefined => 0, // Added for the test
     } as unknown as UnitView;
     ui.onUnitEvent(unit);
     expect(ui["allProgressBars"].has(2)).toBe(true);
@@ -125,6 +127,7 @@ describe("UILayer", () => {
       owner: () => ({ id: () => 1 }),
       tile: () => ({}),
       isActive: () => true,
+      ticksLeftInCooldown: (): number | undefined => 0, // Added for the test
     } as unknown as UnitView;
     ui.onUnitEvent(unit);
     expect(ui["allProgressBars"].has(2)).toBe(true);
