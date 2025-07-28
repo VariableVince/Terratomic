@@ -99,11 +99,13 @@ export class StraightPathFinder {
     const dx = dstX - currX;
     const dy = dstY - currY;
 
-    const dist = Math.hypot(dx, dy);
+    const distSq = dx * dx + dy * dy;
 
-    if (dist <= speed) {
+    if (distSq <= speed * speed) {
       return true;
     }
+
+    const dist = Math.sqrt(distSq);
 
     const dirX = dx / dist;
     const dirY = dy / dist;
