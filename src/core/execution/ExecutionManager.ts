@@ -22,6 +22,7 @@ import { MoveWarshipExecution } from "./MoveWarshipExecution";
 import { NoOpExecution } from "./NoOpExecution";
 import { QuickChatExecution } from "./QuickChatExecution";
 import { RetreatExecution } from "./RetreatExecution";
+import { SetAutoBombingExecution } from "./SetAutoBombingExecution";
 import { SetInvestmentRateExecution } from "./SetInvestmentRateExecution";
 import { SetTargetTroopRatioExecution } from "./SetTargetTroopRatioExecution";
 import { SpawnExecution } from "./SpawnExecution";
@@ -150,6 +151,8 @@ export class Executor {
       }
       case "mark_disconnected":
         return new MarkDisconnectedExecution(player, intent.isDisconnected);
+      case "set_auto_bombing":
+        return new SetAutoBombingExecution(player, intent.enabled);
       default:
         throw new Error(`intent type ${intent} not found`);
     }

@@ -182,6 +182,10 @@ export class SendBomberIntentEvent implements GameEvent {
   ) {}
 }
 
+export class SendSetAutoBombingEvent implements GameEvent {
+  constructor(public readonly enabled: boolean) {}
+}
+
 export class Transport {
   private socket: WebSocket | null = null;
 
@@ -244,6 +248,9 @@ export class Transport {
       this.onSendSetInvestmentRateEvent(e),
     );
     this.eventBus.on(SendBomberIntentEvent, (e) => this.onSendBomberIntent(e));
+    this.eventBus.on(SendSetAutoBombingEvent, (e) =>
+      this.onSendSetAutoBombingEvent(e),
+    );
 
     this.eventBus.on(BuildUnitIntentEvent, (e) => this.onBuildUnitIntent(e));
 
@@ -645,6 +652,14 @@ export class Transport {
       clientID: this.lobbyConfig.clientID,
       targetID: event.targetID ?? null,
       structure: event.structure ?? null,
+    });
+  }
+
+  private onSendSetAutoBombingEvent(event: SendSetAutoBombingEvent) {
+    this.sendIntent({
+      type: "set_auto_bombing",
+      clientID: this.lobbyConfig.clientID,
+      enabled: event.enabled,
     });
   }
 

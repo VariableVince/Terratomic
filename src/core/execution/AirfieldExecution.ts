@@ -90,7 +90,7 @@ export class AirfieldExecution implements Execution {
     const intent = this.player.getBomberIntent?.();
     if (intent?.targetPlayerID && intent?.structure) {
       const targetPlayer = mg.player(intent.targetPlayerID);
-      if (targetPlayer) {
+      if (targetPlayer && !this.player.isFriendly(targetPlayer)) {
         const targets = targetPlayer.units(intent.structure);
         const availableTargets = targets;
 
@@ -106,6 +106,9 @@ export class AirfieldExecution implements Execution {
     }
 
     // Default targeting logic
+    if (!this.player.isAutoBombingEnabled()) {
+      return;
+    }
     const range = mg.config().bomberTargetRange();
     type Near = { unit: Unit; dist2: number };
     const enemies: Near[] = mg

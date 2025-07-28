@@ -608,6 +608,9 @@ export interface Player {
   ): void;
   getBomberIntent(): { targetPlayerID: string; structure: UnitType } | null;
 
+  setAutoBombingEnabled(enabled: boolean): void;
+  isAutoBombingEnabled(): boolean;
+
   // WARNING: this operation is expensive.
   bestTransportShipSpawn(tile: TileRef): TileRef | false;
 }

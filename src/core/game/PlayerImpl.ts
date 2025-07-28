@@ -111,6 +111,7 @@ export class PlayerImpl implements Player {
 
   private bomberIntent: { targetPlayerID: string; structure: UnitType } | null =
     null;
+  private _autoBombingEnabled: boolean = false;
 
   constructor(
     private mg: GameImpl,
@@ -1310,5 +1311,13 @@ export class PlayerImpl implements Player {
     structure: UnitType;
   } | null {
     return this.bomberIntent;
+  }
+
+  public setAutoBombingEnabled(enabled: boolean): void {
+    this._autoBombingEnabled = enabled;
+  }
+
+  public isAutoBombingEnabled(): boolean {
+    return this._autoBombingEnabled;
   }
 }

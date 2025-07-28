@@ -4,7 +4,6 @@ import { GameStartingModal } from "../GameStartingModal";
 import { RefreshGraphicsEvent as RedrawGraphicsEvent } from "../InputHandler";
 import { TransformHandler } from "./TransformHandler";
 import { UIState } from "./UIState";
-import { BomberMenu } from "./layers/BomberMenu";
 import { BuildMenu } from "./layers/BuildMenu";
 import { ChatDisplay } from "./layers/ChatDisplay";
 import { ChatModal } from "./layers/ChatModal";
@@ -191,13 +190,6 @@ export function createRenderer(
     console.error("unit info modal not found");
   }
   unitInfoModal.game = game;
-  let bomberMenu = document.querySelector("bomber-menu") as BomberMenu;
-  if (!bomberMenu || !(bomberMenu instanceof BomberMenu)) {
-    bomberMenu = new BomberMenu();
-    document.body.appendChild(bomberMenu);
-  }
-  bomberMenu.eventBus = eventBus;
-  bomberMenu.game = game;
 
   const structureLayer = new StructureLayer(
     game,
@@ -219,7 +211,6 @@ export function createRenderer(
     eventsDisplay,
     chatDisplay,
     buildMenu,
-    bomberMenu,
     new RadialMenu(
       eventBus,
       game,
