@@ -7,7 +7,11 @@ import { euclDistFN, TileRef } from "../../../core/game/GameMap";
 import { GameUpdateType } from "../../../core/game/GameUpdates";
 import { GameView, PlayerView } from "../../../core/game/GameView";
 import { PseudoRandom } from "../../../core/PseudoRandom";
-import { AlternateViewEvent, DragEvent } from "../../InputHandler";
+import {
+  AlternateViewEvent,
+  DragEvent,
+  MouseOverEvent,
+} from "../../InputHandler";
 import { TransformHandler } from "../TransformHandler";
 import { Layer } from "./Layer";
 
@@ -15,6 +19,7 @@ export class TerritoryLayer implements Layer {
   private canvas: HTMLCanvasElement;
   private context: CanvasRenderingContext2D;
   private imageData: ImageData;
+  private alternativeImageData: ImageData;
 
   private tileToRenderQueue: PriorityQueue<{
     tile: TileRef;
@@ -29,9 +34,12 @@ export class TerritoryLayer implements Layer {
   private highlightCanvas: HTMLCanvasElement;
   private highlightContext: CanvasRenderingContext2D;
 
+  private highlightedTerritory: PlayerView | null = null;
+
   private alternativeView = false;
   private lastDragTime = 0;
   private nodrawDragDuration = 200;
+  private lastMousePosition: { x: number; y: number } | null = null;
 
   private refreshRate = 15; //refresh every 15ms
   private lastRefresh = 0;
@@ -77,6 +85,36 @@ export class TerritoryLayer implements Layer {
           });
       }
     });
+
+    // Detect alliance mutations
+    const myPlayer = this.game.myPlayer();
+    if (myPlayer) {
+      updates?.[GameUpdateType.BrokeAlliance]?.forEach((update) => {
+        const territory = this.game.playerBySmallID(update.betrayedID);
+        console.log("betrayedID", update.betrayedID);
+        console.log("territory", territory);
+        if (territory && territory instanceof PlayerView) {
+          this.redrawTerritory(territory);
+        }
+      });
+
+      updates?.[GameUpdateType.AllianceRequestReply]?.forEach((update) => {
+        if (
+          update.accepted &&
+          (update.request.requestorID === myPlayer.smallID() ||
+            update.request.recipientID === myPlayer.smallID())
+        ) {
+          const territoryId =
+            update.request.requestorID === myPlayer.smallID()
+              ? update.request.recipientID
+              : update.request.requestorID;
+          const territory = this.game.playerBySmallID(territoryId);
+          if (territory && territory instanceof PlayerView) {
+            this.redrawTerritory(territory);
+          }
+        }
+      });
+    }
 
     const focusedPlayer = this.game.focusedPlayer();
     if (focusedPlayer !== this.lastFocusedPlayer) {
@@ -136,6 +174,7 @@ export class TerritoryLayer implements Layer {
   }
 
   init() {
+    this.eventBus.on(MouseOverEvent, (e) => this.onMouseOver(e));
     this.eventBus.on(AlternateViewEvent, (e) => {
       this.alternativeView = e.alternateView;
     });
@@ -144,6 +183,62 @@ export class TerritoryLayer implements Layer {
       // this.lastDragTime = Date.now();
     });
     this.redraw();
+  }
+
+  onMouseOver(event: MouseOverEvent) {
+    this.lastMousePosition = { x: event.x, y: event.y };
+    this.updateHighlightedTerritory();
+  }
+
+  private updateHighlightedTerritory() {
+    if (!this.alternativeView) {
+      return;
+    }
+
+    if (!this.lastMousePosition) {
+      return;
+    }
+
+    const cell = this.transformHandler.screenToWorldCoordinates(
+      this.lastMousePosition.x,
+      this.lastMousePosition.y,
+    );
+    if (!this.game.isValidCoord(cell.x, cell.y)) {
+      return;
+    }
+
+    const previousTerritory = this.highlightedTerritory;
+    const territory = this.getTerritoryAtCell(cell);
+
+    if (territory) {
+      this.highlightedTerritory = territory;
+    } else {
+      this.highlightedTerritory = null;
+    }
+
+    if (previousTerritory?.id() !== this.highlightedTerritory?.id()) {
+      const territories: PlayerView[] = [];
+      if (previousTerritory) {
+        territories.push(previousTerritory);
+      }
+      if (this.highlightedTerritory) {
+        territories.push(this.highlightedTerritory);
+      }
+      this.redrawTerritory(territories);
+    }
+  }
+
+  private getTerritoryAtCell(cell: { x: number; y: number }) {
+    const tile = this.game.ref(cell.x, cell.y);
+    if (!tile) {
+      return null;
+    }
+    // If the tile has no owner, it is either a fallout tile or a terra nullius tile.
+    if (!this.game.hasOwner(tile)) {
+      return null;
+    }
+    const owner = this.game.owner(tile);
+    return owner instanceof PlayerView ? owner : null;
   }
 
   redraw() {
@@ -161,8 +256,19 @@ export class TerritoryLayer implements Layer {
       this.canvas.width,
       this.canvas.height,
     );
+    this.alternativeImageData = this.context.getImageData(
+      0,
+      0,
+      this.canvas.width,
+      this.canvas.height,
+    );
     this.initImageData();
-    this.context.putImageData(this.imageData, 0, 0);
+
+    this.context.putImageData(
+      this.alternativeView ? this.alternativeImageData : this.imageData,
+      0,
+      0,
+    );
 
     // Add a second canvas for highlights
     this.highlightCanvas = document.createElement("canvas");
@@ -179,12 +285,25 @@ export class TerritoryLayer implements Layer {
     });
   }
 
+  redrawTerritory(territory: PlayerView | PlayerView[]) {
+    const territories = Array.isArray(territory) ? territory : [territory];
+    const territorySet = new Set(territories);
+
+    this.game.forEachTile((t) => {
+      const owner = this.game.owner(t) as PlayerView;
+      if (territorySet.has(owner)) {
+        this.paintTerritory(t);
+      }
+    });
+  }
+
   initImageData() {
     this.game.forEachTile((tile) => {
       const cell = new Cell(this.game.x(tile), this.game.y(tile));
       const index = cell.y * this.game.width() + cell.x;
       const offset = index * 4;
       this.imageData.data[offset + 3] = 0;
+      this.alternativeImageData.data[offset + 3] = 0;
     });
   }
 
@@ -207,11 +326,16 @@ export class TerritoryLayer implements Layer {
       const h = vy1 - vy0 + 1;
 
       if (w > 0 && h > 0) {
-        this.context.putImageData(this.imageData, 0, 0, vx0, vy0, w, h);
+        this.context.putImageData(
+          this.alternativeView ? this.alternativeImageData : this.imageData,
+          0,
+          0,
+          vx0,
+          vy0,
+          w,
+          h,
+        );
       }
-    }
-    if (this.alternativeView) {
-      return;
     }
 
     context.drawImage(
@@ -258,17 +382,38 @@ export class TerritoryLayer implements Layer {
     if (isBorder && !this.game.hasOwner(tile)) {
       return;
     }
+
     if (!this.game.hasOwner(tile)) {
       if (this.game.hasFallout(tile)) {
-        this.paintTile(tile, this.theme.falloutColor(), 150);
+        this.paintTile(this.imageData, tile, this.theme.falloutColor(), 150);
+        this.paintTile(
+          this.alternativeImageData,
+          tile,
+          this.theme.falloutColor(),
+          150,
+        );
         return;
       }
       this.clearTile(tile);
       return;
     }
     const owner = this.game.owner(tile) as PlayerView;
+    const isHighlighted =
+      this.highlightedTerritory &&
+      this.highlightedTerritory.id() === owner.id();
+    const myPlayer = this.game.myPlayer();
+
     if (this.game.isBorder(tile)) {
       const playerIsFocused = owner && this.game.focusedPlayer() === owner;
+      if (myPlayer) {
+        let alternativeColor = owner.isFriendly(myPlayer)
+          ? this.theme.allyColor()
+          : this.theme.enemyColor();
+        if (owner.smallID() === myPlayer.smallID()) {
+          alternativeColor = this.theme.selfColor();
+        }
+        this.paintTile(this.alternativeImageData, tile, alternativeColor, 255);
+      }
       if (
         this.game.hasUnitNearby(
           tile,
@@ -283,29 +428,52 @@ export class TerritoryLayer implements Layer {
         const lightTile =
           (x % 2 === 0 && y % 2 === 0) || (y % 2 === 1 && x % 2 === 1);
         const borderColor = lightTile ? borderColors.light : borderColors.dark;
-        this.paintTile(tile, borderColor, 255);
+        this.paintTile(this.imageData, tile, borderColor, 255);
       } else {
         const useBorderColor = playerIsFocused
           ? this.theme.focusedBorderColor()
           : this.theme.borderColor(owner);
-        this.paintTile(tile, useBorderColor, 255);
+        this.paintTile(this.imageData, tile, useBorderColor, 255);
       }
     } else {
-      this.paintTile(tile, this.theme.territoryColor(owner), 150);
+      if (myPlayer) {
+        let alternativeColor = owner.isFriendly(myPlayer)
+          ? this.theme.allyColor()
+          : this.theme.enemyColor();
+        // If the current player is the owner
+        if (owner.smallID() === myPlayer.smallID()) {
+          alternativeColor = this.theme.selfColor();
+        }
+        // If the tile is on a ally territory, use the ally color
+        this.paintTile(
+          this.alternativeImageData,
+          tile,
+          alternativeColor,
+          isHighlighted ? 150 : 60,
+        );
+      }
+
+      this.paintTile(
+        this.imageData,
+        tile,
+        this.theme.territoryColor(owner),
+        150,
+      );
     }
   }
 
-  paintTile(tile: TileRef, color: Colord, alpha: number) {
+  paintTile(imageData: ImageData, tile: TileRef, color: Colord, alpha: number) {
     const offset = tile * 4;
-    this.imageData.data[offset] = color.rgba.r;
-    this.imageData.data[offset + 1] = color.rgba.g;
-    this.imageData.data[offset + 2] = color.rgba.b;
-    this.imageData.data[offset + 3] = alpha;
+    imageData.data[offset] = color.rgba.r;
+    imageData.data[offset + 1] = color.rgba.g;
+    imageData.data[offset + 2] = color.rgba.b;
+    imageData.data[offset + 3] = alpha;
   }
 
   clearTile(tile: TileRef) {
     const offset = tile * 4;
     this.imageData.data[offset + 3] = 0; // Set alpha to 0 (fully transparent)
+    this.alternativeImageData.data[offset + 3] = 0; // Set alpha to 0 (fully transparent)
   }
 
   enqueueTile(tile: TileRef) {
