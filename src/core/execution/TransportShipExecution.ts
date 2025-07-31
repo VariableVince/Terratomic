@@ -66,7 +66,6 @@ export class TransportShipExecution implements Execution {
         this.attacker.id(),
       );
       this.active = false;
-      this.attacker.addTroops(this.troops);
       return;
     }
 
