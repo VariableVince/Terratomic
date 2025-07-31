@@ -47,6 +47,8 @@ const MAP_FILE_NAMES: Record<GameMapType, string> = {
   [GameMapType.FalklandIslands]: "FalklandIslands",
   [GameMapType.Baikal]: "Baikal",
   [GameMapType.Halkidiki]: "Halkidiki",
+  [GameMapType.StraitOfGibraltar]: "StraitOfGibraltar",
+  [GameMapType.Italia]: "Italia",
 };
 
 class GameMapLoader {
