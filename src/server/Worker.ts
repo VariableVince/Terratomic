@@ -313,6 +313,7 @@ export function startWorker() {
                 error: error.toString(),
               } satisfies ServerErrorMessage),
             );
+            ws.removeAllListeners();
             ws.close(1002, "ClientJoinMessageSchema");
             return;
           }
@@ -330,6 +331,7 @@ export function startWorker() {
                 error,
               } satisfies ServerErrorMessage),
             );
+            ws.removeAllListeners();
             ws.close(1002, "ClientJoinMessageSchema");
             return;
           }
@@ -345,8 +347,9 @@ export function startWorker() {
 
           const result = await verifyClientToken(clientMsg.token, config);
           if (result === false) {
-            log.warn("Failed to verify token");
-            ws.close(1002, "Failed to verify token");
+            log.warn("Unauthorized: Invalid token");
+            ws.removeAllListeners();
+            ws.close(1002, "Unauthorized");
             return;
           }
           const { persistentId, claims } = result;
@@ -359,14 +362,13 @@ export function startWorker() {
             // Verify token and get player permissions
             const result = await getUserMe(clientMsg.token, config);
             if (result === false) {
-              log.warn("Failed to verify token");
-              ws.close(1002, "Failed to verify token");
+              log.warn("Unauthorized: Invalid session");
+              ws.removeAllListeners();
+              ws.close(1002, "Unauthorized");
               return;
             }
             roles = result.player.roles;
           }
-
-          // TODO: Validate client settings based on roles
 
           // Create client and add to game
           const client = new Client(
@@ -405,6 +407,7 @@ export function startWorker() {
     );
 
     ws.on("error", (error: Error) => {
+      ws.removeAllListeners();
       if ((error as any).code === "WS_ERR_UNEXPECTED_RSV_1") {
         ws.close(1002, "WS_ERR_UNEXPECTED_RSV_1");
       }
