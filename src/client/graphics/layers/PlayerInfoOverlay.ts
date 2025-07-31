@@ -323,7 +323,7 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
     return html`
       <div
         class="flex w-full z-50 flex-col"
-        @contextmenu=${(e) => e.preventDefault()}
+        @contextmenu=${(e: MouseEvent) => e.preventDefault()}
       >
         <div
           class="bg-slate-800/40 backdrop-blur-sm shadow-xs rounded-lg shadow-lg backdrop-blur-sm transition-all duration-300  text-white text-lg md:text-base ${containerClasses}"

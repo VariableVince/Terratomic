@@ -33,6 +33,31 @@ import "./components/baseComponents/Modal";
 import { isLoggedIn } from "./jwt";
 import "./styles.css";
 
+declare global {
+  interface Window {
+    PageOS: {
+      session: {
+        newPageView: () => void;
+      };
+    };
+    ramp: {
+      que: Array<() => void>;
+      passiveMode: boolean;
+      spaAddAds: (ads: Array<{ type: string; selectorId: string }>) => void;
+      destroyUnits: (adType: string) => void;
+      settings?: {
+        slots?: any;
+      };
+      spaNewPage: (url: string) => void;
+    };
+  }
+
+  // Extend the global interfaces to include your custom events
+  interface DocumentEventMap {
+    "join-lobby": CustomEvent<JoinLobbyEvent>;
+  }
+}
+
 export interface JoinLobbyEvent {
   clientID: string;
   // Multiplayer games only have gameID, gameConfig is not known until game starts.
@@ -270,14 +295,18 @@ class Client {
     window.addEventListener("popstate", onHashUpdate);
     window.addEventListener("hashchange", onHashUpdate);
 
-    function updateSliderProgress(slider) {
+    function updateSliderProgress(slider: HTMLInputElement) {
       const percent =
-        ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+        ((Number(slider.value) - Number(slider.min)) /
+          (Number(slider.max) - Number(slider.min))) *
+        100;
       slider.style.setProperty("--progress", `${percent}%`);
     }
 
     document
-      .querySelectorAll("#bots-count, #private-lobby-bots-count")
+      .querySelectorAll<HTMLInputElement>(
+        "#bots-count, #private-lobby-bots-count",
+      )
       .forEach((slider) => {
         updateSliderProgress(slider);
         slider.addEventListener("input", () => updateSliderProgress(slider));
