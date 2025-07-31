@@ -349,6 +349,9 @@ export class DefaultConfig implements Config {
   bomberExplosionRadius(): number {
     return 4;
   }
+  bomberSpeed(): number {
+    return 3;
+  }
 
   // Fighter Jets
   fighterJetPatrolRange(): number {
@@ -361,7 +364,7 @@ export class DefaultConfig implements Config {
     return 15;
   }
   fighterJetSpeed(): number {
-    return 2;
+    return 3;
   }
   fighterJetHealingAmount(): number {
     return 1;

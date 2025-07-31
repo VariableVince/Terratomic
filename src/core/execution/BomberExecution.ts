@@ -66,7 +66,11 @@ export class BomberExecution implements Execution {
       ? this.sourceAirfield.tile()
       : this.targetTile;
 
-    const step = this.pathFinder.nextTile(this.bomber.tile(), destination, 2);
+    const step = this.pathFinder.nextTile(
+      this.bomber.tile(),
+      destination,
+      this.mg.config().bomberSpeed(),
+    );
 
     if (step === true) {
       if (!this.returning && this.bombsLeft > 0) {

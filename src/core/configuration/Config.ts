@@ -136,6 +136,7 @@ export interface Config {
   bomberSpawnInterval(): number;
   bomberTargetRange(): number;
   bomberExplosionRadius(): number;
+  bomberSpeed(): number;
   safeFromPiratesCooldownMax(): number;
   defensePostRange(): number;
   SAMNukeCooldown(): number;
