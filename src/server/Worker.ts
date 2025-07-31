@@ -395,7 +395,8 @@ export function startWorker() {
             // Handle game not found case
           }
         } catch (error) {
-          // Handle other message types
+          ws.removeAllListeners();
+          ws.close(1011, "Internal server error");
           log.warn(
             `error handling websocket message for ${ipAnonymize(ip)}: ${error}`.substring(
               0,
@@ -411,6 +412,9 @@ export function startWorker() {
       if ((error as any).code === "WS_ERR_UNEXPECTED_RSV_1") {
         ws.close(1002, "WS_ERR_UNEXPECTED_RSV_1");
       }
+    });
+    ws.on("close", () => {
+      ws.removeAllListeners();
     });
   });
 
