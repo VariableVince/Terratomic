@@ -291,7 +291,7 @@ export class RadialMenu implements Layer {
         return;
       }
     } else {
-      if (this.g.owner(tile).isPlayer() || this.g.owner(tile) === myPlayer) {
+      if (this.g.owner(tile).isPlayer() ?? this.g.owner(tile) === myPlayer) {
         this.closeMenu();
         return;
       }

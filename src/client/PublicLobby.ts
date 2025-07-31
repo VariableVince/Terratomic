@@ -92,7 +92,7 @@ export class PublicLobby extends LitElement {
 
     const teamCount =
       lobby.gameConfig.gameMode === GameMode.Team
-        ? lobby.gameConfig.playerTeams || 0
+        ? (lobby.gameConfig.playerTeams ?? 0)
         : null;
 
     return html`
