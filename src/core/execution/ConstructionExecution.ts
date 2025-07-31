@@ -148,7 +148,10 @@ export class ConstructionExecution implements Execution {
         this.mg.addExecution(new AirfieldExecution(player, this.tile));
         break;
       default:
-        throw Error(`unit type ${this.constructionType} not supported`);
+        console.warn(
+          `unit type ${this.constructionType} cannot be constructed`,
+        );
+        break;
     }
   }
 
