@@ -55,11 +55,15 @@ export class AllianceExtensionExecution implements Execution {
         "alliance.renewed",
         MessageType.ALLIANCE_ACCEPTED,
         from.id(),
+        undefined,
+        { name: this.to.displayName() },
       );
       mg.displayMessage(
         "alliance.renewed",
         MessageType.ALLIANCE_ACCEPTED,
         this.to.id(),
+        undefined,
+        { name: from.displayName() },
       );
     }
 

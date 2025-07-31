@@ -188,6 +188,7 @@ export interface DisplayMessageUpdate {
   messageType: MessageType;
   goldAmount?: bigint;
   playerID: number | null;
+  params?: Record<string, string | number>;
 }
 
 export type DisplayChatMessageUpdate = {
