@@ -336,7 +336,6 @@ class Client {
           "top-bar",
           "help-modal",
           "user-setting",
-          "territory-patterns-modal",
           "language-modal",
           "news-modal",
         ].forEach((tag) => {
