@@ -91,7 +91,7 @@ export const OTHER_INDEX_CAPTURE = 2; // Structures captured
 export const OTHER_INDEX_LOST = 3; // Structures/warships destroyed/captured by others
 
 const BigIntStringSchema = z.preprocess((val) => {
-  if (typeof val === "string" && /^\d+$/.test(val)) return BigInt(val);
+  if (typeof val === "string" && /^-?\d+$/.test(val)) return BigInt(val);
   if (typeof val === "bigint") return val;
   return val;
 }, z.bigint());
