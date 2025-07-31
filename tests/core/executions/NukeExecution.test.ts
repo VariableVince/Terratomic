@@ -1,5 +1,11 @@
 import { NukeExecution } from "../../../src/core/execution/NukeExecution";
-import { Game, Player, UnitType } from "../../../src/core/game/Game";
+import {
+  Game,
+  Player,
+  PlayerInfo,
+  PlayerType,
+  UnitType,
+} from "../../../src/core/game/Game";
 import { setup } from "../../util/Setup";
 import { TestConfig } from "../../util/TestConfig";
 import { executeTicks } from "../../util/utils";
@@ -10,7 +16,26 @@ let otherPlayer: Player;
 
 describe("NukeExecution", () => {
   beforeEach(async () => {
-    game = await setup("BigPlains", { infiniteGold: true, instantBuild: true });
+    game = await setup(
+      "BigPlains",
+      { infiniteGold: true, instantBuild: true },
+      [
+        new PlayerInfo(
+          "us",
+          "player",
+          PlayerType.Human,
+          "client_id1",
+          "player_id",
+        ),
+        new PlayerInfo(
+          "us",
+          "other",
+          PlayerType.Human,
+          "client_id2",
+          "other_id",
+        ),
+      ],
+    );
 
     (game.config() as TestConfig).nukeMagnitudes = jest.fn(() => ({
       inner: 10,
