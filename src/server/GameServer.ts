@@ -203,6 +203,7 @@ export class GameServer {
               } satisfies ServerErrorMessage),
             );
             client.ws.close(1002, "ClientMessageSchema");
+            client.ws.removeAllListeners();
             return;
           }
           const clientMsg = parsed.data;
@@ -260,6 +261,7 @@ export class GameServer {
     });
     client.ws.on("error", (error: Error) => {
       if ((error as any).code === "WS_ERR_UNEXPECTED_RSV_1") {
+        client.ws.removeAllListeners();
         client.ws.close(1002, "WS_ERR_UNEXPECTED_RSV_1");
       }
     });
@@ -460,6 +462,7 @@ export class GameServer {
         });
         if (client.ws.readyState === WebSocket.OPEN) {
           client.ws.close(1000, "no heartbeats received, closing connection");
+          client.ws.removeAllListeners();
         }
       } else {
         alive.push(client);
