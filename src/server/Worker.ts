@@ -10,7 +10,7 @@ import { GameEnv } from "../core/configuration/Config";
 import { getServerConfigFromServer } from "../core/configuration/ConfigLoader";
 import { GameType } from "../core/game/Game";
 import {
-  ClientJoinMessageSchema,
+  ClientMessageSchema,
   GameRecord,
   GameRecordSchema,
   ServerErrorMessage,
@@ -297,12 +297,12 @@ export function startWorker() {
 
         try {
           // Parse and handle client messages
-          const parsed = ClientJoinMessageSchema.safeParse(
+          const parsed = ClientMessageSchema.safeParse(
             JSON.parse(message.toString()),
           );
           if (!parsed.success) {
             const error = z.prettifyError(parsed.error);
-            log.warn("Error parsing join message client", error);
+            log.warn("Error parsing client message", error);
             ws.send(
               JSON.stringify({
                 type: "error",
@@ -313,6 +313,22 @@ export function startWorker() {
             return;
           }
           const clientMsg = parsed.data;
+
+          if (clientMsg.type === "ping") {
+            // Ignore ping
+            return;
+          } else if (clientMsg.type !== "join") {
+            const error = `Invalid message before join: ${JSON.stringify(clientMsg)}`;
+            log.warn(error);
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                error,
+              } satisfies ServerErrorMessage),
+            );
+            ws.close(1002, "ClientJoinMessageSchema");
+            return;
+          }
 
           // Verify this worker should handle this game
           const expectedWorkerId = config.workerIndex(clientMsg.gameID);
