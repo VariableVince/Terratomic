@@ -1,17 +1,12 @@
 import { NukeExecution } from "../../../src/core/execution/NukeExecution";
-import {
-  Game,
-  Player,
-  PlayerInfo,
-  PlayerType,
-  UnitType,
-} from "../../../src/core/game/Game";
+import { Game, Player, UnitType } from "../../../src/core/game/Game";
 import { setup } from "../../util/Setup";
 import { TestConfig } from "../../util/TestConfig";
 import { executeTicks } from "../../util/utils";
 
 let game: Game;
 let player: Player;
+let otherPlayer: Player;
 
 describe("NukeExecution", () => {
   beforeEach(async () => {
@@ -21,20 +16,14 @@ describe("NukeExecution", () => {
       inner: 10,
       outer: 10,
     }));
-    const player_info = new PlayerInfo(
-      "us",
-      "player_id",
-      PlayerType.Human,
-      null,
-      "player_id",
-    );
-    game.addPlayer(player_info);
+    (game.config() as TestConfig).nukeAllianceBreakThreshold = jest.fn(() => 5);
 
     while (game.inSpawnPhase()) {
       game.executeNextTick();
     }
 
     player = game.player("player_id");
+    otherPlayer = game.player("other_id");
   });
 
   test("nuke should destroy buildings and redraw out of range buildings", async () => {
@@ -91,5 +80,30 @@ describe("NukeExecution", () => {
     //near target should be targetable (distance target < 400)
     executeTicks(game, 35);
     expect(nukeExec.getNuke()!.isTargetable()).toBeTruthy();
+  });
+
+  test("nuke should break alliances on launch", async () => {
+    const req = player.createAllianceRequest(otherPlayer);
+    req!.accept();
+
+    player.conquer(game.ref(1, 1));
+    player.buildUnit(UnitType.MissileSilo, game.ref(1, 1), {});
+
+    for (let x = 90; x < 99; x++) {
+      for (let y = 90; y < 99; y++) {
+        otherPlayer.conquer(game.ref(x, y));
+      }
+    }
+
+    // Add a nuke targeting just outside the other player's territory.
+    game.addExecution(
+      new NukeExecution(UnitType.AtomBomb, player, game.ref(85, 85), null),
+    );
+
+    game.executeNextTick(); // init
+    game.executeNextTick(); // exec
+
+    expect(player.isTraitor()).toBe(true);
+    expect(player.isAlliedWith(otherPlayer)).toBe(false);
   });
 });
