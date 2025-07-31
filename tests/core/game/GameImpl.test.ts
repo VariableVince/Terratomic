@@ -26,6 +26,7 @@ describe("GameImpl", () => {
       infiniteTroops: true,
     });
     const attackerInfo = new PlayerInfo(
+      "us", // flag
       "attacker dude",
       PlayerType.Human,
       null,
@@ -33,6 +34,7 @@ describe("GameImpl", () => {
     );
     game.addPlayer(attackerInfo);
     const defenderInfo = new PlayerInfo(
+      "us", // flag
       "defender dude",
       PlayerType.Human,
       null,

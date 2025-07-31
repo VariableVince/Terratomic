@@ -196,6 +196,8 @@ export class UnitGrid {
     if (!this.isValidCell(gridX, gridY)) {
       return [];
     }
-    return Array.from(this.grid[gridY][gridX]).filter((u) => u.tile() === tile);
+    return Array.from(this.grid[gridY][gridX].values())
+      .flatMap((unitSet) => Array.from(unitSet))
+      .filter((u) => u.tile() === tile);
   }
 }
