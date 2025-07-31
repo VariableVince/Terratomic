@@ -752,9 +752,6 @@ export class GameImpl implements Game {
   removeUnit(u: Unit) {
     u.owner().invalidateEffectiveUnitsCache(u.type());
     this.unitGrid.removeUnit(u);
-    if (u.hasTrainStation()) {
-      this._railNetwork.removeStation(u);
-    }
   }
   updateUnitTile(u: Unit) {
     this.unitGrid.updateUnitCell(u);
