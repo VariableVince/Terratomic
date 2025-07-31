@@ -5,7 +5,7 @@ import ipAnonymize from "ip-anonymize";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocket, WebSocketServer } from "ws";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { GameEnv } from "../core/configuration/Config";
 import { getServerConfigFromServer } from "../core/configuration/ConfigLoader";
 import { GameType } from "../core/game/Game";
