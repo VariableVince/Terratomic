@@ -136,32 +136,26 @@ export class FakeHumanExecution implements Execution {
       return;
     }
 
-    if (this.behavior === null) {
-      // Player is unavailable during init()
-      this.behavior = new BotBehavior(
-        this.random,
-        this.mg,
-        this.player,
-        this.triggerRatio,
-        this.reserveRatio,
-      );
-    }
+    // Player is unavailable during init()
+    this.behavior ??= new BotBehavior(
+      this.random,
+      this.mg,
+      this.player,
+      this.triggerRatio,
+      this.reserveRatio,
+    );
 
-    if (this.nukeHelper === null) {
-      this.nukeHelper = new NukeExecutionHelper(
-        this.random,
-        this.mg,
-        this.player,
-      );
-    }
+    this.nukeHelper ??= new NukeExecutionHelper(
+      this.random,
+      this.mg,
+      this.player,
+    );
 
-    if (this.unitCreationHelper === null) {
-      this.unitCreationHelper = new UnitCreationHelper(
-        this.random,
-        this.mg,
-        this.player,
-      );
-    }
+    this.unitCreationHelper ??= new UnitCreationHelper(
+      this.random,
+      this.mg,
+      this.player,
+    );
 
     if (this.firstMove) {
       this.firstMove = false;

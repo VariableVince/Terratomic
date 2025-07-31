@@ -121,7 +121,7 @@ export class UILayer implements Layer {
             return;
           }
           const endTick =
-            this.game.unitInfo(constructionType).constructionDuration || 0;
+            this.game.unitInfo(constructionType).constructionDuration ?? 0;
           this.drawLoadingBar(unit, endTick);
         }
         break;

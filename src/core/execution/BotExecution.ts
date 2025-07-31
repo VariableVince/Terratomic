@@ -41,15 +41,13 @@ export class BotExecution implements Execution {
       return;
     }
 
-    if (this.behavior === null) {
-      this.behavior = new BotBehavior(
-        this.random,
-        this.mg,
-        this.bot,
-        this.triggerRatio,
-        this.reserveRatio,
-      );
-    }
+    this.behavior ??= new BotBehavior(
+      this.random,
+      this.mg,
+      this.bot,
+      this.triggerRatio,
+      this.reserveRatio,
+    );
 
     this.maybeAttack();
   }
