@@ -313,7 +313,6 @@ export function startWorker() {
                 error: error.toString(),
               } satisfies ServerErrorMessage),
             );
-            ws.removeAllListeners();
             ws.close(1002, "ClientJoinMessageSchema");
             return;
           }
@@ -331,7 +330,6 @@ export function startWorker() {
                 error,
               } satisfies ServerErrorMessage),
             );
-            ws.removeAllListeners();
             ws.close(1002, "ClientJoinMessageSchema");
             return;
           }
@@ -348,7 +346,6 @@ export function startWorker() {
           const result = await verifyClientToken(clientMsg.token, config);
           if (result === false) {
             log.warn("Unauthorized: Invalid token");
-            ws.removeAllListeners();
             ws.close(1002, "Unauthorized");
             return;
           }
@@ -363,7 +360,6 @@ export function startWorker() {
             const result = await getUserMe(clientMsg.token, config);
             if (result === false) {
               log.warn("Unauthorized: Invalid session");
-              ws.removeAllListeners();
               ws.close(1002, "Unauthorized");
               return;
             }
@@ -395,7 +391,6 @@ export function startWorker() {
             // Handle game not found case
           }
         } catch (error) {
-          ws.removeAllListeners();
           ws.close(1011, "Internal server error");
           log.warn(
             `error handling websocket message for ${ipAnonymize(ip)}: ${error}`.substring(
@@ -408,7 +403,6 @@ export function startWorker() {
     );
 
     ws.on("error", (error: Error) => {
-      ws.removeAllListeners();
       if ((error as any).code === "WS_ERR_UNEXPECTED_RSV_1") {
         ws.close(1002, "WS_ERR_UNEXPECTED_RSV_1");
       }
