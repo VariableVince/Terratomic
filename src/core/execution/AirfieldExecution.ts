@@ -86,22 +86,37 @@ export class AirfieldExecution implements Execution {
     if (this.spawnTicker < mg.config().bomberSpawnInterval()) return;
     this.spawnTicker = 0;
 
-    // NEW: Use bomber intent if set
+    const findAndLaunchBomber = (targets: Unit[]) => {
+      for (const targetUnit of targets) {
+        const currentBombers =
+          this.player.bombersOnTarget.get(targetUnit.tile()) ?? 0;
+        if (currentBombers < 6) {
+          mg.addExecution(
+            new BomberExecution(
+              this.player,
+              airfieldUnit,
+              targetUnit.tile(),
+              this.player.bombersOnTarget,
+            ),
+          );
+          this.player.bombersOnTarget.set(
+            targetUnit.tile(),
+            currentBombers + 1,
+          );
+          return true;
+        }
+      }
+      return false;
+    };
+
     const intent = this.player.getBomberIntent?.();
     if (intent?.targetPlayerID && intent?.structure) {
       const targetPlayer = mg.player(intent.targetPlayerID);
       if (targetPlayer && !this.player.isFriendly(targetPlayer)) {
         const targets = targetPlayer.units(intent.structure);
-        const availableTargets = targets;
-
-        if (availableTargets.length > 0) {
-          const targetUnit = this.random.randElement(availableTargets);
-          mg.addExecution(
-            new BomberExecution(this.player, airfieldUnit, targetUnit.tile()),
-          );
+        if (findAndLaunchBomber(targets)) {
           return;
         }
-        // fallback to default logic
       }
     }
 
@@ -110,8 +125,7 @@ export class AirfieldExecution implements Execution {
       return;
     }
     const range = mg.config().bomberTargetRange();
-    type Near = { unit: Unit; dist2: number };
-    const enemies: Near[] = mg
+    const enemies = mg
       .nearbyUnits(airfieldUnit.tile(), range, [
         UnitType.SAMLauncher,
         UnitType.Airfield,
@@ -122,9 +136,8 @@ export class AirfieldExecution implements Execution {
         UnitType.Academy,
         UnitType.Hospital,
       ])
-      .filter(({ unit, distSquared }) => {
-        const t = unit.tile();
-        const o = mg.owner(t);
+      .filter(({ unit }) => {
+        const o = mg.owner(unit.tile());
         return (
           o.isPlayer() &&
           o.id() !== this.player.id() &&
@@ -134,22 +147,6 @@ export class AirfieldExecution implements Execution {
       .map(({ unit, distSquared }) => ({ unit, dist2: distSquared }));
 
     if (enemies.length === 0) return;
-
-    const byPlayer = new Map<string, Near[]>();
-    for (const e of enemies) {
-      const pid = e.unit.owner().id();
-      const arr = byPlayer.get(pid) ?? [];
-      arr.push(e);
-      byPlayer.set(pid, arr);
-    }
-
-    const playersByDist = Array.from(byPlayer.entries())
-      .map(([pid, list]) => ({
-        pid,
-        list,
-        minDist: Math.min(...list.map((e) => e.dist2)),
-      }))
-      .sort((a, b) => a.minDist - b.minDist);
 
     const priority: UnitType[] = [
       UnitType.SAMLauncher,
@@ -162,22 +159,18 @@ export class AirfieldExecution implements Execution {
       UnitType.Hospital,
     ];
 
-    let targetTile: TileRef | null = null;
-    for (const { list } of playersByDist) {
-      for (const type of priority) {
-        const ofType = list
-          .filter((e) => e.unit.type() === type)
-          .sort((a, b) => a.dist2 - b.dist2);
-        if (ofType.length > 0) {
-          targetTile = ofType[0].unit.tile();
-          break;
-        }
+    const sortedEnemies = enemies.sort((a, b) => {
+      const priorityA = priority.indexOf(a.unit.type());
+      const priorityB = priority.indexOf(b.unit.type());
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
       }
-      if (targetTile) break;
-    }
+      return a.dist2 - b.dist2;
+    });
 
-    if (!targetTile) return;
-    mg.addExecution(new BomberExecution(this.player, airfieldUnit, targetTile));
+    const potentialTargets = sortedEnemies.map((e) => e.unit);
+
+    findAndLaunchBomber(potentialTargets);
   }
 
   isActive(): boolean {

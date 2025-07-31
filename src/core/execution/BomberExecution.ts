@@ -15,6 +15,7 @@ export class BomberExecution implements Execution {
     private origOwner: Player,
     private sourceAirfield: Unit,
     private targetTile: TileRef,
+    private bombersOnTarget: Map<TileRef, number>,
   ) {}
 
   init(mg: Game, ticks: number): void {
@@ -31,6 +32,10 @@ export class BomberExecution implements Execution {
       );
       if (!spawn) {
         this.active = false;
+        this.bombersOnTarget.set(
+          this.targetTile,
+          (this.bombersOnTarget.get(this.targetTile) ?? 1) - 1,
+        );
         return;
       }
       this.bomber = this.origOwner.buildUnit(UnitType.Bomber, spawn, {
@@ -39,6 +44,10 @@ export class BomberExecution implements Execution {
     }
     if (!this.bomber.isActive()) {
       this.active = false;
+      this.bombersOnTarget.set(
+        this.targetTile,
+        (this.bombersOnTarget.get(this.targetTile) ?? 1) - 1,
+      );
       return;
     }
     if (!this.returning && this.bombsLeft > 0) {
@@ -65,6 +74,10 @@ export class BomberExecution implements Execution {
       } else if (this.returning) {
         this.bomber.delete(true);
         this.active = false;
+        this.bombersOnTarget.set(
+          this.targetTile,
+          (this.bombersOnTarget.get(this.targetTile) ?? 1) - 1,
+        );
       }
       return;
     }

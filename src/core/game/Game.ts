@@ -607,6 +607,7 @@ export interface Player {
     intent: { targetPlayerID: string; structure: UnitType } | null,
   ): void;
   getBomberIntent(): { targetPlayerID: string; structure: UnitType } | null;
+  bombersOnTarget: Map<TileRef, number>;
 
   setAutoBombingEnabled(enabled: boolean): void;
   isAutoBombingEnabled(): boolean;

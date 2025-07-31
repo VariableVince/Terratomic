@@ -112,6 +112,7 @@ export class PlayerImpl implements Player {
   private bomberIntent: { targetPlayerID: string; structure: UnitType } | null =
     null;
   private _autoBombingEnabled: boolean = false;
+  public bombersOnTarget = new Map<TileRef, number>();
 
   constructor(
     private mg: GameImpl,
