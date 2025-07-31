@@ -908,7 +908,7 @@ export class DefaultConfig implements Config {
   nukeMagnitudes(unitType: UnitType): NukeMagnitude {
     switch (unitType) {
       case UnitType.MIRVWarhead:
-        return { inner: 25, outer: 30 };
+        return { inner: 12, outer: 18 };
       case UnitType.AtomBomb:
         return { inner: 12, outer: 30 };
       case UnitType.HydrogenBomb:
