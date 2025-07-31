@@ -231,8 +231,7 @@ export const SpawnIntentSchema = BaseIntentSchema.extend({
   name: UsernameSchema,
   flag: FlagSchema,
   playerType: PlayerTypeSchema,
-  x: z.number(),
-  y: z.number(),
+  tile: z.number(),
 });
 
 export const BoatAttackIntentSchema = BaseIntentSchema.extend({
@@ -310,8 +309,7 @@ export const InvestmentRateIntentSchema = BaseIntentSchema.extend({
 export const BuildUnitIntentSchema = BaseIntentSchema.extend({
   type: z.literal("build_unit"),
   unit: z.enum(UnitType),
-  x: z.number(),
-  y: z.number(),
+  tile: z.number(),
 });
 
 export const CancelAttackIntentSchema = BaseIntentSchema.extend({

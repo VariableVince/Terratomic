@@ -1,4 +1,4 @@
-import { Cell, Execution, Game } from "../game/Game";
+import { Execution, Game } from "../game/Game";
 import { PseudoRandom } from "../PseudoRandom";
 import { ClientID, GameID, Intent, Turn } from "../Schemas";
 import { simpleHash } from "../Util";
@@ -79,10 +79,7 @@ export class Executor {
         );
 
       case "spawn":
-        return new SpawnExecution(
-          player.info(),
-          this.mg.ref(intent.x, intent.y),
-        );
+        return new SpawnExecution(player.info(), intent.tile);
       case "boat":
         const src = intent.src ?? null;
         return new TransportShipExecution(
@@ -121,11 +118,8 @@ export class Executor {
       case "embargo":
         return new EmbargoExecution(player, intent.targetID, intent.action);
       case "build_unit":
-        return new ConstructionExecution(
-          player,
-          intent.unit,
-          new Cell(intent.x, intent.y),
-        );
+        return new ConstructionExecution(player, intent.unit, intent.tile);
+
       case "quick_chat":
         return new QuickChatExecution(
           player,

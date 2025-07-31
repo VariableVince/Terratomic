@@ -16,7 +16,7 @@ import samlauncherIcon from "../../../../resources/images/SamLauncherIconWhite.s
 import shieldIcon from "../../../../resources/images/ShieldIconWhite.svg";
 import { translateText } from "../../../client/Utils";
 import { EventBus } from "../../../core/EventBus";
-import { Cell, Gold, PlayerActions, UnitType } from "../../../core/game/Game";
+import { Gold, PlayerActions, UnitType } from "../../../core/game/Game";
 import { TileRef } from "../../../core/game/GameMap";
 import { GameView } from "../../../core/game/GameView";
 import { BuildUnitIntentEvent } from "../../Transport";
@@ -366,10 +366,7 @@ export class BuildMenu extends LitElement implements Layer {
 
   public onBuildSelected = (item: BuildItemDisplay) => {
     this.eventBus.emit(
-      new BuildUnitIntentEvent(
-        item.unitType,
-        new Cell(this.game.x(this.clickedTile), this.game.y(this.clickedTile)),
-      ),
+      new BuildUnitIntentEvent(item.unitType, this.clickedTile),
     );
     this.hideMenu();
   };

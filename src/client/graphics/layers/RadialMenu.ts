@@ -459,7 +459,7 @@ export class RadialMenu implements Layer {
     if (this.clickedCell === null) return;
     const clicked = this.g.ref(this.clickedCell.x, this.clickedCell.y);
     if (this.g.inSpawnPhase()) {
-      this.eventBus.emit(new SendSpawnIntentEvent(this.clickedCell));
+      this.eventBus.emit(new SendSpawnIntentEvent(clicked));
     } else {
       const myPlayer = this.g.myPlayer();
       if (myPlayer !== null && this.g.owner(clicked) !== myPlayer) {

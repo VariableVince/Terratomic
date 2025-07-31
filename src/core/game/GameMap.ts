@@ -5,7 +5,7 @@ export type TileUpdate = bigint;
 
 export interface GameMap {
   ref(x: number, y: number): TileRef;
-
+  isValidRef(ref: TileRef): boolean;
   x(ref: TileRef): number;
   y(ref: TileRef): number;
   cell(ref: TileRef): Cell;
