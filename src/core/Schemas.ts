@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import quickChatData from "../../resources/QuickChat.json" with { type: "json" };
+import countries from "../client/data/countries.json" with { type: "json" };
 import {
   AllPlayers,
   Difficulty,
@@ -191,7 +192,19 @@ export const ID = z
 export const AllPlayersStatsSchema = z.record(ID, PlayerStatsSchema);
 
 export const UsernameSchema = SafeString;
-export const FlagSchema = z.string().max(128).optional();
+const countryCodes = countries.map((c) => c.code);
+export const FlagSchema = z
+  .string()
+  .max(128)
+  .optional()
+  .refine(
+    (val) => {
+      if (val === undefined || val === "") return true;
+      if (val.startsWith("!")) return true;
+      return countryCodes.includes(val);
+    },
+    { message: "Invalid flag: must be a valid country code or start with !" },
+  );
 
 export const QuickChatKeySchema = z.enum(
   Object.entries(quickChatData).flatMap(([category, entries]) =>
