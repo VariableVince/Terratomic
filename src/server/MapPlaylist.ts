@@ -40,6 +40,8 @@ const frequency = {
   FalklandIslands: 1,
   Baikal: 1,
   Halkidiki: 1,
+  StraitOfGibraltar: 1,
+  Italia: 1,
 };
 
 interface MapWithMode {
