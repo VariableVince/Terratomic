@@ -1,4 +1,4 @@
-import { Execution, Game } from "../game/Game";
+import { Cell, Execution, Game } from "../game/Game";
 import { PseudoRandom } from "../PseudoRandom";
 import { ClientID, GameID, Intent, Turn } from "../Schemas";
 import { simpleHash } from "../Util";
@@ -123,8 +123,8 @@ export class Executor {
       case "build_unit":
         return new ConstructionExecution(
           player,
-          this.mg.ref(intent.x, intent.y),
           intent.unit,
+          new Cell(intent.x, intent.y),
         );
       case "quick_chat":
         return new QuickChatExecution(

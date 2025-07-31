@@ -53,7 +53,7 @@ export class UnitCreationHelper {
 
     if (chosenType !== null && chosenTile !== null) {
       this.mg.addExecution(
-        new ConstructionExecution(this.player, chosenTile, chosenType),
+        new ConstructionExecution(this.player, chosenType, chosenTile),
       );
       return true;
     }
@@ -111,7 +111,7 @@ export class UnitCreationHelper {
     if (canBuild === false) {
       return false;
     }
-    this.mg.addExecution(new ConstructionExecution(this.player, tile, type));
+    this.mg.addExecution(new ConstructionExecution(this.player, type, tile));
     return true;
   }
 
@@ -173,7 +173,7 @@ export class UnitCreationHelper {
         return false;
       }
       this.mg.addExecution(
-        new ConstructionExecution(this.player, targetTile, UnitType.Warship),
+        new ConstructionExecution(this.player, UnitType.Warship, targetTile),
       );
       return true;
     }
@@ -223,7 +223,7 @@ export class UnitCreationHelper {
       const tile = this.findSuitableDefensePostTile(frontlineBorders);
       if (tile && this.player.canBuild(UnitType.DefensePost, tile)) {
         this.mg.addExecution(
-          new ConstructionExecution(this.player, tile, UnitType.DefensePost),
+          new ConstructionExecution(this.player, UnitType.DefensePost, tile),
         );
         return true;
       }
@@ -258,7 +258,7 @@ export class UnitCreationHelper {
       if (!this.player.canBuild(UnitType.SAMLauncher, buildTile)) continue;
 
       this.mg.addExecution(
-        new ConstructionExecution(this.player, buildTile, UnitType.SAMLauncher),
+        new ConstructionExecution(this.player, UnitType.SAMLauncher, buildTile),
       );
       return true; // build one SAM per tick at most
     }
