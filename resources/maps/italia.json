@@ -1,15 +1,7 @@
 {
-  "map": {
-    "height": 1273,
-    "num_land_tiles": 807868,
-    "width": 1361
-  },
-  "mini_map": {
-    "height": 636,
-    "num_land_tiles": 199974,
-    "width": 680
-  },
   "name": "Italia",
+  "width": 1361,
+  "height": 1273,
   "nations": [
     {
       "coordinates": [1038, 993],

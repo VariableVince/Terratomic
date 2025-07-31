@@ -14,12 +14,14 @@ import faroeislands from "../../../resources/maps/FaroeIslandsThumb.webp";
 import gatewayToTheAtlantic from "../../../resources/maps/GatewayToTheAtlanticThumb.webp";
 import halkidiki from "../../../resources/maps/HalkidikiThumb.webp";
 import iceland from "../../../resources/maps/IcelandThumb.webp";
+import italia from "../../../resources/maps/ItaliaThumb.webp";
 import mars from "../../../resources/maps/MarsThumb.webp";
 import mena from "../../../resources/maps/MenaThumb.webp";
 import northAmerica from "../../../resources/maps/NorthAmericaThumb.webp";
 import oceania from "../../../resources/maps/OceaniaThumb.webp";
 import pangaea from "../../../resources/maps/PangaeaThumb.webp";
 import southAmerica from "../../../resources/maps/SouthAmericaThumb.webp";
+import straitofgibraltar from "../../../resources/maps/StraitOfGibraltarThumb.webp";
 import worldmapgiant from "../../../resources/maps/WorldMapGiantThumb.webp";
 import world from "../../../resources/maps/WorldMapThumb.webp";
 
@@ -75,6 +77,10 @@ export function getMapsImage(map: GameMapType): string {
       return baikal;
     case GameMapType.Halkidiki:
       return halkidiki;
+    case GameMapType.StraitOfGibraltar:
+      return straitofgibraltar;
+    case GameMapType.Italia:
+      return italia;
     default:
       return "";
   }

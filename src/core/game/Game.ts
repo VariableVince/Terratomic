@@ -108,8 +108,6 @@ export const mapCategories: Record<string, GameMapType[]> = {
     GameMapType.FalklandIslands,
     GameMapType.Baikal,
     GameMapType.Halkidiki,
-    GameMapType.StraitOfGibraltar,
-    GameMapType.Italia,
   ],
   fantasy: [
     GameMapType.Pangaea,
