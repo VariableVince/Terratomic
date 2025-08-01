@@ -350,7 +350,7 @@ export class DefaultConfig implements Config {
     return 4;
   }
   bomberSpeed(): number {
-    return 3;
+    return 2;
   }
 
   // Fighter Jets
@@ -364,7 +364,7 @@ export class DefaultConfig implements Config {
     return 15;
   }
   fighterJetSpeed(): number {
-    return 3;
+    return 2;
   }
   fighterJetHealingAmount(): number {
     return 1;
