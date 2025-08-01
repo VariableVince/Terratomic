@@ -66,26 +66,37 @@ export class BomberExecution implements Execution {
       ? this.sourceAirfield.tile()
       : this.targetTile;
 
-    const step = this.pathFinder.nextTile(
-      this.bomber.tile(),
-      destination,
-      this.mg.config().bomberSpeed(),
-    );
+    const speed = this.mg.config().bomberSpeed();
+    for (let i = 0; i < speed; i++) {
+      const step = this.pathFinder.nextTile(this.bomber.tile(), destination, 1);
 
-    if (step === true) {
-      if (!this.returning && this.bombsLeft > 0) {
-        this.dropBomb();
-      } else if (this.returning) {
-        this.bomber.delete(true);
-        this.active = false;
-        this.bombersOnTarget.set(
-          this.targetTile,
-          (this.bombersOnTarget.get(this.targetTile) ?? 1) - 1,
-        );
+      if (step === true) {
+        if (!this.returning && this.bombsLeft > 0) {
+          this.dropBomb();
+        } else if (this.returning) {
+          this.bomber.delete(true);
+          this.active = false;
+          this.bombersOnTarget.set(
+            this.targetTile,
+            (this.bombersOnTarget.get(this.targetTile) ?? 1) - 1,
+          );
+        }
+        return;
       }
-      return;
+
+      this.bomber.move(step);
+
+      if (
+        !this.returning &&
+        this.bombsLeft > 0 &&
+        ++this.dropTicker >= this.mg.config().bomberDropCadence() &&
+        this.mg.euclideanDistSquared(this.bomber.tile(), this.targetTile) <= 1
+      ) {
+        this.dropBomb();
+        this.dropTicker = 0;
+        return;
+      }
     }
-    this.bomber.move(step);
   }
 
   private dropBomb(): void {
