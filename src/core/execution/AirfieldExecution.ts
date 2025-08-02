@@ -1,4 +1,12 @@
-import { Execution, Game, Player, Unit, UnitType } from "../game/Game";
+import {
+  Execution,
+  Game,
+  Player,
+  PlayerType,
+  Relation,
+  Unit,
+  UnitType,
+} from "../game/Game";
 import { TileRef } from "../game/GameMap";
 import { PseudoRandom } from "../PseudoRandom";
 import { BomberExecution } from "./BomberExecution";
@@ -141,7 +149,9 @@ export class AirfieldExecution implements Execution {
         return (
           o.isPlayer() &&
           o.id() !== this.player.id() &&
-          !this.player.isFriendly(o)
+          (this.player.type() === PlayerType.FakeHuman
+            ? this.player.relation(o) <= Relation.Hostile
+            : !this.player.isFriendly(o))
         );
       })
       .map(({ unit, distSquared }) => ({ unit, dist2: distSquared }));

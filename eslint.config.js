@@ -30,6 +30,7 @@ export default [
             "postcss.config.js",
             "tailwind.config.js",
             "webpack.config.js",
+            "Terrain-Viewer/render.js",
           ],
         },
         tsconfigRootDir: import.meta.dirname,

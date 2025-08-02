@@ -6,11 +6,13 @@ import {
   Relation,
   TerraNullius,
   Tick,
+  UnitType,
 } from "../../game/Game";
 import { PseudoRandom } from "../../PseudoRandom";
 import { flattenedEmojiTable } from "../../Util";
 import { AttackExecution } from "../AttackExecution";
 import { EmojiExecution } from "../EmojiExecution";
+import { SetAutoBombingExecution } from "../SetAutoBombingExecution";
 
 export class BotBehavior {
   private enemy: Player | null = null;
@@ -35,6 +37,14 @@ export class BotBehavior {
         req.accept();
       } else {
         req.reject();
+      }
+    }
+  }
+
+  handleBombers() {
+    if (this.player.units(UnitType.Airfield).length > 0) {
+      if (!this.player.isAutoBombingEnabled()) {
+        this.game.addExecution(new SetAutoBombingExecution(this.player, true));
       }
     }
   }
