@@ -812,7 +812,10 @@ export class PlayerImpl implements Player {
   }
 
   setInvestmentRate(rate: number): void {
-    this._investmentRate = Math.min(1, Math.max(0, rate));
+    this._investmentRate = Math.min(
+      this.mg.config().maxInvestmentRate(),
+      Math.max(0, rate),
+    );
   }
 
   troops(): number {
@@ -842,7 +845,7 @@ export class PlayerImpl implements Player {
     return this._productivityGrowthPerMinute;
   }
   updateProductivity(): void {
-    const alpha = 0.0005;
+    const alpha = 0.00035;
     const beta = 0.5;
 
     const maxPop = this.mg.config().maxPopulation(this);
@@ -864,6 +867,10 @@ export class PlayerImpl implements Player {
     }
 
     this._productivity *= 1 + growth;
+    if (this._productivity >= this.mg.config().maxProductivity()) {
+      this._productivity = this.mg.config().maxProductivity();
+      this.setInvestmentRate(0);
+    }
     // Store per-minute growth for display
     this._productivityGrowthPerMinute =
       ((1 + growth) ** 600 - 1) * this._productivity;

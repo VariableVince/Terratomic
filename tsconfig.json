@@ -29,7 +29,8 @@
     "resources/**/*",
     "generated/**/*",
     "tests/**/*",
-    "src/scripts"
+    "src/scripts",
+    "Terrain-Viewer/**/*"
   ],
   "exclude": ["node_modules"]
 }
