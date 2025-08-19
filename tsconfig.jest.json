@@ -4,7 +4,9 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "experimentalDecorators": true,
-    "types": ["jest", "node"]
+    "types": ["jest", "node"],
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   },
-  "include": ["tests/**/*"]
+  "include": ["tests/**/*", "tests/**/*.cjs"]
 }

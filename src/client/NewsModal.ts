@@ -17,7 +17,6 @@ export class NewsModal extends LitElement {
 
     .news-container {
       max-height: 60vh;
-      overflow-y: auto;
       padding: 1rem;
       display: flex;
       flex-direction: column;
@@ -49,6 +48,56 @@ export class NewsModal extends LitElement {
         <div class="options-layout">
           <div class="options-section">
             <div class="news-container">
+              <div class="news-content">
+                <p>
+                  This version (v0.1.8) introduces a complete visual overhaul of
+                  the game and a more intuitive building process, all inspired
+                  by a Cold War / WWII military command aesthetic. The new
+                  interface is designed to be more immersive and thematic, with
+                  a focus on providing a clear and concise overview of the game
+                  state.
+                </p>
+                <p>
+                  <strong>Key Features:</strong>
+                </p>
+                <ul>
+                  <li>
+                    <strong>New, Intuitive Build Flow:</strong> The building
+                    process has been reversed to be more user-friendly. You now
+                    <strong
+                      >first select the unit or structure you want to
+                      build</strong
+                    >
+                    from the new build menu, and then you click on the map to
+                    place it.
+                  </li>
+                  <li>
+                    <strong>Redesigned Control Panel:</strong> The main control
+                    panel has been redesigned and now includes tabs for "Build",
+                    "Attack", "Economy", and "Research", making it easier to
+                    access all the game's features.
+                  </li>
+                  <li>
+                    <strong>Integrated Build Menu:</strong> The build menu is
+                    now part of the control panel, allowing for a more
+                    streamlined building experience. It also includes a "Mass
+                    Production" option for building multiple units.
+                  </li>
+                  <li>
+                    <strong>Updated Unit Names:</strong> Several units have been
+                    renamed to better fit the new theme (e.g., "City" is now
+                    "Industrial Complex", "Warship" is now "Destroyer").
+                  </li>
+                  <li>
+                    <strong>Improved Visuals:</strong> The game now features new
+                    background images.
+                  </li>
+                </ul>
+                <p>
+                  This update aims to provide a more engaging, intuitive, and
+                  visually appealing experience for all players.
+                </p>
+              </div>
               <div class="news-content">
                 <p>
                   This test version introduces a new mechanic:

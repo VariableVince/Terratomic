@@ -165,7 +165,8 @@ export class OptionsMenu extends LitElement implements Layer {
         @contextmenu=${(e: MouseEvent) => e.preventDefault()}
       >
         <div
-          class="bg-opacity-60 bg-gray-900 p-1 lg:p-2 rounded-es-sm lg:rounded-lg backdrop-blur-md"
+          class="military-panel p-1 lg:p-2"
+          style="box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);"
         >
           <div class="flex items-stretch gap-1 lg:gap-2">
             ${button({
@@ -195,10 +196,11 @@ export class OptionsMenu extends LitElement implements Layer {
         </div>
 
         <div
-          class="options-menu flex flex-col justify-around gap-y-3 mt-2 bg-opacity-60 bg-gray-900 p-1 lg:p-2 rounded-lg backdrop-blur-md ${!this
+          class="military-panel options-menu flex flex-col justify-around gap-y-3 mt-2 p-1 lg:p-2 ${!this
             .showSettings
             ? "hidden"
             : ""}"
+          style="box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);"
         >
           ${button({
             onClick: this.onTerrainButtonClick,

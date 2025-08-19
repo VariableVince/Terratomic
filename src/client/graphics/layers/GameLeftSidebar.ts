@@ -89,9 +89,10 @@ export class GameLeftSidebar extends LitElement implements Layer {
   render() {
     return html`
       <aside
-        class=${`fixed top-[50px] lg:top-[10px] left-0 z-[1000] flex flex-col max-h-[calc(100vh-80px)] overflow-y-auto p-2 bg-slate-800/40 backdrop-blur-sm shadow-xs rounded-tr-lg rounded-br-lg transition-transform duration-300 ease-out transform ${
+        class=${`military-panel fixed top-[50px] lg:top-[10px] left-0 z-[1000] flex flex-col max-h-[calc(100vh-80px)] overflow-y-auto p-2 transition-transform duration-300 ease-out transform ${
           this.isVisible ? "translate-x-0" : "-translate-x-full"
         }`}
+        style="box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);"
       >
         ${this.isPlayerTeamLabelVisible
           ? html`

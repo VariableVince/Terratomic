@@ -8,6 +8,7 @@ import { BuildMenu } from "./layers/BuildMenu";
 import { ChatDisplay } from "./layers/ChatDisplay";
 import { ChatModal } from "./layers/ChatModal";
 import { ControlPanel } from "./layers/ControlPanel";
+import { ControlPanel2 } from "./layers/ControlPanel2";
 import { EmojiTable } from "./layers/EmojiTable";
 import { EventsDisplay } from "./layers/EventsDisplay";
 import { FxLayer } from "./layers/FxLayer";
@@ -43,6 +44,8 @@ export function createRenderer(
   const uiState: UIState = {
     attackRatio: 0.2, // 20% as a float
     investmentRate: 0.5, // 50% default investment rate
+    pendingBuildUnitType: null,
+    multibuildEnabled: false,
   };
 
   //hide when the game renders
@@ -67,6 +70,7 @@ export function createRenderer(
   }
   buildMenu.game = game;
   buildMenu.eventBus = eventBus;
+  buildMenu.uiState = uiState;
 
   const leaderboard = document.querySelector("leader-board") as Leaderboard;
   if (!leaderboard || !(leaderboard instanceof Leaderboard)) {
@@ -97,6 +101,16 @@ export function createRenderer(
   controlPanel.eventBus = eventBus;
   controlPanel.uiState = uiState;
   controlPanel.game = game;
+
+  const controlPanel2 = document.querySelector(
+    "control-panel2",
+  ) as ControlPanel2;
+  if (!(controlPanel2 instanceof ControlPanel2)) {
+    console.error("ControlPanel2 element not found in the DOM");
+  }
+  controlPanel2.eventBus = eventBus;
+  controlPanel2.uiState = uiState;
+  controlPanel2.game = game;
 
   const eventsDisplay = document.querySelector(
     "events-display",
@@ -210,13 +224,11 @@ export function createRenderer(
     new NameLayer(game, transformHandler, eventBus),
     eventsDisplay,
     chatDisplay,
-    buildMenu,
     new RadialMenu(
       eventBus,
       game,
       transformHandler,
       emojiTable as EmojiTable,
-      buildMenu,
       uiState,
       playerInfo,
       playerPanel,
@@ -225,6 +237,7 @@ export function createRenderer(
     leaderboard,
     gameLeftSidebar,
     controlPanel,
+    controlPanel2,
     playerInfo,
     winModel,
     optionsMenu,

@@ -1,9 +1,9 @@
 .l-header {
-  background: var(--boxBackgroundColor);
-  backdrop-filter: blur(var(--blur-md));
   display: flex;
   justify-content: center;
   padding: 24px 24px 12px;
+  background: black;
+  opacity: 0.5;
 
   @media (min-width: 800px) {
     padding: 24px 24px;

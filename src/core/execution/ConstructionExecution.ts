@@ -148,9 +148,16 @@ export class ConstructionExecution implements Execution {
         this.mg.addExecution(new AirfieldExecution(player, this.tile));
         break;
       default:
-        console.warn(
-          `unit type ${this.constructionType} cannot be constructed`,
+        // Try to build the unit directly if it has no specific execution
+        const spawnTile = this.player.canBuild(
+          this.constructionType,
+          this.tile,
         );
+        if (spawnTile === false) {
+          console.warn(`cannot build ${this.constructionType}`);
+          return;
+        }
+        this.player.buildUnit(this.constructionType, spawnTile, {});
         break;
     }
   }

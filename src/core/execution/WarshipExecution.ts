@@ -42,11 +42,9 @@ export class WarshipExecution implements Execution {
         );
         return;
       }
-      this.warship = this.input.owner.buildUnit(
-        UnitType.Warship,
-        spawn,
-        this.input,
-      );
+      this.warship = this.input.owner.buildUnit(UnitType.Warship, spawn, {
+        patrolTile: this.input.patrolTile,
+      });
     }
   }
 

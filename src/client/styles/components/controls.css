@@ -89,3 +89,83 @@
   background-color: #1d4ed8; /* blue-700 */
   box-shadow: 0 2px 0 #0f172a; /* darker blue */
 }
+
+/* ===== WWII / Cold War Panel Theme (styling only) ===== */
+
+/* Main panel shell */
+.military-panel {
+  background: linear-gradient(to bottom, #2f3223, #3b3e2c);
+  border: 2px solid #1f2018;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 10px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+  padding: 8px;
+  color: #d8d1b1; /* default text color */
+  font-family: "Azeret Mono", monospace;
+}
+
+/* Section headings / titles */
+.military-heading {
+  font-family: "Black Ops One", cursive;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #d8d1b1;
+  margin: 0 0 4px 0;
+}
+
+/* Labels for inline stats / small captions */
+.military-label {
+  font-size: 12px;
+  color: #beb79d;
+  text-transform: uppercase;
+}
+
+/* Utilitarian console buttons */
+.military-button {
+  background-color: #3b3e2c;
+  color: #d8d1b1;
+  border: 1px solid #1f2018;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  font-size: 12px;
+  font-family: "Azeret Mono", monospace;
+  transition: background-color 0.15s ease-in-out;
+}
+.military-button:hover {
+  background-color: #4e513a;
+}
+
+/* Sliders (range inputs) */
+.military-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #4e513a; /* track */
+  border-radius: 3px;
+  outline: none;
+}
+.military-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #4eb057; /* thumb */
+  margin-top: -4px;
+  cursor: pointer;
+}
+.military-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #4eb057;
+  cursor: pointer;
+}
+.military-slider::-moz-range-track {
+  background: #4e513a;
+  height: 6px;
+  border-radius: 3px;
+}

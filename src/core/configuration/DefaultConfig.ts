@@ -419,7 +419,7 @@ export class DefaultConfig implements Config {
               : BigInt(
                   Math.min(
                     1_000_000,
-                    Math.pow(2, p.unitsConstructed(UnitType.Port)) * 125_000,
+                    Math.pow(2, p.unitsOwned(UnitType.Port)) * 125_000,
                   ),
                 ),
           territoryBound: true,
@@ -478,7 +478,7 @@ export class DefaultConfig implements Config {
               : BigInt(
                   Math.min(
                     250_000,
-                    (p.unitsConstructed(UnitType.DefensePost) + 1) * 50_000,
+                    (p.unitsOwned(UnitType.DefensePost) + 1) * 50_000,
                   ),
                 ),
           territoryBound: true,
@@ -493,7 +493,7 @@ export class DefaultConfig implements Config {
               : BigInt(
                   Math.min(
                     3_000_000,
-                    (p.unitsConstructed(UnitType.SAMLauncher) + 1) * 1_500_000,
+                    (p.unitsOwned(UnitType.SAMLauncher) + 1) * 1_500_000,
                   ),
                 ),
           territoryBound: true,
@@ -508,7 +508,7 @@ export class DefaultConfig implements Config {
               : BigInt(
                   Math.min(
                     1_000_000,
-                    Math.pow(2, p.unitsConstructed(UnitType.City)) * 125_000,
+                    Math.pow(2, p.unitsOwned(UnitType.City)) * 125_000,
                   ),
                 ),
           territoryBound: true,
@@ -528,8 +528,7 @@ export class DefaultConfig implements Config {
               : BigInt(
                   Math.min(
                     3_000_000,
-                    Math.pow(2, p.unitsConstructed(UnitType.Hospital)) *
-                      1_500_000,
+                    Math.pow(2, p.unitsOwned(UnitType.Hospital)) * 1_500_000,
                   ),
                 ),
           territoryBound: true,
@@ -544,8 +543,7 @@ export class DefaultConfig implements Config {
               : BigInt(
                   Math.min(
                     3_000_000,
-                    Math.pow(2, p.unitsConstructed(UnitType.Academy)) *
-                      1_500_000,
+                    Math.pow(2, p.unitsOwned(UnitType.Academy)) * 1_500_000,
                   ),
                 ),
           territoryBound: true,
@@ -560,8 +558,7 @@ export class DefaultConfig implements Config {
               : BigInt(
                   Math.min(
                     2_000_000,
-                    Math.pow(2, p.unitsConstructed(UnitType.Airfield)) *
-                      400_000,
+                    Math.pow(2, p.unitsOwned(UnitType.Airfield)) * 400_000,
                   ),
                 ),
           territoryBound: true,

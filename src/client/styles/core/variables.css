@@ -5,20 +5,20 @@
   --fontColorLight: #fff;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Cold-War military palette */
-  /* ► Primary  (general-purpose buttons) = desaturated “battle-green” */
-  --primaryColor: #48553d; /* olive drab-600 */
-  --primaryColorHover: #36402c; /* olive drab-700 */
-  --primaryColorDisabled: linear-gradient(to right, #4a4a4a, #3d3d3d);
+  /* Cold War / 1950s–60s military command aesthetic */
+  /* Primary (buttons, main elements) = Olive Green */
+  --primaryColor: #4a5d23;
+  --primaryColorHover: #3a4a1c;
+  --primaryColorDisabled: #2c3e50; /* Dark Gray for disabled/matte metal */
 
-  /* ► Secondary (outline / pale fills) = khaki-tint */
-  --secondaryColor: #e6e9d5; /* khaki-100 */
-  --secondaryColorHover: #d4d7c2; /* khaki-200 */
+  /* Secondary (outline / pale fills) = Tan */
+  --secondaryColor: #d4c7a5;
+  --secondaryColorHover: #c2b490;
 
-  /* ► Alert / highlight (selected lobby, warnings) = muted crimson */
-  --alertColor: #7f1d1d; /* red-900 */
-  --alertColorHover: #991b1b; /* red-800 */
+  /* Alert / highlight (selected lobby, warnings) = Muted Red */
+  --alertColor: #8b0000;
+  --alertColorHover: #a00000;
 
-  /* ► Accent text on pale backgrounds */
-  --accentTextColor: #374151; /* gray-700 */
+  /* Accent text on pale backgrounds */
+  --accentTextColor: #374151; /* Dark Gray */
 }

@@ -1058,7 +1058,15 @@ export class PlayerImpl implements Player {
     if (spawns.length === 0) {
       return false;
     }
-    return spawns[0].tile();
+    const closestPort = spawns[0];
+    const waterNeighbors = this.mg
+      .neighbors(closestPort.tile())
+      .filter((t) => this.mg.isOcean(t));
+    if (waterNeighbors.length === 0) {
+      // This should not happen if port placement is correct
+      return false;
+    }
+    return waterNeighbors[0];
   }
 
   landBasedStructureSpawn(
