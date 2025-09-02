@@ -163,6 +163,19 @@ export class InputHandler {
       attackRatioUp: "Digit2",
       boatAttack: "KeyB",
       groundAttack: "KeyG",
+      buildAtomBomb: "Digit5",
+      buildHydrogenBomb: "Digit6",
+      buildMIRV: "Digit7",
+      buildFighterJet: "Digit8",
+      buildWarship: "Digit9",
+      buildCity: "KeyY",
+      buildPort: "KeyU",
+      buildAirfield: "KeyI",
+      buildHospital: "KeyO",
+      buildAcademy: "KeyP",
+      buildMissileSilo: "KeyH",
+      buildSAMLauncher: "KeyJ",
+      buildDefensePost: "KeyK",
       modifierKey: "ControlLeft",
       altKey: "AltLeft",
       ...JSON.parse(localStorage.getItem("settings.keybinds") ?? "{}"),
@@ -188,6 +201,8 @@ export class InputHandler {
     window.addEventListener("pointermove", this.onPointerMove.bind(this));
     this.canvas.addEventListener("contextmenu", (e) => this.onContextMenu(e));
     window.addEventListener("mousemove", (e) => {
+      this.lastPointerX = e.clientX;
+      this.lastPointerY = e.clientY;
       if (e.movementX || e.movementY) {
         this.eventBus.emit(new MouseMoveEvent(e.clientX, e.clientY));
       }
@@ -329,8 +344,41 @@ export class InputHandler {
         this.eventBus.emit(new CenterCameraEvent());
       }
 
+      this.handleBuildHotkey(e.code);
+
       this.activeKeys.delete(e.code);
     });
+  }
+
+  private handleBuildHotkey(code: string) {
+    const buildHotkeys: Record<string, UnitType> = {
+      [this.keybinds.buildAtomBomb]: UnitType.AtomBomb,
+      [this.keybinds.buildHydrogenBomb]: UnitType.HydrogenBomb,
+      [this.keybinds.buildMIRV]: UnitType.MIRV,
+      [this.keybinds.buildFighterJet]: UnitType.FighterJet,
+      [this.keybinds.buildWarship]: UnitType.Warship,
+      [this.keybinds.buildCity]: UnitType.City,
+      [this.keybinds.buildPort]: UnitType.Port,
+      [this.keybinds.buildAirfield]: UnitType.Airfield,
+      [this.keybinds.buildHospital]: UnitType.Hospital,
+      [this.keybinds.buildAcademy]: UnitType.Academy,
+      [this.keybinds.buildMissileSilo]: UnitType.MissileSilo,
+      [this.keybinds.buildSAMLauncher]: UnitType.SAMLauncher,
+      [this.keybinds.buildDefensePost]: UnitType.DefensePost,
+    };
+
+    const unitType = buildHotkeys[code];
+    if (unitType) {
+      const cell = this.transformHandler.screenToWorldCoordinates(
+        this.lastPointerX,
+        this.lastPointerY,
+      );
+
+      if (this.game.isValidCoord(cell.x, cell.y)) {
+        const tile = this.game.ref(cell.x, cell.y);
+        this.eventBus.emit(new BuildUnitIntentEvent(unitType, tile));
+      }
+    }
   }
 
   private onPointerDown(event: PointerEvent) {
