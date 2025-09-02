@@ -138,9 +138,7 @@ export class RadialMenu implements Layer {
     const pie = d3
       .pie<any>()
       .value(() => 1)
-      .padAngle(0.03)
-      .startAngle(Math.PI / 4) // Start at 45 degrees (π/4 radians)
-      .endAngle(2 * Math.PI + Math.PI / 4); // Complete the circle but shifted by 45 degrees
+      .padAngle(0.03);
 
     const arc = d3
       .arc<any>()

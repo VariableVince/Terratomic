@@ -18,6 +18,7 @@ import { translateText } from "../../../client/Utils";
 import { EventBus } from "../../../core/EventBus";
 import { Gold, UnitType } from "../../../core/game/Game";
 import { GameView } from "../../../core/game/GameView";
+import { CloseViewEvent } from "../../InputHandler";
 import { renderNumber } from "../../Utils";
 import { UIState } from "../UIState";
 
@@ -366,6 +367,7 @@ export class BuildMenu extends LitElement {
     } else {
       this.uiState.pendingBuildUnitType = item.unitType;
     }
+    this.eventBus.emit(new CloseViewEvent());
     this.requestUpdate();
   };
 
