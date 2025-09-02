@@ -298,7 +298,7 @@ export class ControlPanel extends LitElement implements Layer {
             <!-- Root panel shell (military-panel provides background/border/colors) -->
             <div class="relative military-panel">
               <div
-                class="w-full h-[300px] lg:h-[255px] text-sm lg:text-m bg-transparent border-0 shadow-inner p-2 pr-3 lg:p-4 rounded-md flex"
+                class="w-full h-[255px] text-sm lg:text-m bg-transparent border-0 shadow-inner p-2 pr-3 lg:p-4 rounded-md flex"
                 @contextmenu=${(e: MouseEvent) => e.preventDefault()}
               >
                 <div class="flex-grow flex flex-col h-full">
