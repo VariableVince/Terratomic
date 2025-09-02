@@ -31,6 +31,8 @@ export default [
             "tailwind.config.js",
             "webpack.config.js",
             "Terrain-Viewer/render.js",
+            "tests/__mocks__/nanoid.cjs",
+            "tests/transformers/removeImportAttributes.cjs",
           ],
         },
         tsconfigRootDir: import.meta.dirname,
@@ -44,6 +46,12 @@ export default [
       "@typescript-eslint/no-unused-expressions": "off",
       "@typescript-eslint/no-unused-vars": "off",
       "no-case-declarations": "off",
+    },
+  },
+  {
+    files: ["tests/**/*.cjs"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
     },
   },
   {

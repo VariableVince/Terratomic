@@ -496,6 +496,7 @@
     "distrustful": "Distrustful",
     "neutral": "Neutral",
     "friendly": "Friendly",
+    "allied": "Allied",
     "default": "Default"
   },
   "control_panel": {
