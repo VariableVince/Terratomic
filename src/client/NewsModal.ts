@@ -49,6 +49,59 @@ export class NewsModal extends LitElement {
           <div class="options-section">
             <div class="news-container">
               <div class="news-content">
+                <h1>Terratomic v0.1.10 – Release Notes</h1>
+                <p>
+                  We’re back with another quality update focused on UI
+                  improvements, smoother gameplay interactions, and better
+                  translations. This version tackles some long-standing
+                  usability issues and adds helpful touches to make the game
+                  more intuitive.
+                </p>
+                <h2>Gameplay & UI Fixes</h2>
+                <ul>
+                  <li>
+                    <strong>Fixed sticky map dragging:</strong> Dragging the map
+                    will now properly stop when your cursor moves over UI
+                    overlays, resolving the “endless drag” issue.
+                  </li>
+                  <li>
+                    <strong>Improved build panel behavior:</strong> Fixed a race
+                    condition where the build panel would immediately close if
+                    you clicked too quickly after hovering. Navigation between
+                    build options should now feel smooth and reliable.
+                  </li>
+                </ul>
+                <h2>Visual & Interaction Improvements</h2>
+                <ul>
+                  <li>
+                    <strong>Better cursor visibility in build mode:</strong> The
+                    build-mode crosshair cursor has been changed from black to
+                    white, making it far easier to spot against dark
+                    territories.
+                  </li>
+                  <li>
+                    <strong>Build menu hotkeys displayed:</strong> Each
+                    buildable item now shows its configured hotkey directly in
+                    the menu. No more guesswork—faster building at your
+                    fingertips!
+                  </li>
+                </ul>
+                <h2>Translation & Localization</h2>
+                <ul>
+                  <li>
+                    <strong>Corrected Airfield unit translation:</strong> The
+                    Airfield unit now properly displays as “Airfield” instead of
+                    a raw key value.
+                  </li>
+                  <li>
+                    <strong>Consolidated alliance event translations:</strong>
+                    Redundant and inconsistent alliance-related translations
+                    have been streamlined for better clarity and consistency
+                    across the UI.
+                  </li>
+                </ul>
+              </div>
+              <div class="news-content">
                 <h1>Release v0.1.9</h1>
                 <p>
                   This release focuses on improving the user interface and user
@@ -84,6 +137,7 @@ export class NewsModal extends LitElement {
                 </ul>
               </div>
               <div class="news-content">
+                <h1>Release v0.1.8</h1>
                 <p>
                   This version (v0.1.8) introduces a complete visual overhaul of
                   the game and a more intuitive building process, all inspired
@@ -134,6 +188,7 @@ export class NewsModal extends LitElement {
                 </p>
               </div>
               <div class="news-content">
+                <h1>Release v0.1.7</h1>
                 <p>
                   This test version introduces a new mechanic:
                   <strong>Investment</strong>.
