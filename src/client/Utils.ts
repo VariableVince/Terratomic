@@ -169,3 +169,29 @@ export function getAltKey(): string {
     return "Alt";
   }
 }
+
+export function displayKey(key: string): string {
+  if (!key) return "Unset";
+  if (key === " ") return "Space";
+  if (key.startsWith("Key")) {
+    return key.slice(3);
+  }
+  if (key.startsWith("Digit")) {
+    return key.slice(5);
+  }
+  if (key.startsWith("Numpad")) {
+    return `Numpad ${key.slice(6)}`;
+  }
+  if (key === "Backquote") return "`";
+  if (key === "Minus") return "-";
+  if (key === "Equal") return "=";
+  if (key === "BracketLeft") return "[";
+  if (key === "BracketRight") return "]";
+  if (key === "Backslash") return "\\";
+  if (key === "Semicolon") return ";";
+  if (key === "Quote") return "'";
+  if (key === "Comma") return ",";
+  if (key === "Period") return ".";
+  if (key === "Slash") return "/";
+  return key;
+}

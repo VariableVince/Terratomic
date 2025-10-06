@@ -19,7 +19,7 @@ import { EventBus } from "../../../core/EventBus";
 import { Gold, UnitType } from "../../../core/game/Game";
 import { GameView } from "../../../core/game/GameView";
 import { CloseViewEvent } from "../../InputHandler";
-import { renderNumber } from "../../Utils";
+import { displayKey, renderNumber } from "../../Utils";
 import { UIState } from "../UIState";
 
 interface BuildItemDisplay {
@@ -147,14 +147,58 @@ export class BuildMenu extends LitElement {
   @state()
   private filteredBuildTable: BuildItemDisplay[][] = buildTable;
 
+  @state()
+  private hotkeyMap: Map<UnitType, string> = new Map();
+
   // Recompute once after first render, and whenever relevant inputs change
   protected firstUpdated(): void {
     this.recomputeFilteredTable();
+    this.buildHotkeyMap();
   }
 
   protected updated(changed: Map<string, unknown>): void {
     if (changed.has("unitFilter") || changed.has("game")) {
       this.recomputeFilteredTable();
+    }
+  }
+
+  private buildHotkeyMap() {
+    const keybinds = {
+      buildAtomBomb: "Digit5",
+      buildHydrogenBomb: "Digit6",
+      buildMIRV: "Digit7",
+      buildFighterJet: "Digit8",
+      buildWarship: "Digit9",
+      buildCity: "KeyY",
+      buildPort: "KeyU",
+      buildAirfield: "KeyI",
+      buildHospital: "KeyO",
+      buildAcademy: "KeyP",
+      buildMissileSilo: "KeyH",
+      buildSAMLauncher: "KeyJ",
+      buildDefensePost: "KeyK",
+      ...JSON.parse(localStorage.getItem("settings.keybinds") ?? "{}"),
+    };
+
+    const buildHotkeys: Record<string, UnitType> = {
+      [keybinds.buildAtomBomb]: UnitType.AtomBomb,
+      [keybinds.buildHydrogenBomb]: UnitType.HydrogenBomb,
+      [keybinds.buildMIRV]: UnitType.MIRV,
+      [keybinds.buildFighterJet]: UnitType.FighterJet,
+      [keybinds.buildWarship]: UnitType.Warship,
+      [keybinds.buildCity]: UnitType.City,
+      [keybinds.buildPort]: UnitType.Port,
+      [keybinds.buildAirfield]: UnitType.Airfield,
+      [keybinds.buildHospital]: UnitType.Hospital,
+      [keybinds.buildAcademy]: UnitType.Academy,
+      [keybinds.buildMissileSilo]: UnitType.MissileSilo,
+      [keybinds.buildSAMLauncher]: UnitType.SAMLauncher,
+      [keybinds.buildDefensePost]: UnitType.DefensePost,
+    };
+
+    for (const key in buildHotkeys) {
+      const unitType = buildHotkeys[key];
+      this.hotkeyMap.set(unitType, displayKey(key));
     }
   }
 
@@ -305,6 +349,13 @@ export class BuildMenu extends LitElement {
       font-size: 9px;
       border: 1px solid #444;
     }
+    .build-hotkey {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      color: #a0a0a0;
+      font-size: 9px;
+    }
     .build-button:not(:disabled):hover > .build-count-chip {
       background-color: #3a3a3a;
       border-color: #666;
@@ -406,6 +457,9 @@ export class BuildMenu extends LitElement {
                       : ""}
                     aria-label=${`${name}, ${renderNumber(price)} gold`}
                   >
+                    <div class="build-hotkey">
+                      ${this.hotkeyMap.get(item.unitType)}
+                    </div>
                     <img class="build-icon" src=${item.icon} alt=${name} />
                     <div class="build-item-details">
                       <span class="build-name">${name}</span>
