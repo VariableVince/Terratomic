@@ -78,7 +78,7 @@ export class UnitInfoModal extends LitElement implements Layer {
 
   private buildUnitTypeTranslationString(): string {
     if (!this.unit) return "unit_type.unknown"; // fallback stays the same
-    const unitType = this.unit.type().toLowerCase().replace(/\s+/g, "_");
+    const unitType = this.unit.type().toLowerCase().replace(/ /g, ""); // Remove spaces, don't replace with underscore
     return `unit_type.${unitType}`;
   }
 
