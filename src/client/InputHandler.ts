@@ -411,7 +411,13 @@ export class InputHandler {
       return;
     }
 
-    // Ensure this pointerup originated on the game canvas, not on UI overlays.
+    // Always end the drag interaction on any pointer up.
+    // This prevents the "sticky drag" issue.
+    this.pointerDown = false;
+    this.pointers.clear();
+
+    // But, only process a "click" action if the event happened on the canvas.
+    // This prevents "leaky clicks" through UI elements.
     const path = event.composedPath?.() ?? [];
     const cameFromCanvas =
       event.target === this.canvas ||
@@ -421,10 +427,6 @@ export class InputHandler {
     // Normalize coordinates
     const upX = event.clientX;
     const upY = event.clientY;
-
-    // End interaction
-    this.pointerDown = false;
-    this.pointers.clear();
 
     // ---------- RESTORED SAFEGUARD (drag vs click) ----------
     // Treat as click only if the pointer barely moved since pointerdown.

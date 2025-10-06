@@ -512,6 +512,15 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.uiState.multibuildEnabled = checkbox.checked;
   }
 
+  private _changeTab(
+    tab: "Build" | "Attack" | "Economy" | "Research" | "Bombers",
+  ) {
+    this.activeTab = tab;
+    if (this.uiState.pendingBuildUnitType) {
+      this.uiState.pendingBuildUnitType = null;
+    }
+  }
+
   render() {
     if (!this.game) {
       return html``;
@@ -580,7 +589,7 @@ export class ControlPanel2 extends LitElement implements Layer {
             "Build"
               ? "bg-gray-700 text-crt-green border border-crt-green"
               : "text-tan"}"
-            @click=${() => (this.activeTab = "Build")}
+            @click=${() => this._changeTab("Build")}
           >
             Build
           </button>
@@ -589,7 +598,7 @@ export class ControlPanel2 extends LitElement implements Layer {
             "Attack"
               ? "bg-gray-700 text-crt-green border border-crt-green"
               : "text-tan"}"
-            @click=${() => (this.activeTab = "Attack")}
+            @click=${() => this._changeTab("Attack")}
           >
             Attack
           </button>
@@ -598,7 +607,7 @@ export class ControlPanel2 extends LitElement implements Layer {
             "Economy"
               ? "bg-gray-700 text-crt-green border border-crt-green"
               : "text-tan"}"
-            @click=${() => (this.activeTab = "Economy")}
+            @click=${() => this._changeTab("Economy")}
           >
             Economy
           </button>
@@ -607,7 +616,7 @@ export class ControlPanel2 extends LitElement implements Layer {
             "Research"
               ? "bg-gray-700 text-crt-green border border-crt-green"
               : "text-tan"}"
-            @click=${() => (this.activeTab = "Research")}
+            @click=${() => this._changeTab("Research")}
           >
             Research
           </button>
@@ -620,7 +629,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                     : "text-tan"} ${this._highlightBombersTab
                     ? "highlight-tab"
                     : ""}"
-                  @click=${() => (this.activeTab = "Bombers")}
+                  @click=${() => this._changeTab("Bombers")}
                 >
                   Bombers
                 </button>
