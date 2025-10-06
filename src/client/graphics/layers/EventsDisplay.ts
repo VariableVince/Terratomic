@@ -240,7 +240,7 @@ export class EventsDisplay extends LitElement implements Layer {
         continue;
 
       this.addEvent({
-        description: translateText("alliance.about_to_expire", {
+        description: translateText("events_display.about_to_expire", {
           name: other.name(),
         }),
         tags: [tag],

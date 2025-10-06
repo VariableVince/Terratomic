@@ -52,14 +52,14 @@ export class AllianceExtensionExecution implements Execution {
 
       // Inform both players about the successful extension
       mg.displayMessage(
-        "alliance.renewed",
+        "events_display.alliance_renewed",
         MessageType.ALLIANCE_ACCEPTED,
         from.id(),
         undefined,
         { name: this.to.displayName() },
       );
       mg.displayMessage(
-        "alliance.renewed",
+        "events_display.alliance_renewed",
         MessageType.ALLIANCE_ACCEPTED,
         this.to.id(),
         undefined,
