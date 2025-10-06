@@ -214,9 +214,9 @@ export class InputHandler {
       set: (value) => {
         this._pendingBuildUnitType = value;
         if (value) {
-          this.canvas.style.cursor = "crosshair"; // Or a custom image cursor
+          this.canvas.classList.add("crosshair-cursor");
         } else {
-          this.canvas.style.cursor = "default";
+          this.canvas.classList.remove("crosshair-cursor");
         }
       },
       get: () => this._pendingBuildUnitType,
