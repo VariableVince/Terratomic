@@ -3,6 +3,7 @@ import { customElement, state } from "lit/decorators.js";
 import { EventBus } from "../../../core/EventBus";
 import { Gold, PlayerID, PlayerType, UnitType } from "../../../core/game/Game";
 import { GameView, PlayerView } from "../../../core/game/GameView";
+import { PlayerListChangedEvent } from "../../events/PlayerListChangedEvent";
 import { AttackRatioEvent } from "../../InputHandler";
 import {
   SendBomberIntentEvent,
@@ -109,6 +110,9 @@ export class ControlPanel2 extends LitElement implements Layer {
   private _isAutoBombingEnabled: boolean = false;
 
   @state()
+  private _lastSelectedBomberTarget: PlayerID | null = null;
+
+  @state()
   private _multibuildEnabled: boolean = false;
 
   private unitIconMap: { [key: string]: string } = {
@@ -195,6 +199,27 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.eventBus.on(ToggleBuildPanelEvent, (event: ToggleBuildPanelEvent) => {
       this.isOpen = event.isOpen;
     });
+
+    this.eventBus.on(PlayerListChangedEvent, () => {
+      this._updatePlayerHashAndRefresh();
+    });
+    this._updatePlayerHashAndRefresh(); // Initial hash calculation
+  }
+
+  private _updatePlayerHashAndRefresh() {
+    const currentPlayersHash = this.game
+      .players()
+      .map((p) => p.id())
+      .sort()
+      .join(",");
+
+    if (this._lastPlayersHash !== currentPlayersHash) {
+      this._lastPlayersHash = currentPlayersHash;
+      // Only refresh the list if the relevant tab is active
+      if (this.activeTab === "Bombers") {
+        this._refreshBomberPlayerLists();
+      }
+    }
   }
 
   tick() {
@@ -240,27 +265,21 @@ export class ControlPanel2 extends LitElement implements Layer {
     // Track relevant state for dynamic updates
     const currentAirfieldCount = player.units(UnitType.Airfield).length;
     this._hasAirfields = currentAirfieldCount > 0;
-    const currentPlayersHash = this.game
-      .players()
-      .map((p) => p.id())
-      .sort()
-      .join(","); // Simple hash for player list changes
 
-    const currentReachablePlayersHash = this._getPlayersInAirfieldRange()
-      .map((p) => p.id())
-      .sort()
-      .join(",");
+    if (this.activeTab === "Bombers" && this.game.ticks() % 10 === 0) {
+      const currentReachablePlayersHash = this._getPlayersInAirfieldRange()
+        .map((p) => p.id())
+        .sort()
+        .join(",");
 
-    if (
-      this.activeTab === "Bombers" &&
-      (this._lastAirfieldCount !== currentAirfieldCount ||
-        this._lastPlayersHash !== currentPlayersHash ||
-        this._reachablePlayersHash !== currentReachablePlayersHash)
-    ) {
-      this._refreshBomberPlayerLists();
-      this._lastAirfieldCount = currentAirfieldCount;
-      this._lastPlayersHash = currentPlayersHash;
-      this._reachablePlayersHash = currentReachablePlayersHash;
+      if (
+        this._lastAirfieldCount !== currentAirfieldCount ||
+        this._reachablePlayersHash !== currentReachablePlayersHash
+      ) {
+        this._refreshBomberPlayerLists();
+        this._lastAirfieldCount = currentAirfieldCount;
+        this._reachablePlayersHash = currentReachablePlayersHash;
+      }
     }
 
     if (this.activeTab === "Bombers" && !this._hasAirfields) {
@@ -323,73 +342,44 @@ export class ControlPanel2 extends LitElement implements Layer {
       .units(UnitType.Airfield)
       .filter((u) => u.isActive());
     if (myAirfields.length === 0) {
-      return []; // No active airfields, no reachable targets
+      return [];
     }
 
-    // Pre-compute squared range for efficiency
-    const bomberRangeSquared = this.game.config().bomberTargetRange() ** 2;
-    const reachablePlayers: PlayerView[] = [];
-    const checkedPlayerIDs = new Set<PlayerID>(); // To avoid adding the same player multiple times
+    const bomberRange = this.game.config().bomberTargetRange();
+    const reachablePlayers = new Map<PlayerID, PlayerView>();
 
-    // Define all targetable structure types for bombers
-    const targetableStructures: UnitType[] = [
-      UnitType.City,
-      UnitType.Hospital,
-      UnitType.Academy,
-      UnitType.Port,
-      UnitType.MissileSilo,
-      UnitType.SAMLauncher,
-      UnitType.Airfield,
-      UnitType.DefensePost,
-    ];
+    const structureIndex = this.game.getStructureIndex();
 
-    for (const otherPlayer of this.game.players()) {
-      // Skip self and players already identified as reachable
-      if (
-        otherPlayer.id() === myPlayer.id() ||
-        myPlayer.isFriendly(otherPlayer) ||
-        checkedPlayerIDs.has(otherPlayer.id())
-      ) {
-        continue;
-      }
-      // Only consider human or fake human players as targets
-      if (
-        otherPlayer.type() !== PlayerType.Human &&
-        otherPlayer.type() !== PlayerType.FakeHuman
-      ) {
-        continue;
-      }
-
-      let isReachable = false;
-      // Get all relevant structures for the other player
-      const otherPlayerAllStructures = targetableStructures.flatMap((type) =>
-        otherPlayer.units(type),
+    for (const airfield of myAirfields) {
+      const airfieldPos = {
+        x: this.game.x(airfield.tile()),
+        y: this.game.y(airfield.tile()),
+      };
+      const nearbyStructures = structureIndex.getInRange(
+        airfieldPos.x,
+        airfieldPos.y,
+        bomberRange,
       );
 
-      // Check if any of my airfields can reach any of their structures
-      for (const myAirfield of myAirfields) {
-        for (const otherStructure of otherPlayerAllStructures) {
-          const distanceSquared = this.game.euclideanDistSquared(
-            myAirfield.tile(),
-            otherStructure.tile(),
-          );
-          if (distanceSquared <= bomberRangeSquared) {
-            isReachable = true;
-            break; // Found a reachable structure, no need to check more for this player
+      for (const structure of nearbyStructures) {
+        const owner = structure.owner();
+        if (
+          owner &&
+          owner.isPlayer() &&
+          owner.id() !== myPlayer.id() && // Prevent self-targeting
+          !myPlayer.isFriendly(owner) &&
+          owner.type() !== PlayerType.Bot
+        ) {
+          if (!reachablePlayers.has(owner.id())) {
+            reachablePlayers.set(owner.id(), owner);
           }
         }
-        if (isReachable) {
-          break; // Found a reachable structure for this player, no need to check more airfields
-        }
-      }
-
-      if (isReachable) {
-        reachablePlayers.push(otherPlayer);
-        checkedPlayerIDs.add(otherPlayer.id());
       }
     }
-    // Sort players alphabetically by name for consistent display
-    return reachablePlayers.sort((a, b) => a.name().localeCompare(b.name()));
+
+    return Array.from(reachablePlayers.values()).sort((a, b) =>
+      a.name().localeCompare(b.name()),
+    );
   }
 
   private _refreshBomberPlayerLists() {
@@ -440,12 +430,24 @@ export class ControlPanel2 extends LitElement implements Layer {
     if (playersToDisplay.length === 0) {
       playerSelect.innerHTML = `<option value="" disabled selected>No building in bomber reach.</option>`;
       playerSelect.disabled = true;
+      this._lastSelectedBomberTarget = null; // Clear selection if no targets are available
     } else {
       const optsPlayers = playersToDisplay
         .map((p) => `<option value="${p.id()}">${p.name()}</option>`)
         .join("");
       playerSelect.innerHTML = optsPlayers;
       playerSelect.disabled = false;
+
+      const stillAValidTarget = playersToDisplay.some(
+        (p) => p.id() === this._lastSelectedBomberTarget,
+      );
+
+      if (stillAValidTarget) {
+        playerSelect.value = this._lastSelectedBomberTarget as string;
+      } else {
+        // If the last target is no longer valid, default to the first in the list and update the state
+        this._lastSelectedBomberTarget = playerSelect.value;
+      }
     }
   }
 
@@ -485,11 +487,15 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.sendBomberIntent(null, null);
   }
 
-  _stopAutoBombing() {
+  async _stopAutoBombing() {
     this._isAutoBombingEnabled = false;
     this.eventBus.emit(new SendSetAutoBombingEvent(false));
     // Clear any manual target when auto-bombing is disabled
     this.sendBomberIntent(null, null);
+
+    await this.updateComplete; // Wait for the UI to update
+
+    this._refreshBomberPlayerLists(); // NOW refresh the list
   }
 
   handleStructureChange(e: Event) {
@@ -504,6 +510,11 @@ export class ControlPanel2 extends LitElement implements Layer {
         }
       });
     }
+  }
+
+  private _handleBomberTargetChange(e: Event) {
+    const select = e.target as HTMLSelectElement;
+    this._lastSelectedBomberTarget = select.value;
   }
 
   private _handleMultibuildToggle(event: Event) {
@@ -692,6 +703,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                               <select
                                 id="bomber-player-select"
                                 class="ml-1 p-1 bg-gray-700 text-tan border border-gray-500 rounded-sm w-full truncate"
+                                @change=${this._handleBomberTargetChange}
                               ></select>
                             </label>
 

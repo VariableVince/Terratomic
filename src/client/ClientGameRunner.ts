@@ -147,6 +147,7 @@ export async function createClientGame(
   );
   await worker.initialize();
   const gameView = new GameView(
+    eventBus,
     worker,
     config,
     gameMap.gameMap,

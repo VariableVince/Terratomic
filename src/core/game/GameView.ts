@@ -1,4 +1,7 @@
+import { PlayerListChangedEvent } from "../../client/events/PlayerListChangedEvent";
+import { SpatialIndex } from "../../client/graphics/SpatialIndex";
 import { Config } from "../configuration/Config";
+import { EventBus } from "../EventBus";
 import { ClientID, GameID } from "../Schemas";
 import { createRandomName } from "../Util";
 import { WorkerClient } from "../worker/WorkerClient";
@@ -7,6 +10,7 @@ import {
   EmojiMessage,
   GameUpdates,
   Gold,
+  isStructureType,
   NameViewData,
   Player,
   PlayerActions,
@@ -347,10 +351,12 @@ export class GameView implements GameMap {
   private _alliances: AllianceViewData[] = [];
 
   private unitGrid: UnitGrid;
+  private structureIndex: SpatialIndex;
 
   private toDelete = new Set<number>();
 
   constructor(
+    public eventBus: EventBus,
     public worker: WorkerClient,
     private _config: Config,
     private _map: GameMap,
@@ -359,6 +365,7 @@ export class GameView implements GameMap {
   ) {
     this.lastUpdate = null;
     this.unitGrid = new UnitGrid(_map);
+    this.structureIndex = new SpatialIndex(this);
   }
   isOnEdgeOfMap(ref: TileRef): boolean {
     return this._map.isOnEdgeOfMap(ref);
@@ -368,7 +375,18 @@ export class GameView implements GameMap {
     return this.lastUpdate?.updates ?? null;
   }
 
+  public getStructureIndex(): SpatialIndex {
+    return this.structureIndex;
+  }
+
   public update(gu: GameUpdateViewData) {
+    // Fingerprint BEFORE the update
+    const oldAlivePlayerIds = new Set(
+      Array.from(this._players.values())
+        .filter((p) => p.isAlive())
+        .map((p) => p.id()),
+    );
+
     this.toDelete.forEach((id) => this._units.delete(id));
     this.toDelete.clear();
 
@@ -410,9 +428,15 @@ export class GameView implements GameMap {
         unit = new UnitView(this, update);
         this._units.set(update.id, unit);
         this.unitGrid.addUnit(unit);
+        if (isStructureType(unit.type())) {
+          this.structureIndex.add(unit);
+        }
       }
       if (!update.isActive) {
         this.unitGrid.removeUnit(unit);
+        if (isStructureType(unit.type())) {
+          this.structureIndex.remove(unit);
+        }
       } else if (unit.tile() !== unit.lastTile()) {
         this.unitGrid.updateUnitCell(unit);
       }
@@ -421,6 +445,30 @@ export class GameView implements GameMap {
         this.toDelete.add(unit.id());
       }
     });
+
+    // Fingerprint AFTER the update
+    const newAlivePlayerIds = new Set(
+      Array.from(this._players.values())
+        .filter((p) => p.isAlive())
+        .map((p) => p.id()),
+    );
+
+    // Compare the fingerprints
+    let listsAreDifferent = false;
+    if (oldAlivePlayerIds.size !== newAlivePlayerIds.size) {
+      listsAreDifferent = true;
+    } else {
+      for (const id of oldAlivePlayerIds) {
+        if (!newAlivePlayerIds.has(id)) {
+          listsAreDifferent = true;
+          break;
+        }
+      }
+    }
+
+    if (listsAreDifferent) {
+      this.eventBus.emit(new PlayerListChangedEvent());
+    }
   }
 
   public alliances(): AllianceViewData[] {
