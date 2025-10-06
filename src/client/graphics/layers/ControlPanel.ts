@@ -82,6 +82,8 @@ export class ControlPanel extends LitElement implements Layer {
 
   private _hoverTimeoutId: number | null = null; // New property
 
+  private _ignoreNextClick = false;
+
   init() {
     this.attackRatio = Number(
       localStorage.getItem("settings.attackRatio") ?? "0.3",
@@ -203,10 +205,18 @@ export class ControlPanel extends LitElement implements Layer {
     if (!this.isBuildPanelOpen) {
       this.isBuildPanelOpen = true;
       this.eventBus.emit(new ToggleBuildPanelEvent(true));
+      this._ignoreNextClick = true;
+      setTimeout(() => {
+        this._ignoreNextClick = false;
+      }, 200);
     }
   }
 
   toggleBuildPanel() {
+    if (this._ignoreNextClick) {
+      this._ignoreNextClick = false;
+      return;
+    }
     this.isBuildPanelOpen = !this.isBuildPanelOpen;
     this.eventBus.emit(new ToggleBuildPanelEvent(this.isBuildPanelOpen));
   }
