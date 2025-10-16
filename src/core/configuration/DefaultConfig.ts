@@ -19,6 +19,7 @@ import {
   Trios,
   UnitInfo,
   UnitType,
+  UpgradeType,
 } from "../game/Game";
 import { TileRef } from "../game/GameMap";
 import { PlayerView } from "../game/GameView";
@@ -327,6 +328,26 @@ export class DefaultConfig implements Config {
     return Math.round(10 * Math.pow(numberOfPorts, 0.37));
   }
 
+  // Roads and Cargo Trucks
+
+  cargoTruckSpawnRate(numberOfStructures: number): number {
+    return Math.max(1, Math.floor(14 / Math.sqrt(numberOfStructures)));
+  }
+
+  cargoTruckGold(distance: number): Gold {
+    return BigInt(Math.floor((10000 + 150 * Math.pow(distance, 1.1)) * 0.125));
+  }
+
+  roadUpdatesPerTick(): number {
+    return 2;
+  }
+
+  // This acts as a "max cost" for the A* pathfinder, not a strict tile length.
+  // A path over empty land has a cost of 2 per tile.
+  maxRoadLength(): number {
+    return 240;
+  }
+
   // Cargoplanes (Turned off for now)
   cargoPlanesEnabled(): boolean {
     return false;
@@ -602,6 +623,52 @@ export class DefaultConfig implements Config {
           territoryBound: false,
           maxHealth: 750,
         };
+      default:
+        assertNever(type);
+    }
+  }
+  upgradeInfo(type: UpgradeType): { cost: (player: Player) => Gold } {
+    const costForPlayer = (cost: bigint) => (p: Player) => {
+      if (p.type() === PlayerType.Human && this.infiniteGold()) {
+        return 0n;
+      }
+      return cost;
+    };
+
+    switch (type) {
+      case UpgradeType.Roads:
+        return { cost: costForPlayer(1_000_000n) };
+
+      // Land
+      case UpgradeType.InternationalTrade:
+        return { cost: costForPlayer(2_000_000n) };
+      case UpgradeType.ScorchedEarth:
+        return { cost: costForPlayer(3_000_000n) };
+
+      // Water
+      case UpgradeType.WaterUpgrade1:
+        return { cost: costForPlayer(1_000_000n) };
+      case UpgradeType.WaterUpgrade2:
+        return { cost: costForPlayer(2_000_000n) };
+      case UpgradeType.WaterUpgrade3:
+        return { cost: costForPlayer(3_000_000n) };
+
+      // Air
+      case UpgradeType.AirUpgrade1:
+        return { cost: costForPlayer(1_000_000n) };
+      case UpgradeType.AirUpgrade2:
+        return { cost: costForPlayer(2_000_000n) };
+      case UpgradeType.AirUpgrade3:
+        return { cost: costForPlayer(3_000_000n) };
+
+      // Economy
+      case UpgradeType.EconomyUpgrade1:
+        return { cost: costForPlayer(1_000_000n) };
+      case UpgradeType.EconomyUpgrade2:
+        return { cost: costForPlayer(2_000_000n) };
+      case UpgradeType.EconomyUpgrade3:
+        return { cost: costForPlayer(3_000_000n) };
+
       default:
         assertNever(type);
     }
@@ -1023,5 +1090,23 @@ export class DefaultConfig implements Config {
 
   maxInvestmentRate(): number {
     return 0.5; // 50%
+  }
+
+  // --- International Cargo Trucks ---
+
+  internationalCargoTrucksEnabled(): boolean {
+    return true;
+  }
+
+  internationalCargoTruckSpawnChance(): number {
+    return 5; // Represents a 5% chance
+  }
+
+  internationalCargoTruckGoldMultiplier(): number {
+    return 2.0;
+  }
+
+  internationalCargoTruckGoldSplitRatio(): number {
+    return 0.5; // 50/50 split
   }
 }

@@ -25,6 +25,7 @@ import {
   Tick,
   UnitInfo,
   UnitType,
+  UpgradeType,
 } from "./Game";
 import { GameMap, TileRef, TileUpdate } from "./GameMap";
 import {
@@ -238,6 +239,11 @@ export class PlayerView {
   isPlayer(): this is Player {
     return true;
   }
+
+  hasUpgrade(upgrade: UpgradeType): boolean {
+    return this.data.upgrades.includes(upgrade);
+  }
+
   unitsOwned(type: UnitType): number {
     return this.data.unitsOwned[type];
   }
@@ -647,7 +653,7 @@ export class GameView implements GameMap {
   isBorder(ref: TileRef): boolean {
     return this._map.isBorder(ref);
   }
-  neighbors(ref: TileRef): TileRef[] {
+  neighbors(ref: TileRef): Uint32Array {
     return this._map.neighbors(ref);
   }
   isWater(ref: TileRef): boolean {

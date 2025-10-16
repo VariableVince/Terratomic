@@ -1,12 +1,20 @@
 import { html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import goldCoinIcon from "../../../../resources/images/GoldCoinIcon.svg";
 import { EventBus } from "../../../core/EventBus";
-import { Gold, PlayerID, PlayerType, UnitType } from "../../../core/game/Game";
+import {
+  Gold,
+  PlayerID,
+  PlayerType,
+  UnitType,
+  UpgradeType,
+} from "../../../core/game/Game";
 import { GameView, PlayerView } from "../../../core/game/GameView";
 import { PlayerListChangedEvent } from "../../events/PlayerListChangedEvent";
 import { AttackRatioEvent } from "../../InputHandler";
 import {
   SendBomberIntentEvent,
+  SendPurchaseUpgradeIntentEvent,
   SendSetAutoBombingEvent,
   SendSetInvestmentRateEvent,
   SendSetTargetTroopRatioEvent,
@@ -81,6 +89,9 @@ export class ControlPanel2 extends LitElement implements Layer {
   @state()
   private activeTab: "Build" | "Attack" | "Economy" | "Research" | "Bombers" =
     "Build";
+
+  @state()
+  private activeResearchTab: "Land" | "Water" | "Air" | "Economy" = "Land";
 
   @state()
   private _lastAirfieldCount: number = 0;
@@ -536,8 +547,167 @@ export class ControlPanel2 extends LitElement implements Layer {
     if (!this.game) {
       return html``;
     }
+
+    const player = this.game.myPlayer();
+
+    const getUpgradeCost = (upgradeType: UpgradeType) => {
+      if (!player) return 0n;
+      return this.game.config().upgradeInfo(upgradeType).cost(player);
+    };
+
+    const canPurchaseUpgrade = (upgradeType: UpgradeType) => {
+      if (!player) return true;
+
+      if (upgradeType === UpgradeType.ScorchedEarth) {
+        if (!player.hasUpgrade(UpgradeType.Roads)) {
+          return true;
+        }
+      }
+
+      const cost = getUpgradeCost(upgradeType);
+      const hasUpgrade = player.hasUpgrade(upgradeType);
+      const canAfford = player.gold() >= cost;
+      return hasUpgrade || !canAfford;
+    };
+
+    const renderUpgradeButton = (
+      upgradeType: UpgradeType,
+      name: string,
+      level: number,
+      tooltip: string = "",
+    ) => {
+      const cost = getUpgradeCost(upgradeType);
+      const hasUpgrade = player?.hasUpgrade(upgradeType);
+      const canAfford = player && player.gold() >= cost;
+
+      const buttonClass = hasUpgrade
+        ? "build-button upgrade-unlocked"
+        : canAfford
+          ? "build-button upgrade-available"
+          : "build-button upgrade-locked";
+
+      const buttonText = hasUpgrade
+        ? html`${name} Unlocked`
+        : html`<div class="build-item-details flex flex-col items-center">
+            <span class="build-name">${name}</span>
+            <span class="build-cost flex items-center gap-1" translate="no">
+              ${(Number(cost) / 1_000_000).toFixed(0)}M
+              <img src=${goldCoinIcon} alt="gold" width="12" height="12" />
+            </span>
+          </div>`;
+      return html`
+        <button
+          class="build-button"
+          title=${tooltip}
+          ?disabled=${canPurchaseUpgrade(upgradeType)}
+          @click=${() => {
+            if (!hasUpgrade) {
+              this.eventBus.emit(
+                new SendPurchaseUpgradeIntentEvent(upgradeType),
+              );
+            }
+          }}
+        >
+          ${buttonText}
+        </button>
+      `;
+    };
+
     return html`
       <style>
+        /* Copied and adapted from BuildMenu.ts for consistency */
+        .build-button {
+          position: relative;
+          width: 100%; /* Full width of the column */
+          height: 50px;
+          border: 2px solid #2d3748;
+          background-color: #2d3748;
+          color: #e2e8f0;
+          border-radius: 6px;
+          box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 5px;
+          font-size: 12px;
+          text-align: center;
+        }
+        .upgrade-available {
+          background-color: #4c516d;
+          border-color: #5a617c;
+          color: #e2e8f0;
+        }
+        .upgrade-available:hover {
+          background-color: #5a617c;
+          border-color: #6a718c;
+        }
+        .upgrade-available:active {
+          background-color: #3c4157;
+        }
+        .upgrade-locked {
+          background-color: #1a202c;
+          border-color: #2d3748;
+          color: #718096;
+        }
+        .upgrade-unlocked {
+          background-color: #2d3748;
+          border-color: #4a5568;
+          color: #a0aec0;
+          cursor: default;
+        }
+        .build-button:not(:disabled):hover {
+          transform: scale(1.02);
+          box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        .build-button:not(:disabled):active {
+          transform: scale(0.98);
+          box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.7);
+        }
+        .build-button:disabled {
+          background-color: #1a202c;
+          border-color: #2d3748;
+          color: #888;
+          cursor: not-allowed;
+          opacity: 0.6;
+          box-shadow: none;
+        }
+
+        .research-tabs {
+          display: flex;
+          margin-top: auto;
+          border-top: 1px solid #4a5568; /* gray-700 */
+        }
+
+        .research-tab {
+          flex-grow: 1;
+          padding: 8px 0;
+          text-align: center;
+          cursor: pointer;
+          border: 1px solid #1a202c;
+          border-top: none;
+          background-color: #1a202c;
+          color: #a0aec0;
+          box-shadow: inset 0px 2px 5px rgba(0, 0, 0, 0.4);
+        }
+
+        .research-tab:hover:not(.active) {
+          background-color: #2d3748;
+          color: #e2e8f0;
+        }
+
+        .research-tab.active {
+          background-color: #2d3748;
+          color: #e2e8f0;
+          border-color: #4a5568;
+          border-bottom-color: transparent;
+          box-shadow: 0px -2px 5px rgba(0, 0, 0, 0.2);
+          position: relative;
+          top: -1px;
+          border-radius: 6px 6px 0 0;
+        }
+
         input[type="range"] {
           -webkit-appearance: none;
           background: transparent;
@@ -886,11 +1056,131 @@ export class ControlPanel2 extends LitElement implements Layer {
             : ""}
           ${this.activeTab === "Research"
             ? html`
-                <div class="text-tan">
-                  <h2 class="military-heading">Research</h2>
-                  <p class="military-label normal-case">
-                    This is where research-related options will go.
-                  </p>
+                <div class="text-tan flex flex-col h-full">
+                  <!-- Research Sub-Tab Content -->
+                  <div class="flex-grow pt-4 overflow-x-hidden">
+                    ${this.activeResearchTab === "Land"
+                      ? html`
+                          <div class="grid grid-cols-3 gap-4">
+                            ${renderUpgradeButton(
+                              UpgradeType.Roads,
+                              "Roads",
+                              1,
+                            )}
+                            ${renderUpgradeButton(
+                              UpgradeType.InternationalTrade,
+                              "International Trade",
+                              2,
+                            )}
+                            ${renderUpgradeButton(
+                              UpgradeType.ScorchedEarth,
+                              "Scorched Earth",
+                              3,
+                              "This upgrade will remove your road network",
+                            )}
+                          </div>
+                        `
+                      : ""}
+                    ${this.activeResearchTab === "Water"
+                      ? html`
+                          <div class="grid grid-cols-3 gap-4">
+                            ${renderUpgradeButton(
+                              UpgradeType.WaterUpgrade1,
+                              "Water 1",
+                              1,
+                            )}
+                            ${renderUpgradeButton(
+                              UpgradeType.WaterUpgrade2,
+                              "Water 2",
+                              2,
+                            )}
+                            ${renderUpgradeButton(
+                              UpgradeType.WaterUpgrade3,
+                              "Water 3",
+                              3,
+                            )}
+                          </div>
+                        `
+                      : ""}
+                    ${this.activeResearchTab === "Air"
+                      ? html`
+                          <div class="grid grid-cols-3 gap-4">
+                            ${renderUpgradeButton(
+                              UpgradeType.AirUpgrade1,
+                              "Air 1",
+                              1,
+                            )}
+                            ${renderUpgradeButton(
+                              UpgradeType.AirUpgrade2,
+                              "Air 2",
+                              2,
+                            )}
+                            ${renderUpgradeButton(
+                              UpgradeType.AirUpgrade3,
+                              "Air 3",
+                              3,
+                            )}
+                          </div>
+                        `
+                      : ""}
+                    ${this.activeResearchTab === "Economy"
+                      ? html`
+                          <div class="grid grid-cols-3 gap-4">
+                            ${renderUpgradeButton(
+                              UpgradeType.EconomyUpgrade1,
+                              "Econ 1",
+                              1,
+                            )}
+                            ${renderUpgradeButton(
+                              UpgradeType.EconomyUpgrade2,
+                              "Econ 2",
+                              2,
+                            )}
+                            ${renderUpgradeButton(
+                              UpgradeType.EconomyUpgrade3,
+                              "Econ 3",
+                              3,
+                            )}
+                          </div>
+                        `
+                      : ""}
+                  </div>
+
+                  <!-- Research Sub-Tabs -->
+                  <div class="research-tabs">
+                    <button
+                      class="research-tab ${this.activeResearchTab === "Land"
+                        ? "active"
+                        : ""}"
+                      @click=${() => (this.activeResearchTab = "Land")}
+                    >
+                      Land
+                    </button>
+                    <button
+                      class="research-tab ${this.activeResearchTab === "Water"
+                        ? "active"
+                        : ""}"
+                      @click=${() => (this.activeResearchTab = "Water")}
+                    >
+                      Water
+                    </button>
+                    <button
+                      class="research-tab ${this.activeResearchTab === "Air"
+                        ? "active"
+                        : ""}"
+                      @click=${() => (this.activeResearchTab = "Air")}
+                    >
+                      Air
+                    </button>
+                    <button
+                      class="research-tab ${this.activeResearchTab === "Economy"
+                        ? "active"
+                        : ""}"
+                      @click=${() => (this.activeResearchTab = "Economy")}
+                    >
+                      Economy
+                    </button>
+                  </div>
                 </div>
               `
             : ""}

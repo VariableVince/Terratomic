@@ -8,6 +8,7 @@ import {
   UnitUpdate,
 } from "./GameUpdates";
 import { PlayerView } from "./GameView";
+import { Road } from "./RoadManager";
 import { Stats } from "./Stats";
 
 export type PlayerID = string;
@@ -160,6 +161,29 @@ export enum UnitType {
   CargoPlane = "Cargo Plane",
   Bomber = "Bomber",
   FighterJet = "Fighter Jet", // Represents a Fighter Jet unit.
+}
+
+export enum UpgradeType {
+  Roads = "Roads",
+
+  // Land Upgrades
+  InternationalTrade = "InternationalTrade",
+  ScorchedEarth = "ScorchedEarth",
+
+  // Dummy Water Upgrades
+  WaterUpgrade1 = "WaterUpgrade1",
+  WaterUpgrade2 = "WaterUpgrade2",
+  WaterUpgrade3 = "WaterUpgrade3",
+
+  // Dummy Air Upgrades
+  AirUpgrade1 = "AirUpgrade1",
+  AirUpgrade2 = "AirUpgrade2",
+  AirUpgrade3 = "AirUpgrade3",
+
+  // Dummy Economy Upgrades
+  EconomyUpgrade1 = "EconomyUpgrade1",
+  EconomyUpgrade2 = "EconomyUpgrade2",
+  EconomyUpgrade3 = "EconomyUpgrade3",
 }
 
 const _structureTypes: ReadonlySet<UnitType> = new Set([
@@ -545,6 +569,11 @@ export interface Player {
     params: UnitParams<T>,
   ): Unit;
 
+  // Upgrades
+  hasUpgrade(upgrade: UpgradeType): boolean;
+  addUpgrade(upgrade: UpgradeType): void;
+  removeUpgrade(upgrade: UpgradeType): void;
+
   captureUnit(unit: Unit): void;
 
   // Relations & Diplomacy
@@ -651,6 +680,12 @@ export interface Game extends GameMap {
   // Alliances
   alliances(): MutableAlliance[];
   expireAlliance(alliance: Alliance): void;
+
+  // Roads
+  roads(): Road[];
+  hasRoadOnTile(tile: TileRef): boolean;
+  destroyPlayerRoads(player: Player): void;
+  markPlayerNodesForReconnection(player: Player): void;
 
   // Game State
   ticks(): Tick;
