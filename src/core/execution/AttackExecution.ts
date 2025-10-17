@@ -63,6 +63,12 @@ export class AttackExecution implements Execution {
         ? mg.terraNullius()
         : mg.player(this._targetID);
 
+    if (this._owner === this.target) {
+      console.error(`Player ${this._owner} cannot attack itself`);
+      this.active = false;
+      return;
+    }
+
     if (this.target && this.target.isPlayer()) {
       const targetPlayer = this.target as Player;
       if (
@@ -71,13 +77,8 @@ export class AttackExecution implements Execution {
       ) {
         // Don't let bots embargo since they can't trade anyway.
         targetPlayer.addEmbargo(this._owner.id(), true);
+        this.rejectIncomingAllianceRequests(targetPlayer);
       }
-    }
-
-    if (this._owner === this.target) {
-      console.error(`Player ${this._owner} cannot attack itself`);
-      this.active = false;
-      return;
     }
 
     if (this.target.isPlayer()) {
@@ -311,6 +312,15 @@ export class AttackExecution implements Execution {
       }
       this._owner.conquer(tileToConquer);
       this.handleDeadDefender();
+    }
+  }
+
+  private rejectIncomingAllianceRequests(target: Player) {
+    const request = this._owner
+      .incomingAllianceRequests()
+      .find((ar) => ar.requestor() === target);
+    if (request !== undefined) {
+      request.reject();
     }
   }
 

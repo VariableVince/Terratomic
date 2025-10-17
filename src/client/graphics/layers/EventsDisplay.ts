@@ -498,14 +498,30 @@ export class EventsDisplay extends LitElement implements Layer {
 
   onAllianceRequestReplyEvent(update: AllianceRequestReplyUpdate) {
     const myPlayer = this.game.myPlayer();
-    if (!myPlayer) return;
-
-    const { requestorID, recipientID } = update.request;
-    const myID = myPlayer.smallID();
-
-    if (requestorID !== myID && recipientID !== myID) {
+    if (!myPlayer) {
       return;
     }
+    // myPlayer can deny alliances without clicking on the button
+    if (update.request.recipientID === myPlayer.smallID()) {
+      // Remove alliance requests whose requestors are the same as the reply's requestor
+      // Noop unless the request was denied through other means (e.g attacking the requestor)
+      this.events = this.events.filter(
+        (event) =>
+          !(
+            event.type === MessageType.ALLIANCE_REQUEST &&
+            event.focusID === update.request.requestorID
+          ),
+      );
+      this.requestUpdate();
+      return;
+    }
+    if (update.request.requestorID !== myPlayer.smallID()) {
+      return;
+    }
+
+    const myID = myPlayer.smallID();
+    const requestorID = update.request.requestorID;
+    const recipientID = update.request.recipientID;
 
     // Only show message to recipient if it was accepted
     if (!update.accepted && requestorID !== myID) {
