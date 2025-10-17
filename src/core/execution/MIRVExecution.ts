@@ -186,7 +186,7 @@ export class MirvExecution implements Execution {
 
   private isNukeTooCloseToExisting(tile: TileRef, taken: TileRef[]): boolean {
     for (const t of taken) {
-      if (this.mg.manhattanDist(tile, t) < 25) {
+      if (this.mg.manhattanDist(tile, t) < 55) {
         return true;
       }
     }
