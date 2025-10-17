@@ -1,5 +1,6 @@
 import { LitElement, css, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { FlagSchema } from "../core/Schemas";
 import Countries from "./data/countries.json";
 const flagKey: string = "flag";
 
@@ -64,10 +65,24 @@ export class FlagInput extends LitElement {
     );
   }
 
+  private updateFlag = (ev: Event) => {
+    const e = ev as CustomEvent<{ flag: string }>;
+    if (!FlagSchema.safeParse(e.detail.flag).success) return;
+    if (this.flag !== e.detail.flag) {
+      this.flag = e.detail.flag;
+    }
+  };
+
   connectedCallback() {
     super.connectedCallback();
     this.flag = this.getStoredFlag();
     this.dispatchFlagEvent();
+    window.addEventListener("flag-change", this.updateFlag as EventListener);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener("flag-change", this.updateFlag as EventListener);
   }
 
   createRenderRoot() {
