@@ -12,24 +12,10 @@ export default {
     "^nanoid$": "<rootDir>/tests/__mocks__/nanoid.cjs",
   },
   transform: {
-    "^.+\\.tsx?$": [
-      "ts-jest",
-      {
-        useESM: true,
-        tsconfig: "tsconfig.jest.json",
-        astTransformers: {
-          before: ["<rootDir>/tests/transformers/removeImportAttributes.cjs"],
-        },
-        diagnostics: {
-          ignoreCodes: [2823], // <-- ignore "import attributes require esnext/nodenext" in tests
-          warnOnly: true, // optional: logs as warnings instead of failing the run
-        },
-      },
-    ],
+    "^.+\\.tsx?$": ["@swc/jest"],
   },
 
   transformIgnorePatterns: ["node_modules/(?!(node:)/)"],
-  preset: "ts-jest/presets/default-esm",
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts"],
   coverageThreshold: {
     global: {
