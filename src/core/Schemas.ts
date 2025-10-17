@@ -191,7 +191,7 @@ const TokenSchema = z
   .string()
   .refine(
     (v) =>
-      PersistentIdSchema.safeParse(v).success ??
+      PersistentIdSchema.safeParse(v).success ||
       JwtTokenSchema.safeParse(v).success,
     {
       message: "Token must be a valid UUID or JWT",
