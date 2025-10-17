@@ -124,12 +124,14 @@ describe("Attack race condition with alliance requests", () => {
     });
 
     const playerAInfo = new PlayerInfo(
+      "us",
       "playerA",
       PlayerType.Human,
       null,
       "playerA_id",
     );
     const playerBInfo = new PlayerInfo(
+      "us",
       "playerB",
       PlayerType.Human,
       null,
@@ -203,12 +205,14 @@ describe("Attack race condition with alliance requests", () => {
     });
 
     const playerAInfo = new PlayerInfo(
+      "us",
       "playerA",
       PlayerType.Human,
       null,
       "playerA_id",
     );
     const playerBInfo = new PlayerInfo(
+      "us",
       "playerB",
       PlayerType.Human,
       null,

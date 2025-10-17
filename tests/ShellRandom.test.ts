@@ -24,8 +24,8 @@ describe("Shell Random Damage", () => {
         instantBuild: true,
       },
       [
-        new PlayerInfo("attacker", PlayerType.Human, null, "player_1_id"),
-        new PlayerInfo("defender", PlayerType.Human, null, "player_2_id"),
+        new PlayerInfo("us", "attacker", PlayerType.Human, null, "player_1_id"),
+        new PlayerInfo("us", "defender", PlayerType.Human, null, "player_2_id"),
       ],
     );
 
