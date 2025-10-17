@@ -243,15 +243,15 @@ label.option-card:hover {
 }
 
 .player-tag {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 4px 16px;
+  gap: 8px;
+  background: #2a2a2a;
+  color: #fff;
+  padding: 8px 12px;
+  margin: 4px;
   border-radius: 16px;
   font-size: 14px;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 #bots-count,
 #private-lobby-bots-count {
@@ -634,8 +634,42 @@ label.option-card:hover {
   padding: 2px 4px;
   font-size: 12px;
   margin-bottom: 8px;
-}
-.peace-timer-select option {
-  background-color: #1e1e1ee8;
-  color: #cccccc;
+  /* News Button Notification */
+  news-button .active button {
+    position: relative;
+    border-color: #2563eb !important;
+    border-width: 2px !important;
+    box-shadow:
+      0 0 0 1px rgba(37, 99, 235, 0.5),
+      0 0 8px rgba(37, 99, 235, 0.4);
+  }
+  .peace-timer-select option {
+    background-color: #1e1e1ee8;
+    color: #cccccc;
+  }
+
+  .host-badge {
+    font-size: 11px;
+    color: #4caf50;
+    font-weight: bold;
+  }
+
+  .remove-player-btn {
+    width: 16px;
+    height: 16px;
+    border: none;
+    background: #ff4444;
+    color: white;
+    border-radius: 50%;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 4px;
+  }
+
+  .remove-player-btn:hover {
+    background: #ff6666;
+  }
 }

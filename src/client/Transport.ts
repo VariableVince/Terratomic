@@ -189,6 +189,9 @@ export class SendBomberIntentEvent implements GameEvent {
 export class SendSetAutoBombingEvent implements GameEvent {
   constructor(public readonly enabled: boolean) {}
 }
+export class SendKickPlayerIntentEvent implements GameEvent {
+  constructor(public readonly target: string) {}
+}
 
 export class Transport {
   private socket: WebSocket | null = null;
@@ -281,6 +284,9 @@ export class Transport {
     this.eventBus.on(MoveFighterJetIntentEvent, (e) => {
       this.onMoveFighterJetEvent(e);
     });
+    this.eventBus.on(SendKickPlayerIntentEvent, (e) =>
+      this.onSendKickPlayerIntent(e),
+    );
   }
 
   private startPing() {
@@ -687,6 +693,13 @@ export class Transport {
       type: "set_auto_bombing",
       clientID: this.lobbyConfig.clientID,
       enabled: event.enabled,
+    });
+  }
+  private onSendKickPlayerIntent(event: SendKickPlayerIntentEvent) {
+    this.sendIntent({
+      type: "kick_player",
+      clientID: this.lobbyConfig.clientID,
+      target: event.target,
     });
   }
 

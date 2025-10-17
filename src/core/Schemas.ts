@@ -44,7 +44,8 @@ export type Intent =
   | MoveFighterJetIntent
   | BomberIntent
   | MarkDisconnectedIntent
-  | SetAutoBombingIntent;
+  | SetAutoBombingIntent
+  | KickPlayerIntent;
 
 export type AttackIntent = z.infer<typeof AttackIntentSchema>;
 export type CancelAttackIntent = z.infer<typeof CancelAttackIntentSchema>;
@@ -76,6 +77,7 @@ export type QuickChatIntent = z.infer<typeof QuickChatIntentSchema>;
 export type MarkDisconnectedIntent = z.infer<
   typeof MarkDisconnectedIntentSchema
 >;
+export type KickPlayerIntent = z.infer<typeof KickPlayerIntentSchema>;
 
 export type Turn = z.infer<typeof TurnSchema>;
 export enum PeaceTimerDuration {
@@ -376,6 +378,10 @@ export const SetAutoBombingIntentSchema = BaseIntentSchema.extend({
   type: z.literal("set_auto_bombing"),
   enabled: z.boolean(),
 });
+export const KickPlayerIntentSchema = BaseIntentSchema.extend({
+  type: z.literal("kick_player"),
+  target: ID,
+});
 
 const IntentSchema = z.discriminatedUnion("type", [
   AttackIntentSchema,
@@ -402,6 +408,7 @@ const IntentSchema = z.discriminatedUnion("type", [
   BomberIntentSchema,
   QuickChatIntentSchema,
   SetAutoBombingIntentSchema,
+  KickPlayerIntentSchema,
 ]);
 
 //
