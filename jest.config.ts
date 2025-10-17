@@ -32,7 +32,12 @@ export default {
   preset: "ts-jest/presets/default-esm",
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts"],
   coverageThreshold: {
-    global: { branches: 0, functions: 0, lines: 0, statements: 0 },
+    global: {
+      statements: 22.2,
+      branches: 17.5,
+      lines: 22.7,
+      functions: 21.2,
+    },
   },
   coverageReporters: ["text", "lcov", "html"],
   setupFilesAfterEnv: ["<rootDir>/tests/setup.ts"],
