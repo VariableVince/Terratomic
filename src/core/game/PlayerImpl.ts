@@ -129,7 +129,7 @@ export class PlayerImpl implements Player {
     this._troops = toInt(startTroops);
     this._workers = 0n;
     this._gold = 0n;
-    this._displayName = this._name; // processName(this._name)
+    this._displayName = this._name;
     this._pseudo_random = new PseudoRandom(simpleHash(this.playerInfo.id));
   }
 
