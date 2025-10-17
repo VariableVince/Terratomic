@@ -25,7 +25,6 @@ export class OModal extends LitElement {
     }
 
     .c-modal__wrapper {
-      background: #23232382;
       border-radius: 8px;
       min-width: 340px;
       max-width: 860px;
@@ -50,6 +49,7 @@ export class OModal extends LitElement {
     }
 
     .c-modal__content {
+      background: #23232382;
       position: relative;
       color: #fff;
       padding: 1.4rem;
