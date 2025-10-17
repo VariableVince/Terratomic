@@ -1,6 +1,7 @@
 import {
   Execution,
   Game,
+  isUnit,
   MessageType,
   Player,
   Unit,
@@ -45,10 +46,12 @@ export class SAMLauncherExecution implements Execution {
       this.sam.tile(),
       this.mg.config().defaultSamRange(),
       [UnitType.AtomBomb, UnitType.HydrogenBomb],
-      ({ unit }) =>
-        unit.owner() !== this.player &&
-        !this.player.isFriendly(unit.owner()) &&
-        unit.isTargetable(),
+      ({ unit }) => {
+        if (!isUnit(unit)) return false;
+        if (unit.owner() === this.player) return false;
+        if (this.player.isFriendly(unit.owner() as Player)) return false;
+        return unit.isTargetable();
+      },
     );
 
     return (
@@ -131,6 +134,7 @@ export class SAMLauncherExecution implements Execution {
       this.MIRVWarheadSearchRadius,
       UnitType.MIRVWarhead,
       ({ unit }) => {
+        if (!isUnit(unit)) return false;
         if (unit.owner() === this.player) return false;
         if (this.player.isFriendly(unit.owner())) return false;
         const dst = unit.targetTile();
@@ -234,10 +238,11 @@ export class SAMLauncherExecution implements Execution {
 
         if (unitOwner === this.player) return false;
 
-        if (this.player.isFriendly(unitOwner)) return false;
+        if (this.player.isFriendly(unitOwner as Player)) return false;
         if (
           targetUnitOwner === this.player ||
-          (targetUnitOwner && targetUnitOwner.isFriendly(this.player))
+          (targetUnitOwner &&
+            (targetUnitOwner as Player).isFriendly(this.player))
         ) {
           return false;
         }

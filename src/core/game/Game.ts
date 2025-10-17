@@ -10,6 +10,7 @@ import {
 import { PlayerView } from "./GameView";
 import { Road } from "./RoadManager";
 import { Stats } from "./Stats";
+import { UnitPredicate } from "./UnitGrid";
 
 export type PlayerID = string;
 export type Tick = number;
@@ -412,9 +413,10 @@ export class PlayerInfo {
   }
 }
 
-export function isUnit(unit: Unit | UnitParams<UnitType>): unit is Unit {
+export function isUnit(unit: unknown): unit is Unit {
   return (
-    unit !== undefined &&
+    unit &&
+    typeof unit === "object" &&
     "isUnit" in unit &&
     typeof unit.isUnit === "function" &&
     unit.isUnit()
@@ -704,7 +706,7 @@ export interface Game extends GameMap {
     tile: TileRef,
     searchRange: number,
     types: UnitType | UnitType[],
-    predicate?: (value: { unit: Unit; distSquared: number }) => boolean,
+    predicate?: UnitPredicate,
   ): Array<{ unit: Unit; distSquared: number }>;
 
   addExecution(...exec: Execution[]): void;
