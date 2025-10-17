@@ -49,8 +49,8 @@ describe("Unit Grid range tests", () => {
     ["plains", 0, 10, 0, true], // Same spot
     ["plains", 0, 10, 10, true], // Exactly on the range
     ["plains", 0, 10, 11, false], // Exactly 1px outside
-    ["big_plains", 0, 198, 42, true], // Inside huge range
-    ["big_plains", 0, 198, 199, false], // Exactly 1px outside huge range
+    ["Big_Plains", 0, 198, 42, true], // Inside huge range
+    ["Big_Plains", 0, 198, 199, false], // Exactly 1px outside huge range
   ] as const;
 
   describe("Is unit in range", () => {
@@ -75,8 +75,8 @@ describe("Unit Grid range tests", () => {
     ["plains", 0, 10, 0, [], 0], // no unit
     ["plains", 0, 10, 10, [UnitType.City], 1], // Exactly on the range
     ["plains", 0, 10, 11, [UnitType.DefensePost], 0], // 1px outside
-    ["big_plains", 0, 198, 42, [UnitType.TradeShip], 1], // Inside huge range
-    ["big_plains", 0, 198, 199, [UnitType.TransportShip], 0], // 1px outside
+    ["Big_Plains", 0, 198, 42, [UnitType.TradeShip], 1], // Inside huge range
+    ["Big_Plains", 0, 198, 199, [UnitType.TransportShip], 0], // 1px outside
   ] as const;
 
   describe("Retrieve all units in range", () => {
