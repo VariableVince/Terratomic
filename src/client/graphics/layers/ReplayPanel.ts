@@ -64,11 +64,11 @@ export class ReplayPanel extends LitElement implements Layer {
 
     return html`
       <div
-        class="military-panel p-1 lg:p-2"
-        style="box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);"
+        class="submarine-panel military-panel p-1 lg:p-2"
+        style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);"
         @contextmenu=${(e) => e.preventDefault()}
       >
-        <label class="block mb-1 text-white" translate="no">
+        <label class="block mb-1" style="color:#dbe7ff" translate="no">
           ${this._isSinglePlayer
             ? translateText("replay_panel.game_speed")
             : translateText("replay_panel.replay_speed")}
@@ -77,8 +77,8 @@ export class ReplayPanel extends LitElement implements Layer {
           <button
             class="text-white font-bold py-0 rounded border transition ${this
               ._replaySpeedMultiplier === ReplaySpeedMultiplier.slow
-              ? "bg-blue-500 border-gray-400"
-              : "border-gray-500"}"
+              ? "bg-[#1a2e4a] border-[#27476e]"
+              : "border-[#27476e]"}"
             @click=${() => {
               this.onReplaySpeedChange(ReplaySpeedMultiplier.slow);
             }}
@@ -88,8 +88,8 @@ export class ReplayPanel extends LitElement implements Layer {
           <button
             class="text-white font-bold py-0 rounded border transition ${this
               ._replaySpeedMultiplier === ReplaySpeedMultiplier.normal
-              ? "bg-blue-500 border-gray-400"
-              : "border-gray-500"}"
+              ? "bg-[#1a2e4a] border-[#27476e]"
+              : "border-[#27476e]"}"
             @click=${() => {
               this.onReplaySpeedChange(ReplaySpeedMultiplier.normal);
             }}
@@ -99,8 +99,8 @@ export class ReplayPanel extends LitElement implements Layer {
           <button
             class="text-white font-bold py-0 rounded border transition ${this
               ._replaySpeedMultiplier === ReplaySpeedMultiplier.fast
-              ? "bg-blue-500 border-gray-400"
-              : "border-gray-500"}"
+              ? "bg-[#1a2e4a] border-[#27476e]"
+              : "border-[#27476e]"}"
             @click=${() => {
               this.onReplaySpeedChange(ReplaySpeedMultiplier.fast);
             }}
@@ -110,8 +110,8 @@ export class ReplayPanel extends LitElement implements Layer {
           <button
             class="text-white font-bold py-0 rounded border transition ${this
               ._replaySpeedMultiplier === ReplaySpeedMultiplier.fastest
-              ? "bg-blue-500 border-gray-400"
-              : "border-gray-500"}"
+              ? "bg-[#1a2e4a] border-[#27476e]"
+              : "border-[#27476e]"}"
             @click=${() => {
               this.onReplaySpeedChange(ReplaySpeedMultiplier.fastest);
             }}

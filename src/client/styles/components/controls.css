@@ -109,6 +109,34 @@
   font-family: "Azeret Mono", monospace;
 }
 
+/* Submarine/Bunker dark blue variant for in-game UI */
+.submarine-panel {
+  background: linear-gradient(
+    to bottom,
+    rgba(11, 18, 32, 0.92),
+    /* #0b1220 */ rgba(16, 27, 51, 0.92) /* #101b33 */
+  );
+  border: 2px solid #0e1a33; /* deep navy border */
+  color: #dbe7ff; /* soft desaturated light-blue text */
+}
+/* Typography inside submarine panels */
+.submarine-panel .military-heading {
+  color: #e3edff; /* slightly brighter for headings */
+}
+.submarine-panel .military-label {
+  color: #c9dbff; /* softer steel-blue for labels */
+}
+
+/* Default slider look in submarine panels */
+.submarine-panel .military-slider {
+  background: rgba(24, 39, 66, 0.8); /* track */
+}
+.submarine-panel .military-slider::-webkit-slider-thumb,
+.submarine-panel .military-slider::-moz-range-thumb {
+  background: #0b1220; /* blend thumb with panel */
+  border-color: #27476e; /* default thumb rim */
+}
+
 /* Section headings / titles */
 .military-heading {
   font-family: "Black Ops One", cursive;

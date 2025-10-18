@@ -760,17 +760,21 @@ export class ControlPanel2 extends LitElement implements Layer {
       </style>
       <div
         class="${this._isVisible && this.isOpen
-          ? `w-full h-[260px] text-sm lg:text-m military-panel border-2 border-gray-700 p-2 pr-3 lg:p-4 flex flex-col transition-all duration-300 ml-8`
+          ? `w-full h-[260px] text-sm lg:text-m submarine-panel military-panel border-2 border-gray-700 p-2 pr-3 lg:p-4 flex flex-col transition-all duration-300 ml-8`
           : "hidden"}"
-        style="box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);"
+        style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);"
         @contextmenu=${(e: MouseEvent) => e.preventDefault()}
       >
-        <div class="flex border-b border-gray-700 mb-4">
+        <div
+          class="flex border-b"
+          style="border-color: rgba(24,39,66,0.7)"
+          mb-4
+        >
           <button
             class="py-2 px-4 text-center font-ocr uppercase ${this.activeTab ===
             "Build"
-              ? "bg-gray-700 text-crt-green border border-crt-green"
-              : "text-tan"}"
+              ? "text-crt-green border border-crt-green"
+              : ""}"
             @click=${() => this._changeTab("Build")}
           >
             Build
@@ -778,8 +782,8 @@ export class ControlPanel2 extends LitElement implements Layer {
           <button
             class="py-2 px-4 text-center font-ocr uppercase ${this.activeTab ===
             "Attack"
-              ? "bg-gray-700 text-crt-green border border-crt-green"
-              : "text-tan"}"
+              ? "text-crt-green border border-crt-green"
+              : ""}"
             @click=${() => this._changeTab("Attack")}
           >
             Attack
@@ -787,8 +791,8 @@ export class ControlPanel2 extends LitElement implements Layer {
           <button
             class="py-2 px-4 text-center font-ocr uppercase ${this.activeTab ===
             "Economy"
-              ? "bg-gray-700 text-crt-green border border-crt-green"
-              : "text-tan"}"
+              ? "text-crt-green border border-crt-green"
+              : ""}"
             @click=${() => this._changeTab("Economy")}
           >
             Economy
@@ -796,8 +800,8 @@ export class ControlPanel2 extends LitElement implements Layer {
           <button
             class="py-2 px-4 text-center font-ocr uppercase ${this.activeTab ===
             "Research"
-              ? "bg-gray-700 text-crt-green border border-crt-green"
-              : "text-tan"}"
+              ? "text-crt-green border border-crt-green"
+              : ""}"
             @click=${() => this._changeTab("Research")}
           >
             Research
@@ -807,10 +811,8 @@ export class ControlPanel2 extends LitElement implements Layer {
                 <button
                   class="py-2 px-4 text-center font-ocr uppercase ${this
                     .activeTab === "Bombers"
-                    ? "bg-gray-700 text-crt-green border border-crt-green"
-                    : "text-tan"} ${this._highlightBombersTab
-                    ? "highlight-tab"
-                    : ""}"
+                    ? "text-crt-green border border-crt-green"
+                    : ""} ${this._highlightBombersTab ? "highlight-tab" : ""}"
                   @click=${() => this._changeTab("Bombers")}
                 >
                   Bombers
@@ -822,7 +824,7 @@ export class ControlPanel2 extends LitElement implements Layer {
         <div class="tab-content flex-grow overflow-y-auto max-w-full">
           ${this.activeTab === "Bombers"
             ? html`
-                <div class="text-tan flex w-full">
+                <div class="flex w-full">
                   <!-- Column 1: Auto-Bombing -->
                   <div class="w-1/3 pr-2">
                     <h3 class="military-heading mb-2">Auto-Bombing</h3>
@@ -873,7 +875,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                               Select Target
                               <select
                                 id="bomber-player-select"
-                                class="ml-1 p-1 bg-gray-700 text-tan border border-gray-500 rounded-sm w-full truncate"
+                                class="ml-1 p-1 bg-[#132036] text-white border border-[#27476e] rounded-sm w-full truncate"
                                 @change=${this._handleBomberTargetChange}
                               ></select>
                             </label>
@@ -923,7 +925,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                       ? ""
                       : html`
                           <h3 class="military-heading mb-2">Target Actions</h3>
-                          <div class="text-tan text-sm min-h-[20px]">
+                          <div class="text-sm min-h-[20px]">
                             ${this._currentTargetPlayerId &&
                             this._currentTargetStructureType
                               ? html`<span class="font-bold military-label"

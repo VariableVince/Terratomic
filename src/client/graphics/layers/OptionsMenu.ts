@@ -18,9 +18,9 @@ const button = ({
 }) => html`
   <button
     class="flex items-center justify-center p-1
-                               bg-opacity-70 bg-gray-700 text-opacity-90 text-white
+                               bg-opacity-70 bg-[#132036] text-opacity-90 text-white
                                border-none rounded cursor-pointer
-                               hover:bg-opacity-60 hover:bg-gray-600
+                               hover:bg-opacity-60 hover:bg-[#1a2e4a]
                                transition-colors duration-200
                                text-sm lg:text-xl ${classes}"
     @click=${onClick}
@@ -183,8 +183,8 @@ export class OptionsMenu extends LitElement implements Layer {
         @contextmenu=${(e: MouseEvent) => e.preventDefault()}
       >
         <div
-          class="military-panel p-1 lg:p-2"
-          style="box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);"
+          class="submarine-panel military-panel p-1 lg:p-2"
+          style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);"
         >
           <div class="flex items-stretch gap-1 lg:gap-2">
             ${button({
@@ -194,9 +194,8 @@ export class OptionsMenu extends LitElement implements Layer {
               children: this.isPaused ? "▶️" : "⏸",
             })}
             <div
-              class="w-[55px] h-8 lg:w-24 lg:h-10 flex items-center justify-center
-                              bg-opacity-50 bg-gray-700 text-opacity-90 text-white
-                              rounded text-sm lg:text-xl"
+              class="w-[55px] h-8 lg:w-24 lg:h-10 flex items-center justify-center rounded text-sm lg:text-xl"
+              style="background-color: rgba(24, 39, 66, 0.7); color: #e8f0ff;"
             >
               ${secondsToHms(this.timer)}
             </div>
@@ -215,7 +214,8 @@ export class OptionsMenu extends LitElement implements Layer {
             this._peaceTimerRemaining !== null
               ? html`
                   <div
-                    class="flex items-center justify-center mt-1 bg-opacity-50 bg-gray-700 text-opacity-90 text-white rounded p-1"
+                    class="flex items-center justify-center mt-1 rounded p-1"
+                    style="background-color: rgba(24, 39, 66, 0.7); color: #e8f0ff;"
                   >
                     <span
                       class="font-bold text-sm lg:text-base text-white whitespace-normal"
@@ -229,10 +229,10 @@ export class OptionsMenu extends LitElement implements Layer {
       </div>
 
         <div
-          class="military-panel options-menu flex flex-col justify-around gap-y-3 mt-2 p-1 lg:p-2 ${
+          class="submarine-panel military-panel options-menu flex flex-col justify-around gap-y-3 mt-2 p-1 lg:p-2 ${
             !this.showSettings ? "hidden" : ""
           }"
-          style="box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);"
+          style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);"
         >
           ${button({
             onClick: this.onTerrainButtonClick,

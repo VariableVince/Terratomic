@@ -960,7 +960,10 @@ export class EventsDisplay extends LitElement implements Layer {
       <!-- Events Toggle (when hidden) -->
       ${this._hidden
         ? html`
-            <div class="absolute bottom-0 right-0 z-50">
+            <div
+              class="absolute bottom-0 right-0 z-50"
+              style="background-color: rgba(24,39,66,0.6)"
+            >
               ${this.renderButton({
                 content: html`
                   Events
@@ -973,15 +976,15 @@ export class EventsDisplay extends LitElement implements Layer {
                 `,
                 onClick: this.toggleHidden,
                 className:
-                  "text-white cursor-pointer pointer-events-auto w-fit p-2 lg:p-3 rounded-md bg-gray-800/70 backdrop-blur",
+                  "text-white cursor-pointer pointer-events-auto w-fit p-2 lg:p-3 rounded-md",
               })}
             </div>
           `
         : html`
             <!-- Main Events Display -->
             <div
-              class="relative w-full military-panel p-2 pr-3 lg:p-4"
-              style="box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);"
+              class="relative w-full submarine-panel military-panel p-2 pr-3 lg:p-4"
+              style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);"
             >
               <!-- Button Bar -->
               <div class="w-full p-2 lg:p-3 rounded-t-none md:rounded-t-md">

@@ -256,8 +256,8 @@ export class BuildMenu extends LitElement {
       position: relative;
       width: 120px;
       height: 50px;
-      border: 2px solid #1f2018;
-      background: linear-gradient(to bottom, #2f3223, #3b3e2c);
+      border: 2px solid #0e1a33;
+      background: linear-gradient(to bottom, #0b1220, #101b33);
       color: #d8d1b1;
       border-radius: 6px;
       box-shadow:
@@ -274,7 +274,7 @@ export class BuildMenu extends LitElement {
       gap: 8px;
     }
     .build-button:not(:disabled):hover {
-      background: linear-gradient(to bottom, #3b3e2c, #2f3223);
+      background-color: #1a2e4a;
       transform: scale(1.02);
       border-color: #4e513a;
       box-shadow:
@@ -289,8 +289,8 @@ export class BuildMenu extends LitElement {
         0 1px 3px rgba(0, 0, 0, 0.3);
     }
     .build-button:disabled {
-      background: linear-gradient(to bottom, #222, #1a1a1a);
-      border-color: #111;
+      background-color: #0a0f1a;
+      border-color: #0e1a33;
       cursor: not-allowed;
       opacity: 0.6;
       box-shadow: none;

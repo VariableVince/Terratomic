@@ -176,10 +176,13 @@ export class Leaderboard extends LitElement implements Layer {
         @contextmenu=${(e: Event) => e.preventDefault()}
       >
         <div
-          class="grid military-panel w-full text-xs md:text-xs lg:text-sm"
-          style="box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4); grid-template-columns: 30px 100px 70px 55px 75px;"
+          class="grid submarine-panel military-panel w-full text-xs md:text-xs lg:text-sm"
+          style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5); grid-template-columns: 30px 100px 70px 55px 75px;"
         >
-          <div class="contents font-bold bg-gray-700/50">
+          <div
+            class="contents font-bold"
+            style="background-color: rgba(24,39,66,0.5)"
+          >
             <div class="py-1 md:py-2 text-center border-b border-slate-500">
               #
             </div>
@@ -226,7 +229,7 @@ export class Leaderboard extends LitElement implements Layer {
             (p) => p.player.id(),
             (player) => html`
               <div
-                class="contents hover:bg-slate-600/60 ${player.isMyPlayer
+                class="contents hover:bg-[rgba(24,39,66,0.5)] ${player.isMyPlayer
                   ? "font-bold"
                   : ""} cursor-pointer"
                 @click=${() => this.handleRowClickPlayer(player.player)}

@@ -306,14 +306,17 @@ export class ControlPanel extends LitElement implements Layer {
       ${this._isVisible
         ? html`
             <!-- Root panel shell (military-panel provides background/border/colors) -->
-            <div class="relative military-panel">
+            <div class="relative submarine-panel military-panel">
               <div
                 class="w-full h-[255px] text-sm lg:text-m bg-transparent border-0 shadow-inner p-2 pr-3 lg:p-4 rounded-md flex"
                 @contextmenu=${(e: MouseEvent) => e.preventDefault()}
               >
                 <div class="flex-grow flex flex-col h-full">
                   <!-- Top stats block -->
-                  <div class="hidden lg:block mb-4 p-2 rounded-sm bg-gray-700">
+                  <div
+                    class="hidden lg:block mb-4 p-2 rounded-sm"
+                    style="background-color: rgba(24,39,66,0.5)"
+                  >
                     <div class="flex justify-between mb-1">
                       <span class="font-bold military-heading">
                         ${translateText("control_panel.pop")}:
@@ -361,7 +364,7 @@ export class ControlPanel extends LitElement implements Layer {
                       <!-- Background track (exact color) -->
                       <div
                         class="absolute left-0 right-0 top-3 h-2 rounded"
-                        style="background-color:#4E513A"
+                        style="background-color:rgba(24,39,66,0.8)"
                       ></div>
                       <!-- Fill track (exact green) -->
                       <div
@@ -397,16 +400,16 @@ export class ControlPanel extends LitElement implements Layer {
                       )})
                     </label>
                     <div class="relative h-8">
-                      <!-- Background track -->
+                      <!-- Background track (blue track) -->
                       <div
                         class="absolute left-0 right-0 top-3 h-2 rounded"
-                        style="background-color:#4E513A"
+                        style="background-color:rgba(24,39,66,0.8)"
                       ></div>
-                      <!-- Fill track (exact muted red) -->
+                      <!-- Fill track (muted red for attack) -->
                       <div
                         class="absolute left-0 top-3 h-2 rounded transition-all duration-300"
                         style="width:${this.attackRatio *
-                        100}%; background-color: rgba(176,80,78,0.6);"
+                        100}%; background-color: rgba(176,80,78,0.7);"
                       ></div>
                       <!-- Range input -->
                       <input
@@ -431,14 +434,14 @@ export class ControlPanel extends LitElement implements Layer {
               <!-- Vertical Build tab (no functionality change) -->
               <div
                 class="absolute top-0 -right-8 w-8 h-full rounded-r-md flex items-center justify-center cursor-pointer border-2 border-l-0 transition-all duration-200 hover:brightness-125"
-                style="background-color:#3B3E2C; border-color:#1F2018;"
+                style="background-color:#132036; border-color:#0E1A33;"
                 @mouseenter=${this.handleMouseEnterBuildPanel}
                 @mouseleave=${this.handleMouseLeaveBuildPanel}
                 @click=${this.toggleBuildPanel}
               >
                 <span
                   class="build-tab tracking-wider font-ocr uppercase"
-                  style="color:#D8D1B1; transform: none;"
+                  style="color:#dbe7ff; transform: none;"
                   >Build</span
                 >
               </div>
