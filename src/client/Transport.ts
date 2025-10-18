@@ -97,6 +97,10 @@ export class SendPurchaseUpgradeIntentEvent implements GameEvent {
   constructor(public readonly upgrade: UpgradeType) {}
 }
 
+export class SendResearchTreeSelectIntentEvent implements GameEvent {
+  constructor(public readonly techId: string) {}
+}
+
 export class SendTargetPlayerIntentEvent implements GameEvent {
   constructor(public readonly targetID: PlayerID) {}
 }
@@ -264,6 +268,10 @@ export class Transport {
 
     this.eventBus.on(SendPurchaseUpgradeIntentEvent, (e) =>
       this.onSendPurchaseUpgradeIntent(e),
+    );
+
+    this.eventBus.on(SendResearchTreeSelectIntentEvent, (e) =>
+      this.onSendResearchTreeSelectIntent(e),
     );
 
     this.eventBus.on(BuildUnitIntentEvent, (e) => this.onBuildUnitIntent(e));
@@ -599,6 +607,16 @@ export class Transport {
       type: "purchase_upgrade",
       clientID: this.lobbyConfig.clientID,
       upgrade: event.upgrade,
+    });
+  }
+
+  private onSendResearchTreeSelectIntent(
+    event: SendResearchTreeSelectIntentEvent,
+  ) {
+    this.sendIntent({
+      type: "research_tree_select",
+      clientID: this.lobbyConfig.clientID,
+      techId: event.techId,
     });
   }
 

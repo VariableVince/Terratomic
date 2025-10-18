@@ -22,6 +22,7 @@ import { MoveWarshipExecution } from "./MoveWarshipExecution";
 import { NoOpExecution } from "./NoOpExecution";
 import { PurchaseUpgradeExecution } from "./PurchaseUpgradeExecution";
 import { QuickChatExecution } from "./QuickChatExecution";
+import { ResearchTreeSelectExecution } from "./ResearchTreeSelectExecution";
 import { RetreatExecution } from "./RetreatExecution";
 import { SetAutoBombingExecution } from "./SetAutoBombingExecution";
 import { SetInvestmentRateExecution } from "./SetInvestmentRateExecution";
@@ -122,6 +123,8 @@ export class Executor {
         return new ConstructionExecution(player, intent.unit, intent.tile);
       case "purchase_upgrade":
         return new PurchaseUpgradeExecution(player, intent.upgrade);
+      case "research_tree_select":
+        return new ResearchTreeSelectExecution(player, intent.techId);
 
       case "quick_chat":
         return new QuickChatExecution(

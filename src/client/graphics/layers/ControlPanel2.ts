@@ -12,6 +12,7 @@ import {
 import { GameView, PlayerView } from "../../../core/game/GameView";
 import { PlayerListChangedEvent } from "../../events/PlayerListChangedEvent";
 import { AttackRatioEvent } from "../../InputHandler";
+import "../../ResearchTreeModal";
 import {
   SendBomberIntentEvent,
   SendPurchaseUpgradeIntentEvent,
@@ -1058,7 +1059,7 @@ export class ControlPanel2 extends LitElement implements Layer {
             ? html`
                 <div class="text-tan flex flex-col h-full">
                   <!-- Research Sub-Tab Content -->
-                  <div class="flex-grow pt-4 overflow-x-hidden">
+                  <div class="flex-grow pt-4 overflow-x-hidden relative">
                     ${this.activeResearchTab === "Land"
                       ? html`
                           <div class="grid grid-cols-3 gap-4">
@@ -1147,44 +1148,78 @@ export class ControlPanel2 extends LitElement implements Layer {
                   </div>
 
                   <!-- Research Sub-Tabs -->
-                  <div class="research-tabs">
-                    <button
-                      class="research-tab ${this.activeResearchTab === "Land"
-                        ? "active"
-                        : ""}"
-                      @click=${() => (this.activeResearchTab = "Land")}
+                  <div
+                    class="research-tabs"
+                    style="display:flex; align-items:center; justify-content:space-between; gap:16px;"
+                  >
+                    <div
+                      class="research-tab-buttons"
+                      style="display:flex; gap:16px; flex-wrap:wrap;"
                     >
-                      Land
-                    </button>
+                      <button
+                        class="research-tab ${this.activeResearchTab === "Land"
+                          ? "active"
+                          : ""}"
+                        style="padding: 6px 10px;"
+                        @click=${() => (this.activeResearchTab = "Land")}
+                      >
+                        Land
+                      </button>
+                      <button
+                        class="research-tab ${this.activeResearchTab === "Water"
+                          ? "active"
+                          : ""}"
+                        style="padding: 6px 10px;"
+                        @click=${() => (this.activeResearchTab = "Water")}
+                      >
+                        Water
+                      </button>
+                      <button
+                        class="research-tab ${this.activeResearchTab === "Air"
+                          ? "active"
+                          : ""}"
+                        style="padding: 6px 10px;"
+                        @click=${() => (this.activeResearchTab = "Air")}
+                      >
+                        Air
+                      </button>
+                      <button
+                        class="research-tab ${this.activeResearchTab ===
+                        "Economy"
+                          ? "active"
+                          : ""}"
+                        style="padding: 6px 10px;"
+                        @click=${() => (this.activeResearchTab = "Economy")}
+                      >
+                        Economy
+                      </button>
+                    </div>
                     <button
-                      class="research-tab ${this.activeResearchTab === "Water"
-                        ? "active"
-                        : ""}"
-                      @click=${() => (this.activeResearchTab = "Water")}
+                      class="military-button"
+                      title="Open Research Tree"
+                      @click=${() => {
+                        const modal = document.querySelector(
+                          "research-tree-modal",
+                        ) as any;
+                        if (modal) {
+                          modal.game = this.game;
+                          modal.eventBus = this.eventBus;
+                          modal.open();
+                        }
+                      }}
                     >
-                      Water
-                    </button>
-                    <button
-                      class="research-tab ${this.activeResearchTab === "Air"
-                        ? "active"
-                        : ""}"
-                      @click=${() => (this.activeResearchTab = "Air")}
-                    >
-                      Air
-                    </button>
-                    <button
-                      class="research-tab ${this.activeResearchTab === "Economy"
-                        ? "active"
-                        : ""}"
-                      @click=${() => (this.activeResearchTab = "Economy")}
-                    >
-                      Economy
+                      Research Tree
                     </button>
                   </div>
                 </div>
               `
             : ""}
         </div>
+        <!-- Attach ResearchTreeModal instance to the DOM once -->
+        <research-tree-modal
+          .game=${this.game}
+          .eventBus=${this.eventBus}
+        ></research-tree-modal>
       </div>
     `;
   }

@@ -87,6 +87,8 @@ export class PlayerImpl implements Player {
   private _effectiveUnitsCache: Map<UnitType, number> = new Map();
   public _tiles: Set<TileRef> = new Set();
   private _upgrades: Set<UpgradeType> = new Set();
+  // Per-match research tree selections (IDs are client-defined strings)
+  private _researchTreeTechs: Set<string> = new Set();
 
   private _flag: string | undefined;
   private _name: string;
@@ -206,6 +208,7 @@ export class PlayerImpl implements Player {
         {} as Record<UnitType, number>,
       ),
       upgrades: Array.from(this._upgrades),
+      researchTreeTechs: Array.from(this._researchTreeTechs),
     };
   }
 
@@ -306,6 +309,14 @@ export class PlayerImpl implements Player {
 
   removeUpgrade(upgrade: UpgradeType): void {
     this._upgrades.delete(upgrade);
+  }
+
+  // Research tree (standalone) API
+  addResearchedTech(techId: string): void {
+    this._researchTreeTechs.add(techId);
+  }
+  hasResearchedTech(techId: string): boolean {
+    return this._researchTreeTechs.has(techId);
   }
 
   invalidateEffectiveUnitsCache(type: UnitType): void {

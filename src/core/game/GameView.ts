@@ -244,6 +244,10 @@ export class PlayerView {
     return this.data.upgrades.includes(upgrade);
   }
 
+  hasResearchedTech(techId: string): boolean {
+    return this.data.researchTreeTechs?.includes(techId) ?? false;
+  }
+
   unitsOwned(type: UnitType): number {
     return this.data.unitsOwned[type];
   }

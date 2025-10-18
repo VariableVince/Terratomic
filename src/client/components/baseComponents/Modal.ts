@@ -7,6 +7,11 @@ export class OModal extends LitElement {
   @state() public isModalOpen = false;
   @property({ type: String }) title = "";
   @property({ type: String }) translationKey = "";
+  // Optional sizing overrides so some modals can be wider/taller
+  @property({ type: String, attribute: "max-width" }) maxWidth: string =
+    "860px";
+  @property({ type: String, attribute: "max-height" }) maxHeight: string =
+    "60dvh";
 
   static styles = css`
     .c-modal {
@@ -27,7 +32,7 @@ export class OModal extends LitElement {
     .c-modal__wrapper {
       border-radius: 8px;
       min-width: 340px;
-      max-width: 860px;
+      /* max-width is overridden inline using the maxWidth property */
     }
 
     .c-modal__header {
@@ -53,7 +58,7 @@ export class OModal extends LitElement {
       position: relative;
       color: #fff;
       padding: 1.4rem;
-      max-height: 60dvh;
+      /* max-height is overridden inline using the maxHeight property */
       overflow-y: auto;
       backdrop-filter: blur(8px);
     }
@@ -74,14 +79,17 @@ export class OModal extends LitElement {
       ${this.isModalOpen
         ? html`
             <aside class="c-modal">
-              <div class="c-modal__wrapper">
+              <div class="c-modal__wrapper" style="max-width: ${this.maxWidth}">
                 <header class="c-modal__header">
                   ${`${this.translationKey}` === ""
                     ? `${this.title}`
                     : `${translateText(this.translationKey)}`}
                   <div class="c-modal__close" @click=${this.close}>✕</div>
                 </header>
-                <section class="c-modal__content">
+                <section
+                  class="c-modal__content"
+                  style="max-height: ${this.maxHeight}"
+                >
                   <slot></slot>
                 </section>
               </div>

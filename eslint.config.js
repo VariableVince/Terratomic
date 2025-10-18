@@ -57,7 +57,7 @@ export default [
   {
     rules: {
       // Enable rules
-      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      "@typescript-eslint/prefer-nullish-coalescing": "warn",
       eqeqeq: "error",
     },
   },

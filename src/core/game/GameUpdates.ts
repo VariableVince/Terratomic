@@ -174,6 +174,8 @@ export interface PlayerUpdate {
   effectiveUnits: Record<UnitType, number>;
   unitsOwned: Record<UnitType, number>;
   upgrades: UpgradeType[];
+  // Techs researched in the standalone research tree (per-match only)
+  researchTreeTechs: string[];
 }
 
 export interface AllianceRequestUpdate {
