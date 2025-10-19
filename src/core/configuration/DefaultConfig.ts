@@ -30,6 +30,10 @@ import {
   PeaceTimerDuration,
   TeamCountConfig,
 } from "../Schemas";
+import {
+  attackCasualtyModifiers,
+  defenseCasualtyModifiers,
+} from "../tech/TechEffects";
 import { assertNever, simpleHash, within } from "../Util";
 import { Config, GameEnv, NukeMagnitude, ServerConfig, Theme } from "./Config";
 import { PastelTheme } from "./PastelTheme";
@@ -831,13 +835,40 @@ export class DefaultConfig implements Config {
         1.2 - 0.2 * 0.5 ** attacker.effectiveUnits(UnitType.Academy);
       const baseTileCost = 45;
       const attackStandardSize = 10_000;
+      // Apply research-based casualty modifiers when defender is a player
+      const baseAttackerLoss =
+        mag *
+        academyAttackModifier *
+        (baseTroopLoss + attackLossModifier * defenderDensity * traitorDebuff);
+      const baseDefenderLoss = defenderDensity * academyDefenseModifier;
+      let attackerLoss = baseAttackerLoss;
+      let defenderLoss = baseDefenderLoss;
+
+      // Combine attacker-side and defender-side tech modifiers multiplicatively.
+      const atkMods = attackCasualtyModifiers(attacker as Player);
+      const defMods = defenseCasualtyModifiers(defender as Player);
+      attackerLoss *= atkMods.attackerLossMul * defMods.attackerLossMul;
+      defenderLoss *= atkMods.defenderLossMul * defMods.defenderLossMul;
+
+      // TEMP DEBUG: Log only the combined multipliers for human defenders
+      if (defenderType === PlayerType.Human) {
+        try {
+          console.log("[CombatDebug] multipliers", {
+            attackerLossMul: Number(
+              (atkMods.attackerLossMul * defMods.attackerLossMul).toFixed(3),
+            ),
+            defenderLossMul: Number(
+              (atkMods.defenderLossMul * defMods.defenderLossMul).toFixed(3),
+            ),
+          });
+        } catch {
+          // Do nothing; logging must not affect gameplay
+        }
+      }
+
       return {
-        attackerTroopLoss:
-          mag *
-          academyAttackModifier *
-          (baseTroopLoss +
-            attackLossModifier * defenderDensity * traitorDebuff),
-        defenderTroopLoss: defenderDensity * academyDefenseModifier,
+        attackerTroopLoss: attackerLoss,
+        defenderTroopLoss: defenderLoss,
         tilesPerTickUsed:
           (baseTileCost / academyDefenseModifier) *
           within(defenderDensity, 3, 50) ** 0.2 *

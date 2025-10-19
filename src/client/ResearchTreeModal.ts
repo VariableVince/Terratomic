@@ -14,6 +14,7 @@ interface TechNode {
   level: number; // 1..5 top to bottom
   requiresAllOf?: string[]; // all these must be researched
   requiresOneOf?: string[]; // at least one of these researched
+  description?: string; // Optional hover description
 }
 
 @customElement("research-tree-modal")
@@ -82,9 +83,13 @@ export class ResearchTreeModal extends LitElement {
         const id = mkId(cat, lvl);
         const node: TechNode = {
           id,
-          name: `${cat} Tech ${lvl}`,
+          name: id === "Land-1" ? "WWII Lessons Learned" : `${cat} Tech ${lvl}`,
           category: cat,
           level: lvl,
+          description:
+            id === "Land-1"
+              ? "Doctrine refined by hard-won experience improves defensive readiness, logistics, and counter-attack planning. Effects: While defending, your troop losses are reduced by 10% and the attacker's troop losses are increased by 10%."
+              : undefined,
         };
         if (lvl > 1) node.requiresAllOf = [mkId(cat, lvl - 1)];
         t.push(node);
@@ -495,6 +500,46 @@ export class ResearchTreeModal extends LitElement {
             color: #86efac;
             text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
           }
+          /* Themed tooltip for tech descriptions */
+          .tech .tooltip {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #111827; /* modal dark */
+            color: #e5e7eb;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            box-shadow:
+              0 10px 20px rgba(0, 0, 0, 0.35),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+            padding: 8px 10px;
+            font-size: 12px;
+            line-height: 1.25;
+            max-width: 280px;
+            width: max-content;
+            z-index: 10;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 120ms ease;
+            pointer-events: none;
+            white-space: normal;
+          }
+          .tech .tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: #111827 transparent transparent transparent;
+            filter: drop-shadow(0 -1px 0 rgba(55, 65, 81, 0.9));
+          }
+          .tech:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+          }
           .pill {
             font-size: 10px;
             border-radius: 999px;
@@ -577,9 +622,14 @@ export class ResearchTreeModal extends LitElement {
                                 class=${classes}
                                 data-id=${tech.id}
                                 @click=${() => this.onTechClick(tech.id)}
-                                title=${tech.id}
+                                title=${""}
                                 ?disabled=${!clickable}
                               >
+                                ${tech.description
+                                  ? html`<div class="tooltip">
+                                      ${tech.description}
+                                    </div>`
+                                  : ""}
                                 <div
                                   style="font-weight:600; margin-bottom:6px;"
                                 >

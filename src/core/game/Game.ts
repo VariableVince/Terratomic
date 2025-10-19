@@ -576,6 +576,10 @@ export interface Player {
   addUpgrade(upgrade: UpgradeType): void;
   removeUpgrade(upgrade: UpgradeType): void;
 
+  // Research Tree (per-match standalone)
+  hasResearchedTech(techId: string): boolean;
+  addResearchedTech(techId: string): void;
+
   captureUnit(unit: Unit): void;
 
   // Relations & Diplomacy
