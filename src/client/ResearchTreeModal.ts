@@ -500,12 +500,12 @@ export class ResearchTreeModal extends LitElement {
             color: #86efac;
             text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
           }
-          /* Themed tooltip for tech descriptions */
+          /* Themed tooltip for tech descriptions (right-side) */
           .tech .tooltip {
             position: absolute;
-            bottom: calc(100% + 8px);
-            left: 50%;
-            transform: translateX(-50%);
+            top: 50%;
+            left: calc(100% + 8px);
+            transform: translateY(-50%);
             background: #111827; /* modal dark */
             color: #e5e7eb;
             border: 1px solid #374151;
@@ -528,13 +528,13 @@ export class ResearchTreeModal extends LitElement {
           .tech .tooltip::after {
             content: "";
             position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
+            left: -6px;
+            top: 50%;
+            transform: translateY(-50%);
             border-width: 6px;
             border-style: solid;
-            border-color: #111827 transparent transparent transparent;
-            filter: drop-shadow(0 -1px 0 rgba(55, 65, 81, 0.9));
+            border-color: transparent #111827 transparent transparent; /* caret pointing right */
+            filter: drop-shadow(-1px 0 0 rgba(55, 65, 81, 0.9));
           }
           .tech:hover .tooltip {
             opacity: 1;
