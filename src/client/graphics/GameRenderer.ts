@@ -43,6 +43,10 @@ export function createRenderer(
 ): GameRenderer {
   const transformHandler = new TransformHandler(game, eventBus, canvas);
 
+  // Prevent main menu/page scrolling during gameplay
+  const previousBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+
   const uiState: UIState = {
     attackRatio: 0.2, // 20% as a float
     investmentRate: 0.5, // 50% default investment rate
@@ -197,6 +201,12 @@ export function createRenderer(
     console.error("heads-up message not found");
   }
   headsUpMessage.game = game;
+
+  // Provide a lightweight teardown hook to restore page scroll if needed
+
+  const cleanup = () => {
+    document.body.style.overflow = previousBodyOverflow;
+  };
 
   const unitInfoModal = document.querySelector(
     "unit-info-modal",

@@ -256,50 +256,61 @@ export class ControlPanel extends LitElement implements Layer {
           appearance: none;
           width: 16px;
           height: 16px;
-          background: #333;
+          background: #0b1220; /* dark navy to match submarine */
           border-width: 2px;
           border-style: solid;
           border-radius: 50%;
           cursor: pointer;
+          border-color: #27476e; /* subtle blue rim by default */
+          box-shadow: 0 0 0 1px rgba(39, 71, 110, 0.35) inset;
         }
         input[type="range"]::-moz-range-thumb {
           width: 16px;
           height: 16px;
-          background: #333;
+          background: #0b1220; /* dark navy to match submarine */
           border-width: 2px;
           border-style: solid;
           border-radius: 50%;
           cursor: pointer;
+          border-color: #27476e; /* subtle blue rim by default */
+          box-shadow: 0 0 0 1px rgba(39, 71, 110, 0.35) inset;
         }
-        /* Exact WWII palette for thumbs */
-        .targetTroopRatio::-webkit-slider-thumb {
-          border-color: #4eb057;
+        /* Subtle affordance on hover/focus */
+        input[type="range"]:hover::-webkit-slider-thumb,
+        input[type="range"]:focus::-webkit-slider-thumb {
+          border-color: #32629b;
+          box-shadow: 0 0 0 2px rgba(50, 98, 155, 0.45) inset;
         }
-        .targetTroopRatio::-moz-range-thumb {
-          border-color: #4eb057;
+        input[type="range"]:hover::-moz-range-thumb,
+        input[type="range"]:focus::-moz-range-thumb {
+          border-color: #32629b;
+          box-shadow: 0 0 0 2px rgba(50, 98, 155, 0.45) inset;
         }
-        .attackRatio::-webkit-slider-thumb {
-          border-color: #b0504e;
-        }
-        .attackRatio::-moz-range-thumb {
-          border-color: #b0504e;
-        }
-
-        .highlight-tab {
-          animation: pulse 1s infinite alternate;
-        }
-        @keyframes pulse {
-          from {
-            background-color: rgba(78, 176, 87, 0.4);
-          } /* #4EB057 */
-          to {
-            background-color: rgba(78, 176, 87, 0.9);
-          }
-        }
+        /* Standardize thumb rims to submarine blue (no per-slider overrides) */
 
         .build-tab {
           writing-mode: vertical-rl;
           transform: none; /* Changed from rotate(180deg) */
+        }
+
+        /* Pull-tab indicator: three vertical bars */
+        .pull-tab-indicator {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+        }
+        .pull-tab-indicator .bar {
+          width: 3px;
+          height: 22px;
+          background-color: #dbe7ff; /* submarine text */
+          border-radius: 2px;
+          opacity: 0.9;
+          transition: opacity 0.15s ease-in-out;
+        }
+        .pull-tab-indicator:hover .bar {
+          opacity: 1;
         }
       </style>
 
@@ -364,13 +375,13 @@ export class ControlPanel extends LitElement implements Layer {
                       <!-- Background track (exact color) -->
                       <div
                         class="absolute left-0 right-0 top-3 h-2 rounded"
-                        style="background-color:rgba(24,39,66,0.8)"
+                        style="background-color:rgba(24,39,66,0.85)"
                       ></div>
-                      <!-- Fill track (exact green) -->
+                      <!-- Fill track (teal-blue for troops/workers) -->
                       <div
                         class="absolute left-0 top-3 h-2 rounded transition-all duration-300"
                         style="width:${this.currentTroopRatio *
-                        100}%; background-color: rgba(78,176,87,0.6);"
+                        100}%; background-color: rgba(56,162,179,0.68);"
                       ></div>
                       <!-- Range input -->
                       <input
@@ -403,13 +414,13 @@ export class ControlPanel extends LitElement implements Layer {
                       <!-- Background track (blue track) -->
                       <div
                         class="absolute left-0 right-0 top-3 h-2 rounded"
-                        style="background-color:rgba(24,39,66,0.8)"
+                        style="background-color:rgba(24,39,66,0.85)"
                       ></div>
-                      <!-- Fill track (muted red for attack) -->
+                      <!-- Fill track (deep indigo for attack) -->
                       <div
                         class="absolute left-0 top-3 h-2 rounded transition-all duration-300"
                         style="width:${this.attackRatio *
-                        100}%; background-color: rgba(176,80,78,0.7);"
+                        100}%; background-color: rgba(33,56,112,0.8);"
                       ></div>
                       <!-- Range input -->
                       <input
@@ -439,11 +450,15 @@ export class ControlPanel extends LitElement implements Layer {
                 @mouseleave=${this.handleMouseLeaveBuildPanel}
                 @click=${this.toggleBuildPanel}
               >
-                <span
-                  class="build-tab tracking-wider font-ocr uppercase"
-                  style="color:#dbe7ff; transform: none;"
-                  >Build</span
+                <div
+                  class="pull-tab-indicator"
+                  title="Open panel"
+                  aria-label="Open panel"
                 >
+                  <span class="bar" aria-hidden="true"></span>
+                  <span class="bar" aria-hidden="true"></span>
+                  <span class="bar" aria-hidden="true"></span>
+                </div>
               </div>
             </div>
           `

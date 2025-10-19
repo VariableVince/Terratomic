@@ -258,7 +258,7 @@ export class BuildMenu extends LitElement {
       height: 50px;
       border: 2px solid #0e1a33;
       background: linear-gradient(to bottom, #0b1220, #101b33);
-      color: #d8d1b1;
+      color: #c9dbff; /* submarine palette light blue */
       border-radius: 6px;
       box-shadow:
         inset 0 0 10px rgba(0, 0, 0, 0.5),
@@ -274,15 +274,19 @@ export class BuildMenu extends LitElement {
       gap: 8px;
     }
     .build-button:not(:disabled):hover {
-      background-color: #1a2e4a;
+      background-color: #162544; /* deeper navy on hover */
       transform: scale(1.02);
-      border-color: #4e513a;
+      border-color: #27476e; /* blue accent border */
       box-shadow:
         inset 0 0 10px rgba(0, 0, 0, 0.5),
         0 2px 8px rgba(0, 0, 0, 0.6);
     }
     .build-button:not(:disabled):active {
-      background: linear-gradient(to bottom, #2f3223, #2f3223);
+      background: linear-gradient(
+        to bottom,
+        #182742,
+        #182742
+      ); /* pressed navy */
       transform: scale(0.98);
       box-shadow:
         inset 0 0 10px rgba(0, 0, 0, 0.7),
@@ -302,8 +306,8 @@ export class BuildMenu extends LitElement {
       color: #888;
     }
     .selected-for-build {
-      border-color: #4eb057;
-      box-shadow: 0 0 10px #4eb057;
+      border-color: #32629b; /* blue selection accent */
+      box-shadow: 0 0 10px rgba(50, 98, 155, 0.65);
     }
     .build-icon {
       width: 28px;
@@ -321,6 +325,8 @@ export class BuildMenu extends LitElement {
       font-weight: bold;
       text-align: left;
       line-height: 1.2;
+      color: #e3edff; /* brighten primary label */
+      font-family: "Azeret Mono", monospace;
     }
     .build-description {
       font-size: 0.6rem;
@@ -332,11 +338,13 @@ export class BuildMenu extends LitElement {
       -webkit-box-orient: vertical;
       word-break: break-word;
       max-height: 2.4em;
+      color: #9fb6db; /* muted info */
     }
     .build-cost {
       font-size: 10px;
       white-space: nowrap;
       text-align: left;
+      color: #dbe7ff; /* readable cost color */
     }
     .build-count-chip {
       position: absolute;
@@ -353,7 +361,7 @@ export class BuildMenu extends LitElement {
       position: absolute;
       bottom: 2px;
       right: 4px;
-      color: #a0a0a0;
+      color: #93addb; /* subtle hint color */
       font-size: 9px;
     }
     .build-button:not(:disabled):hover > .build-count-chip {

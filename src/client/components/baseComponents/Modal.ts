@@ -12,6 +12,9 @@ export class OModal extends LitElement {
     "860px";
   @property({ type: String, attribute: "max-height" }) maxHeight: string =
     "60dvh";
+  // Control whether the content area itself scrolls (default) or is clipped
+  @property({ type: String, attribute: "content-overflow" })
+  contentOverflow: string = "auto";
 
   static styles = css`
     .c-modal {
@@ -23,7 +26,8 @@ export class OModal extends LitElement {
       right: 0;
       top: 0;
       background-color: rgba(0, 0, 0, 0.5);
-      overflow-y: auto;
+      /* Avoid double vertical scrollbars; content area will scroll */
+      overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -32,6 +36,10 @@ export class OModal extends LitElement {
     .c-modal__wrapper {
       border-radius: 8px;
       min-width: 340px;
+      max-height: 95dvh;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
       /* max-width is overridden inline using the maxWidth property */
     }
 
@@ -59,8 +67,31 @@ export class OModal extends LitElement {
       color: #fff;
       padding: 1.4rem;
       /* max-height is overridden inline using the maxHeight property */
-      overflow-y: auto;
+      overflow: auto;
       backdrop-filter: blur(8px);
+      /* Themed scrollbar (vertical + horizontal) */
+      scrollbar-width: thin;
+      scrollbar-color: #27476e #0e1a33; /* thumb track */
+    }
+    .c-modal__content::-webkit-scrollbar {
+      width: 10px; /* vertical */
+      height: 10px; /* horizontal */
+      background: transparent;
+    }
+    .c-modal__content::-webkit-scrollbar-track {
+      background: #0e1a33;
+      border-radius: 8px;
+      box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4);
+    }
+    .c-modal__content::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #27476e, #1e3554);
+      border-radius: 8px;
+      border: 1px solid #27476e;
+      box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.06);
+    }
+    .c-modal__content::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, #32629b, #254a78);
+      border-color: #32629b;
     }
   `;
   public open() {
@@ -88,7 +119,8 @@ export class OModal extends LitElement {
                 </header>
                 <section
                   class="c-modal__content"
-                  style="max-height: ${this.maxHeight}"
+                  style="max-height: ${this.maxHeight}; overflow: ${this
+                    .contentOverflow}"
                 >
                   <slot></slot>
                 </section>

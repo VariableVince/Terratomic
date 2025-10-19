@@ -124,12 +124,19 @@
   color: #e3edff; /* slightly brighter for headings */
 }
 .submarine-panel .military-label {
-  color: #c9dbff; /* softer steel-blue for labels */
+  /* tone down saturation for better readability */
+  color: #d6dbe6; /* muted light-gray-blue */
 }
 
 /* Default slider look in submarine panels */
 .submarine-panel .military-slider {
-  background: rgba(24, 39, 66, 0.8); /* track */
+  background: transparent; /* let custom track/fill underneath show */
+}
+.submarine-panel .military-slider::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.submarine-panel .military-slider::-moz-range-track {
+  background: transparent;
 }
 .submarine-panel .military-slider::-webkit-slider-thumb,
 .submarine-panel .military-slider::-moz-range-thumb {
@@ -137,9 +144,21 @@
   border-color: #27476e; /* default thumb rim */
 }
 
+/* Submarine variant buttons (override tan) */
+.submarine-panel .military-button {
+  background-color: #183152; /* navy button */
+  color: #e3edff; /* light blue text */
+  border: 1px solid #27476e; /* blue rim */
+}
+.submarine-panel .military-button:hover {
+  background-color: #1d3a60;
+  border-color: #32629b;
+}
+
 /* Section headings / titles */
 .military-heading {
-  font-family: "Black Ops One", cursive;
+  /* Use Oswald for cleaner, condensed headings used by POP:/GOLD: */
+  font-family: "Oswald", sans-serif;
   font-size: 12px;
   letter-spacing: 1px;
   text-transform: uppercase;

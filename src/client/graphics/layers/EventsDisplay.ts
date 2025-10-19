@@ -975,8 +975,9 @@ export class EventsDisplay extends LitElement implements Layer {
                   >
                 `,
                 onClick: this.toggleHidden,
+                // Inherit surrounding text color from panel
                 className:
-                  "text-white cursor-pointer pointer-events-auto w-fit p-2 lg:p-3 rounded-md",
+                  "cursor-pointer pointer-events-auto w-fit p-2 lg:p-3 rounded-md",
               })}
             </div>
           `
@@ -1063,7 +1064,8 @@ export class EventsDisplay extends LitElement implements Layer {
                     ${this.renderButton({
                       content: translateText("leaderboard.hide"),
                       onClick: this.toggleHidden,
-                      className: "text-tan cursor-pointer pointer-events-auto",
+                      // Inherit panel text color instead of forcing old tan
+                      className: "cursor-pointer pointer-events-auto",
                     })}
                   </div>
                 </div>

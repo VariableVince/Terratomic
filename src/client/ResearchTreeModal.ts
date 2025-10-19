@@ -52,8 +52,8 @@ export class ResearchTreeModal extends LitElement {
 
   open() {
     this.modalEl?.open();
-    // Draw edges on the next frame after modal becomes visible so positions are correct
-    requestAnimationFrame(() => setTimeout(() => this.drawEdges(), 0));
+    // Perform a full layout pass on the next frame after opening
+    requestAnimationFrame(() => this.updateLayout());
     // Start a light refresh loop to reflect game state (gold/upgrades) while open
     if (this.refreshTimer === null) {
       this.refreshTimer = window.setInterval(() => this.requestUpdate(), 500);
@@ -260,6 +260,7 @@ export class ResearchTreeModal extends LitElement {
     if (!firstGrid || bands.length !== this.categories.length) return;
     const rootRect = tree.getBoundingClientRect();
     const scrollLeft = tree.scrollLeft;
+    const contentHeight = tree.scrollHeight;
     const slots = firstGrid.querySelectorAll(
       ":scope > .category-slot",
     ) as NodeListOf<HTMLElement>;
@@ -272,8 +273,18 @@ export class ResearchTreeModal extends LitElement {
       band.style.left = `${left}px`;
       band.style.width = `${width}px`;
       band.style.top = "0";
-      band.style.bottom = "0";
+      band.style.bottom = "auto";
+      band.style.height = `${contentHeight}px`;
     });
+    // Reveal the bands immediately after positioning
+    const bandsContainer = this.renderRoot.querySelector(
+      ".category-bands",
+    ) as HTMLElement | null;
+    if (bandsContainer) {
+      bandsContainer.style.height = `${contentHeight}px`;
+      bandsContainer.style.bottom = "auto";
+      bandsContainer.style.visibility = "visible";
+    }
   }
 
   // Orchestrate layout updates and edge redraw
@@ -302,15 +313,16 @@ export class ResearchTreeModal extends LitElement {
     ) as HTMLElement;
     const rootRect = treeEl.getBoundingClientRect();
     const scrollLeft = treeEl.scrollLeft;
+    const scrollTop = treeEl.scrollTop;
 
     const addLine = (fromId: string, toId: string, cls: string) => {
       const a = pos[fromId];
       const b = pos[toId];
       if (!a || !b) return;
       const x1 = a.left - rootRect.left + scrollLeft + a.width / 2;
-      const y1 = a.top - rootRect.top + a.height;
+      const y1 = a.top - rootRect.top + scrollTop + a.height;
       const x2 = b.left - rootRect.left + scrollLeft + b.width / 2;
-      const y2 = b.top - rootRect.top;
+      const y2 = b.top - rootRect.top + scrollTop;
       const path = document.createElementNS(
         "http://www.w3.org/2000/svg",
         "path",
@@ -340,11 +352,7 @@ export class ResearchTreeModal extends LitElement {
   protected firstUpdated(): void {
     setTimeout(() => this.updateLayout(), 0);
     window.addEventListener("resize", this.handleResize);
-    const content = (this.modalEl as any)?.shadowRoot?.querySelector(
-      ".c-modal__content",
-    );
-    content?.addEventListener("scroll", this.handleResize, { passive: true });
-    // Also watch horizontal scroll on the whole tree container
+    // Watch scroll on the whole tree container (both axes)
     const tree = this.renderRoot.querySelector(".tree-container");
     tree?.addEventListener(
       "scroll",
@@ -358,10 +366,7 @@ export class ResearchTreeModal extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener("resize", this.handleResize);
-    const content = (this.modalEl as any)?.shadowRoot?.querySelector(
-      ".c-modal__content",
-    );
-    content?.removeEventListener("scroll", this.handleResize as any);
+    // content no longer scrolls for this modal; listener removed
     const tree = this.renderRoot.querySelector(".tree-container");
     tree?.removeEventListener("scroll", this.handleResize as any);
   }
@@ -373,7 +378,8 @@ export class ResearchTreeModal extends LitElement {
   // No per-match listener needed; UI reflects game state directly
 
   protected updated(): void {
-    setTimeout(() => this.updateLayout(), 0);
+    // Schedule a layout update on the next animation frame
+    requestAnimationFrame(() => this.updateLayout());
   }
 
   render() {
@@ -392,7 +398,13 @@ export class ResearchTreeModal extends LitElement {
     };
 
     return html`
-      <o-modal title="Research Tree" max-width="90vw" max-height="85dvh">
+      <!-- Prevent outer content from scrolling; use inner tree scroll only -->
+      <o-modal
+        title="Research Tree"
+        max-width="90vw"
+        max-height="85dvh"
+        content-overflow="hidden"
+      >
         <style>
           .tree-container {
             display: grid;
@@ -402,9 +414,38 @@ export class ResearchTreeModal extends LitElement {
             gap: 16px;
             position: relative;
             overflow-x: auto;
-            overflow-y: hidden;
+            overflow-y: auto; /* inner scroll */
             width: 100%;
+            /* constrain height to modal content so vertical scroll stays inside */
+            max-height: calc(85dvh - 100px);
             padding-bottom: 4px; /* space for scrollbar overlay */
+            /* Firefox scrollbar */
+            scrollbar-width: thin;
+            scrollbar-color: #27476e #0e1a33; /* thumb track */
+          }
+          /* WebKit-based browsers scrollbar */
+          .tree-container::-webkit-scrollbar {
+            height: 10px; /* horizontal scrollbar thickness */
+            width: 10px; /* vertical scrollbar thickness */
+            background: transparent; /* let track define color */
+          }
+          .tree-container::-webkit-scrollbar-track {
+            background: #0e1a33; /* deep navy track */
+            border-radius: 8px;
+            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4);
+          }
+          .tree-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #27476e, #1e3554);
+            border-radius: 8px;
+            border: 1px solid #27476e;
+            box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.06);
+          }
+          .tree-container::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #32629b, #254a78);
+            border-color: #32629b;
+          }
+          .tree-container::-webkit-scrollbar-corner {
+            background: #0e1a33;
           }
           .category-bands {
             position: absolute;
@@ -412,6 +453,7 @@ export class ResearchTreeModal extends LitElement {
             display: block; /* absolute children are positioned by JS */
             z-index: 0;
             pointer-events: none;
+            visibility: hidden; /* avoid flicker before positioned */
           }
           .category-band {
             border-left: 1px solid rgba(255, 255, 255, 0.05);
@@ -424,7 +466,7 @@ export class ResearchTreeModal extends LitElement {
           }
           .level-header {
             font-weight: bold;
-            color: #d1d5db;
+            color: #e3edff; /* submarine heading */
             margin-bottom: 6px; /* reduce header-bottom gap */
             padding-left: 6px; /* add a bit of left room */
             display: flex;
@@ -459,15 +501,16 @@ export class ResearchTreeModal extends LitElement {
           .category-title {
             font-size: 12px;
             text-transform: uppercase;
-            opacity: 0.7;
+            opacity: 0.8;
+            color: #c9dbff; /* submarine label */
             margin-bottom: 4px;
           }
           .tech {
-            background: #1f2937;
-            border: 1px solid #374151;
+            background: #0b1220; /* submarine panel */
+            border: 1px solid #0e1a33; /* deep navy border */
             border-radius: 8px;
             padding: 8px;
-            color: #e5e7eb;
+            color: #dbe7ff; /* soft desaturated light-blue */
             position: relative;
             cursor: pointer;
             transition:
@@ -481,15 +524,15 @@ export class ResearchTreeModal extends LitElement {
             text-align: left;
           }
           .tech:hover {
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35) inset;
+            box-shadow: 0 0 0 2px rgba(39, 71, 110, 0.8) inset; /* bluish rim */
           }
           .tech.locked {
             opacity: 0.45;
             cursor: not-allowed;
           }
           .tech.researched {
-            background: #374151;
-            border-color: #4b5563;
+            background: #162544; /* slightly lighter */
+            border-color: #27476e;
           }
           .tech.researched::after {
             content: "\\2713";
@@ -497,7 +540,7 @@ export class ResearchTreeModal extends LitElement {
             top: 6px;
             right: 8px;
             font-weight: bold;
-            color: #86efac;
+            color: #86efac; /* keep success green */
             text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
           }
           /* Themed tooltip for tech descriptions (right-side) */
@@ -548,13 +591,13 @@ export class ResearchTreeModal extends LitElement {
             margin-right: 6px;
           }
           .pill-req {
-            background: rgba(239, 68, 68, 0.18);
-            color: #fecaca;
-            border: 1px solid rgba(239, 68, 68, 0.35);
+            background: rgba(176, 80, 78, 0.18); /* warning red match */
+            color: #ffd1d1;
+            border: 1px solid rgba(176, 80, 78, 0.45);
           }
           .pill-oneof {
-            background: rgba(245, 158, 11, 0.18);
-            color: #fde68a;
+            background: rgba(245, 158, 11, 0.14);
+            color: #ffe8a3;
             border: 1px solid rgba(245, 158, 11, 0.35);
           }
           .line-layer {
@@ -572,7 +615,7 @@ export class ResearchTreeModal extends LitElement {
             stroke-width: 2;
           }
           .edge.req {
-            stroke: rgba(239, 68, 68, 0.8);
+            stroke: rgba(176, 80, 78, 0.85);
           }
           .edge.oneof {
             stroke: rgba(245, 158, 11, 0.85);

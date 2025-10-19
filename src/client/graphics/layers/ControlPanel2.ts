@@ -675,10 +675,35 @@ export class ControlPanel2 extends LitElement implements Layer {
           box-shadow: none;
         }
 
+        /* Top-level ControlPanel2 tabs (Build/Attack/Economy/Research/Bombers) */
+        .cp2-tab {
+          color: #c9dbff;
+          border: 1px solid #0e1a33;
+          background-color: #0b1220;
+          border-radius: 6px;
+          transition:
+            background-color 0.15s ease-in-out,
+            color 0.15s ease-in-out,
+            border-color 0.15s ease-in-out,
+            box-shadow 0.15s ease-in-out;
+        }
+        .cp2-tab:hover:not(.active) {
+          background-color: #162544;
+          color: #e3edff;
+          border-color: #183152;
+        }
+        .cp2-tab.active {
+          background-color: #182742;
+          color: #e3edff;
+          border-color: #27476e;
+          box-shadow: 0 0 0 1px rgba(39, 71, 110, 0.35) inset;
+        }
+
         .research-tabs {
           display: flex;
           margin-top: auto;
-          border-top: 1px solid #4a5568; /* gray-700 */
+          /* submarine palette divider */
+          border-top: 1px solid #27476e;
         }
 
         .research-tab {
@@ -686,27 +711,50 @@ export class ControlPanel2 extends LitElement implements Layer {
           padding: 8px 0;
           text-align: center;
           cursor: pointer;
-          border: 1px solid #1a202c;
+          /* submarine palette button base */
+          border: 1px solid #0e1a33;
           border-top: none;
-          background-color: #1a202c;
-          color: #a0aec0;
+          background-color: #0b1220;
+          color: #c9dbff;
           box-shadow: inset 0px 2px 5px rgba(0, 0, 0, 0.4);
         }
 
         .research-tab:hover:not(.active) {
-          background-color: #2d3748;
-          color: #e2e8f0;
+          background-color: #162544;
+          color: #e3edff;
         }
 
         .research-tab.active {
-          background-color: #2d3748;
-          color: #e2e8f0;
-          border-color: #4a5568;
+          background-color: #182742;
+          color: #e3edff;
+          border-color: #27476e;
           border-bottom-color: transparent;
           box-shadow: 0px -2px 5px rgba(0, 0, 0, 0.2);
           position: relative;
           top: -1px;
           border-radius: 6px 6px 0 0;
+        }
+
+        /* Dedicated Research Tree button aligned to submarine palette */
+        .research-button {
+          background-color: #183152; /* slightly brighter than panel */
+          color: #e3edff;
+          border: 1px solid #27476e;
+          padding: 4px 10px;
+          text-transform: uppercase;
+          font-size: 12px;
+          font-family: "Azeret Mono", monospace;
+          transition:
+            background-color 0.15s ease-in-out,
+            box-shadow 0.15s ease-in-out,
+            border-color 0.15s ease-in-out;
+          box-shadow: 0 0 0 1px rgba(39, 71, 110, 0.35) inset;
+          border-radius: 6px;
+        }
+        .research-button:hover {
+          background-color: #1d3a60;
+          border-color: #32629b;
+          box-shadow: 0 0 0 2px rgba(50, 98, 155, 0.45) inset;
         }
 
         input[type="range"] {
@@ -719,44 +767,38 @@ export class ControlPanel2 extends LitElement implements Layer {
           appearance: none;
           width: 16px;
           height: 16px;
-          background: white;
+          background: #0b1220; /* dark navy to match submarine */
           border-width: 2px;
           border-style: solid;
           border-radius: 50%;
           cursor: pointer;
+          border-color: #27476e; /* default subtle blue rim */
+          box-shadow: 0 0 0 1px rgba(39, 71, 110, 0.35) inset;
         }
         input[type="range"]::-moz-range-thumb {
           width: 16px;
           height: 16px;
-          background: white;
+          background: #0b1220; /* dark navy to match submarine */
           border-width: 2px;
           border-style: solid;
           border-radius: 50%;
           cursor: pointer;
+          border-color: #27476e; /* default subtle blue rim */
+          box-shadow: 0 0 0 1px rgba(39, 71, 110, 0.35) inset;
         }
-        .targetTroopRatio::-webkit-slider-thumb {
-          border-color: rgb(59 130 246);
+        /* Subtle affordance on hover/focus */
+        input[type="range"]:hover::-webkit-slider-thumb,
+        input[type="range"]:focus::-webkit-slider-thumb {
+          border-color: #32629b;
+          box-shadow: 0 0 0 2px rgba(50, 98, 155, 0.45) inset;
         }
-        .targetTroopRatio::-moz-range-thumb {
-          border-color: rgb(59 130 246);
+        input[type="range"]:hover::-moz-range-thumb,
+        input[type="range"]:focus::-moz-range-thumb {
+          border-color: #32629b;
+          box-shadow: 0 0 0 2px rgba(50, 98, 155, 0.45) inset;
         }
-        .attackRatio::-webkit-slider-thumb {
-          border-color: rgb(239 68 68);
-        }
-        .attackRatio::-moz-range-thumb {
-          border-color: rgb(239 68 68);
-        }
-        .highlight-tab {
-          animation: pulse 1s infinite alternate;
-        }
-        @keyframes pulse {
-          from {
-            background-color: rgba(78, 176, 87, 0.4);
-          }
-          to {
-            background-color: rgba(78, 176, 87, 0.9);
-          }
-        }
+        /* Standardize thumb rims to submarine blue (no per-slider overrides) */
+        /* Removed unused green pulse styles */
       </style>
       <div
         class="${this._isVisible && this.isOpen
@@ -771,36 +813,36 @@ export class ControlPanel2 extends LitElement implements Layer {
           mb-4
         >
           <button
-            class="py-2 px-4 text-center font-ocr uppercase ${this.activeTab ===
-            "Build"
-              ? "text-crt-green border border-crt-green"
+            class="py-2 px-4 text-center font-ocr uppercase cp2-tab ${this
+              .activeTab === "Build"
+              ? "active"
               : ""}"
             @click=${() => this._changeTab("Build")}
           >
             Build
           </button>
           <button
-            class="py-2 px-4 text-center font-ocr uppercase ${this.activeTab ===
-            "Attack"
-              ? "text-crt-green border border-crt-green"
+            class="py-2 px-4 text-center font-ocr uppercase cp2-tab ${this
+              .activeTab === "Attack"
+              ? "active"
               : ""}"
             @click=${() => this._changeTab("Attack")}
           >
             Attack
           </button>
           <button
-            class="py-2 px-4 text-center font-ocr uppercase ${this.activeTab ===
-            "Economy"
-              ? "text-crt-green border border-crt-green"
+            class="py-2 px-4 text-center font-ocr uppercase cp2-tab ${this
+              .activeTab === "Economy"
+              ? "active"
               : ""}"
             @click=${() => this._changeTab("Economy")}
           >
             Economy
           </button>
           <button
-            class="py-2 px-4 text-center font-ocr uppercase ${this.activeTab ===
-            "Research"
-              ? "text-crt-green border border-crt-green"
+            class="py-2 px-4 text-center font-ocr uppercase cp2-tab ${this
+              .activeTab === "Research"
+              ? "active"
               : ""}"
             @click=${() => this._changeTab("Research")}
           >
@@ -809,9 +851,9 @@ export class ControlPanel2 extends LitElement implements Layer {
           ${this._hasAirfields
             ? html`
                 <button
-                  class="py-2 px-4 text-center font-ocr uppercase ${this
+                  class="py-2 px-4 text-center font-ocr uppercase cp2-tab ${this
                     .activeTab === "Bombers"
-                    ? "text-crt-green border border-crt-green"
+                    ? "active"
                     : ""} ${this._highlightBombersTab ? "highlight-tab" : ""}"
                   @click=${() => this._changeTab("Bombers")}
                 >
@@ -1013,7 +1055,7 @@ export class ControlPanel2 extends LitElement implements Layer {
             : ""}
           ${this.activeTab === "Economy"
             ? html`
-                <div class="text-tan">
+                <div>
                   <div class="relative">
                     <label class="block military-label mb-1" translate="no">
                       Production Investment Rate:
@@ -1031,13 +1073,13 @@ export class ControlPanel2 extends LitElement implements Layer {
                     <div class="relative h-8">
                       <div
                         class="absolute left-0 right-0 top-3 h-2 rounded"
-                        style="background-color:#4E513A"
+                        style="background-color:rgba(24,39,66,0.85)"
                       ></div>
                       <div
                         class="absolute left-0 top-3 h-2 rounded transition-all duration-300"
                         style="width:${(this.investmentRate /
                           this.game.config().maxInvestmentRate()) *
-                        100}%; background-color: rgba(78,176,87,0.6);"
+                        100}%; background-color: rgba(64,123,189,0.6);"
                       ></div>
                       <input
                         type="range"
@@ -1059,7 +1101,7 @@ export class ControlPanel2 extends LitElement implements Layer {
             : ""}
           ${this.activeTab === "Research"
             ? html`
-                <div class="text-tan flex flex-col h-full">
+                <div class="flex flex-col h-full">
                   <!-- Research Sub-Tab Content -->
                   <div class="flex-grow pt-4 overflow-x-hidden relative">
                     ${this.activeResearchTab === "Land"
@@ -1197,7 +1239,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                       </button>
                     </div>
                     <button
-                      class="military-button"
+                      class="research-button"
                       title="Open Research Tree"
                       @click=${() => {
                         const modal = document.querySelector(
