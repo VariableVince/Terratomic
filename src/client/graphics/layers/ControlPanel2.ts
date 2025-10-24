@@ -882,6 +882,24 @@ export class ControlPanel2 extends LitElement implements Layer {
         }
         /* Standardize thumb rims to submarine blue (no per-slider overrides) */
         /* Removed unused green pulse styles */
+        /* Disabled slider visual */
+        .slider-disabled {
+          opacity: 0.5;
+          filter: grayscale(0.3);
+        }
+        .lock-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          margin-left: 6px;
+          color: #a0aec0;
+          font-size: 11px;
+        }
+        .lock-icon {
+          width: 12px;
+          height: 12px;
+          fill: #a0aec0;
+        }
       </style>
       <div
         class="${this._isVisible && this.isOpen
@@ -1205,7 +1223,9 @@ export class ControlPanel2 extends LitElement implements Layer {
                       />
                     </div>
                   </div>
-                  <div class="relative mt-6">
+                  <div
+                    class="relative mt-6 ${!hasRoads ? "slider-disabled" : ""}"
+                  >
                     ${(() => {
                       const me = this.game?.myPlayer?.();
                       const grossPerSecond = me
@@ -1224,6 +1244,23 @@ export class ControlPanel2 extends LitElement implements Layer {
                           <span class="opacity-70"
                             >(${pxPerSecond.toFixed(2)} px/s)</span
                           >
+                          ${!hasRoads
+                            ? html`<span
+                                class="lock-badge"
+                                title="Research Roads to enable road investment"
+                              >
+                                <svg
+                                  class="lock-icon"
+                                  viewBox="0 0 24 24"
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    d="M8 10V7a4 4 0 118 0v3h1a2 2 0 012 2v8a2 2 0 01-2 2H7a2 2 0 01-2-2v-8a2 2 0 012-2h1zm2 0h4V7a2 2 0 10-4 0v3z"
+                                  />
+                                </svg>
+                                Locked
+                              </span>`
+                            : ""}
                         </label>
                       `;
                     })()}
