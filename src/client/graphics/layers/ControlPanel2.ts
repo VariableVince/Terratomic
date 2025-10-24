@@ -1430,19 +1430,11 @@ export class ControlPanel2 extends LitElement implements Layer {
                   </div>
                   <div class="relative mt-6">
                     ${(() => {
-                      const me = this.game?.myPlayer?.();
-                      const grossPerSecond = me
-                        ? this.game.config().grossGoldAdditionRate(me) * 10
-                        : 0;
-                      const investedPerSecond =
-                        grossPerSecond * this._researchInvestmentRate;
+                      // Removed gold cost display next to the research slider per request
                       return html`
                         <label class="block military-label mb-1" translate="no">
                           Research investment:
                           ${(this._researchInvestmentRate * 100).toFixed(0)}%
-                          <span class="opacity-70"
-                            >(-${investedPerSecond.toFixed(0)} gold/s)</span
-                          >
                         </label>
                       `;
                     })()}
