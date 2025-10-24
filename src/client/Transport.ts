@@ -160,6 +160,10 @@ export class SendSetRoadInvestmentEvent implements GameEvent {
   constructor(public readonly rate: number) {}
 }
 
+export class SendSetResearchInvestmentEvent implements GameEvent {
+  constructor(public readonly rate: number) {}
+}
+
 export class SendWinnerEvent implements GameEvent {
   constructor(
     public readonly winner: Winner,
@@ -267,6 +271,9 @@ export class Transport {
     );
     this.eventBus.on(SendSetRoadInvestmentEvent, (e) =>
       this.onSendSetRoadInvestmentEvent(e),
+    );
+    this.eventBus.on(SendSetResearchInvestmentEvent, (e) =>
+      this.onSendSetResearchInvestmentEvent(e),
     );
     this.eventBus.on(SendBomberIntentEvent, (e) => this.onSendBomberIntent(e));
     this.eventBus.on(SendSetAutoBombingEvent, (e) =>
@@ -594,6 +601,16 @@ export class Transport {
   private onSendSetRoadInvestmentEvent(event: SendSetRoadInvestmentEvent) {
     this.sendIntent({
       type: "road_investment_rate",
+      clientID: this.lobbyConfig.clientID,
+      rate: event.rate,
+    });
+  }
+
+  private onSendSetResearchInvestmentEvent(
+    event: SendSetResearchInvestmentEvent,
+  ) {
+    this.sendIntent({
+      type: "research_investment_rate",
       clientID: this.lobbyConfig.clientID,
       rate: event.rate,
     });

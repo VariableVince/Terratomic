@@ -163,18 +163,20 @@ export class ControlPanel extends LitElement implements Layer {
     this._troops = player.troops();
     this._workers = player.workers();
     this.popRate = this.game.config().populationIncreaseRate(player) * 10;
-    // For display: estimate net gold/sec including BOTH investments
+    // For display: estimate net gold/sec including all investments
     // Use centralized gross gold calculation from config
     const grossPerSecond =
       10 * this.game.config().grossGoldAdditionRate(player);
     // Read persisted sliders
     const prodStr = localStorage.getItem("settings.investmentRate");
     const roadStr = localStorage.getItem("settings.roadInvestmentRate");
+    const researchStr = localStorage.getItem("settings.researchInvestmentRate");
     const prodRate = prodStr ? Number(prodStr) : 0;
     const roadRate = roadStr ? Number(roadStr) : 0;
+    const researchRate = researchStr ? Number(researchStr) : 0;
     const hasTreasury = (this._gold ?? 0n) > 0n;
     const maxTotal = hasTreasury ? 1.1 : 1.0;
-    const total = Math.min(prodRate + roadRate, maxTotal);
+    const total = Math.min(prodRate + roadRate + researchRate, maxTotal);
     const netPerSecondDouble = grossPerSecond * (1 - total);
     const netPerSecond = BigInt(
       Math.floor(Number.isFinite(netPerSecondDouble) ? netPerSecondDouble : 0),

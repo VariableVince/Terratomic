@@ -78,6 +78,7 @@ export class PlayerImpl implements Player {
   private _productivityGrowthPerMinute = 0;
   private _maxproductivity = 1;
   private _roadInvestmentRate: number = 0; // 0..1, fraction of per-tick income allocated to roads
+  private _researchInvestmentRate: number = 0; // 0..1, fraction of per-tick income allocated to research
 
   markedTraitorTick = -1;
 
@@ -853,6 +854,15 @@ export class PlayerImpl implements Player {
   setRoadInvestmentRate(rate: number): void {
     const clamped = Math.max(0, Math.min(1, rate));
     this._roadInvestmentRate = clamped;
+  }
+
+  // Research investment ratio (0..1)
+  researchInvestmentRate(): number {
+    return this._researchInvestmentRate;
+  }
+  setResearchInvestmentRate(rate: number): void {
+    const clamped = Math.max(0, Math.min(1, rate));
+    this._researchInvestmentRate = clamped;
   }
 
   troops(): number {

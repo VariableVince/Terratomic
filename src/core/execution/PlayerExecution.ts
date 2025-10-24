@@ -82,7 +82,8 @@ export class PlayerExecution implements Execution {
     const roadInvest = this.player.hasUpgrade(UpgradeType.Roads)
       ? (this.player.roadInvestmentRate?.() ?? 0)
       : 0;
-    let totalInvest = prodInvest + roadInvest; // can exceed 1
+    const researchInvest = this.player.researchInvestmentRate?.() ?? 0; // 0..1 (no gating)
+    let totalInvest = prodInvest + roadInvest + researchInvest; // can exceed 1
 
     // Allow up to 110% total when treasury is positive, else cap at 100%
     const hasTreasury = this.player.gold() > 0n;

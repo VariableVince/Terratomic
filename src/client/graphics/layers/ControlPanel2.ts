@@ -18,6 +18,7 @@ import {
   SendPurchaseUpgradeIntentEvent,
   SendSetAutoBombingEvent,
   SendSetInvestmentRateEvent,
+  SendSetResearchInvestmentEvent,
   SendSetRoadInvestmentEvent,
   SendSetTargetTroopRatioEvent,
 } from "../../Transport";
@@ -45,6 +46,9 @@ export class ControlPanel2 extends LitElement implements Layer {
 
   @state()
   private _roadInvestmentRate: number = 0; // 0..1 of per-tick income allocated to roads
+
+  @state()
+  private _researchInvestmentRate: number = 0; // 0..1 of per-tick income allocated to research (UI only for now)
 
   @state()
   private _population: number;
@@ -182,6 +186,7 @@ export class ControlPanel2 extends LitElement implements Layer {
     // Force both investment sliders to start at 0 at the beginning of the game
     this.investmentRate = 0;
     this._roadInvestmentRate = 0;
+    this._researchInvestmentRate = 0;
     // Persist zeros so UI and any other readers start from 0
     localStorage.setItem(
       "settings.investmentRate",
@@ -190,6 +195,10 @@ export class ControlPanel2 extends LitElement implements Layer {
     localStorage.setItem(
       "settings.roadInvestmentRate",
       this._roadInvestmentRate.toString(),
+    );
+    localStorage.setItem(
+      "settings.researchInvestmentRate",
+      this._researchInvestmentRate.toString(),
     );
     this.uiState.investmentRate = this.investmentRate;
     this.init_ = true;
@@ -256,6 +265,9 @@ export class ControlPanel2 extends LitElement implements Layer {
       this.eventBus.emit(
         new SendSetRoadInvestmentEvent(this._roadInvestmentRate),
       );
+      this.eventBus.emit(
+        new SendSetResearchInvestmentEvent(this._researchInvestmentRate),
+      );
       this.init_ = false;
     }
 
@@ -305,21 +317,26 @@ export class ControlPanel2 extends LitElement implements Layer {
       const maxProd = this.game?.config?.().maxInvestmentRate?.() ?? 0.5;
       let prod = Math.max(0, Math.min(maxProd, this.investmentRate));
       let road = Math.max(0, Math.min(1, this._roadInvestmentRate));
-      const sum = prod + road;
+      let research = Math.max(0, Math.min(1, this._researchInvestmentRate));
+      const sum = prod + road + research;
       if (sum > cap) {
-        // Proportional reduction to exactly meet the cap
+        // Proportional reduction across all three to exactly meet the cap
         const scale = cap / sum; // 0 < scale < 1
         prod = Math.min(maxProd, prod * scale);
         road = road * scale;
+        research = research * scale;
 
         const prodChanged = prod !== this.investmentRate;
         const roadChanged = road !== this._roadInvestmentRate;
-        if (prodChanged || roadChanged) {
+        const researchChanged = research !== this._researchInvestmentRate;
+        if (prodChanged || roadChanged || researchChanged) {
           this.investmentRate = prod;
           this._roadInvestmentRate = road;
+          this._researchInvestmentRate = research;
           if (prodChanged) this.onInvestmentRateChange(this.investmentRate);
           if (roadChanged)
             this.onRoadInvestmentChange(this._roadInvestmentRate);
+          // research currently client-only
           localStorage.setItem(
             "settings.investmentRate",
             this.investmentRate.toString(),
@@ -327,6 +344,10 @@ export class ControlPanel2 extends LitElement implements Layer {
           localStorage.setItem(
             "settings.roadInvestmentRate",
             this._roadInvestmentRate.toString(),
+          );
+          localStorage.setItem(
+            "settings.researchInvestmentRate",
+            this._researchInvestmentRate.toString(),
           );
         }
       }
@@ -379,6 +400,9 @@ export class ControlPanel2 extends LitElement implements Layer {
   onRoadInvestmentChange(newRate: number) {
     this.eventBus.emit(new SendSetRoadInvestmentEvent(newRate));
   }
+  onResearchInvestmentChange(newRate: number) {
+    this.eventBus.emit(new SendSetResearchInvestmentEvent(newRate));
+  }
 
   /**
    * Compute the dynamic cap for total investments.
@@ -393,13 +417,13 @@ export class ControlPanel2 extends LitElement implements Layer {
   }
 
   /**
-   * Adjust the two investment sliders so their sum does not exceed the cap.
-   * If the changed one tries to push the total above the cap, reduce the other accordingly.
+   * Adjust the three investment sliders so their sum does not exceed the cap.
+   * If the changed one tries to push the total above the cap, reduce the other two proportionally.
    */
-  private _applyCoupledInvestmentConstraint(
-    changed: "prod" | "road",
+  private _applyTripleInvestmentConstraint(
+    changed: "prod" | "road" | "research",
     proposed: number,
-  ): { prod: number; road: number } {
+  ): { prod: number; road: number; research: number } {
     const maxProd = this.game?.config?.().maxInvestmentRate?.() ?? 0.5;
     let prod = Math.max(
       0,
@@ -409,30 +433,65 @@ export class ControlPanel2 extends LitElement implements Layer {
       0,
       Math.min(1, changed === "road" ? proposed : this._roadInvestmentRate),
     );
+    let research = Math.max(
+      0,
+      Math.min(
+        1,
+        changed === "research" ? proposed : this._researchInvestmentRate,
+      ),
+    );
 
     const cap = this._maxTotalInvestment();
-    const sum = prod + road;
-    if (sum <= cap) return { prod, road };
+    const sum = prod + road + research;
+    if (sum <= cap) return { prod, road, research };
 
-    // Reduce the opposite slider first by the excess
-    const excess = sum - cap;
-    if (changed === "prod") {
-      // Try to reduce road first
-      const newRoad = Math.max(0, road - excess);
-      road = newRoad;
-      // If still above cap (road hit 0), clamp prod
-      if (prod + road > cap) {
-        prod = Math.max(0, cap - road);
+    // Keep the changed value (already clamped), proportionally reduce the other two
+    const others =
+      changed === "prod"
+        ? road + research
+        : changed === "road"
+          ? prod + research
+          : prod + road;
+    const available = Math.max(
+      0,
+      cap - (changed === "prod" ? prod : changed === "road" ? road : research),
+    );
+    if (others <= 0) {
+      // No room for others
+      if (changed === "prod") {
+        road = 0;
+        research = 0;
+        if (prod > cap) prod = Math.min(maxProd, cap);
+      } else if (changed === "road") {
+        prod = Math.min(maxProd, Math.max(0, Math.min(prod, cap)));
+        research = 0;
+        if (road > cap) road = cap;
+      } else {
+        prod = Math.min(maxProd, Math.max(0, Math.min(prod, cap)));
+        road = 0;
+        if (research > cap) research = cap;
       }
-    } else {
-      // changed === "road": try to reduce prod first
-      const newProd = Math.max(0, prod - excess);
-      prod = Math.min(maxProd, newProd);
-      if (prod + road > cap) {
-        road = Math.max(0, cap - prod);
-      }
+      return { prod, road, research };
     }
-    return { prod, road };
+
+    const scale = available / others; // 0..1
+    if (changed === "prod") {
+      road = Math.max(0, road * scale);
+      research = Math.max(0, research * scale);
+    } else if (changed === "road") {
+      prod = Math.min(maxProd, Math.max(0, prod * scale));
+      research = Math.max(0, research * scale);
+    } else {
+      // changed === "research"
+      prod = Math.min(maxProd, Math.max(0, prod * scale));
+      road = Math.max(0, road * scale);
+    }
+
+    // Final safety clamp
+    prod = Math.max(0, Math.min(maxProd, prod));
+    road = Math.max(0, Math.min(1, road));
+    research = Math.max(0, Math.min(1, research));
+    return { prod, road, research };
   }
 
   renderLayer(context: CanvasRenderingContext2D) {
@@ -1224,8 +1283,8 @@ export class ControlPanel2 extends LitElement implements Layer {
                           const proposed =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
-                          const { prod, road } =
-                            this._applyCoupledInvestmentConstraint(
+                          const { prod, road, research } =
+                            this._applyTripleInvestmentConstraint(
                               "prod",
                               proposed,
                             );
@@ -1235,6 +1294,7 @@ export class ControlPanel2 extends LitElement implements Layer {
 
                           this.investmentRate = prod;
                           this._roadInvestmentRate = road;
+                          this._researchInvestmentRate = research;
 
                           if (prodChanged)
                             this.onInvestmentRateChange(this.investmentRate);
@@ -1250,6 +1310,10 @@ export class ControlPanel2 extends LitElement implements Layer {
                           localStorage.setItem(
                             "settings.roadInvestmentRate",
                             this._roadInvestmentRate.toString(),
+                          );
+                          localStorage.setItem(
+                            "settings.researchInvestmentRate",
+                            this._researchInvestmentRate.toString(),
                           );
                         }}
                         class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
@@ -1323,8 +1387,8 @@ export class ControlPanel2 extends LitElement implements Layer {
                           const proposed =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
-                          const { prod, road } =
-                            this._applyCoupledInvestmentConstraint(
+                          const { prod, road, research } =
+                            this._applyTripleInvestmentConstraint(
                               "road",
                               proposed,
                             );
@@ -1334,6 +1398,7 @@ export class ControlPanel2 extends LitElement implements Layer {
 
                           this.investmentRate = prod;
                           this._roadInvestmentRate = road;
+                          this._researchInvestmentRate = research;
 
                           if (roadChanged)
                             this.onRoadInvestmentChange(
@@ -1350,6 +1415,10 @@ export class ControlPanel2 extends LitElement implements Layer {
                             "settings.investmentRate",
                             this.investmentRate.toString(),
                           );
+                          localStorage.setItem(
+                            "settings.researchInvestmentRate",
+                            this._researchInvestmentRate.toString(),
+                          );
                         }}
                         class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
                       />
@@ -1358,6 +1427,90 @@ export class ControlPanel2 extends LitElement implements Layer {
                       class="text-right text-xs opacity-60 mt-1 military-label normal-case"
                       translate="no"
                     ></div>
+                  </div>
+                  <div class="relative mt-6">
+                    ${(() => {
+                      const me = this.game?.myPlayer?.();
+                      const grossPerSecond = me
+                        ? this.game.config().grossGoldAdditionRate(me) * 10
+                        : 0;
+                      const investedPerSecond =
+                        grossPerSecond * this._researchInvestmentRate;
+                      return html`
+                        <label class="block military-label mb-1" translate="no">
+                          Research investment:
+                          ${(this._researchInvestmentRate * 100).toFixed(0)}%
+                          <span class="opacity-70"
+                            >(-${investedPerSecond.toFixed(0)} gold/s)</span
+                          >
+                        </label>
+                      `;
+                    })()}
+                    <div class="relative h-8">
+                      <div
+                        class="absolute left-0 right-0 top-3 h-2 rounded"
+                        style="background-color:rgba(24,39,66,0.85)"
+                      ></div>
+                      <div
+                        class="absolute left-0 top-3 h-2 rounded transition-all duration-300"
+                        style="width:${(
+                          this._researchInvestmentRate * 100
+                        ).toFixed(2)}%; background-color: rgba(64,123,189,0.6);"
+                      ></div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        .value=${(
+                          this._researchInvestmentRate * 100
+                        ).toString()}
+                        @input=${(e: Event) => {
+                          const proposed =
+                            parseInt((e.target as HTMLInputElement).value) /
+                            100;
+                          const { prod, road, research } =
+                            this._applyTripleInvestmentConstraint(
+                              "research",
+                              proposed,
+                            );
+
+                          const prodChanged = prod !== this.investmentRate;
+                          const roadChanged = road !== this._roadInvestmentRate;
+                          const researchChanged =
+                            research !== this._researchInvestmentRate;
+
+                          this.investmentRate = prod;
+                          this._roadInvestmentRate = road;
+                          this._researchInvestmentRate = research;
+
+                          if (prodChanged)
+                            this.onInvestmentRateChange(this.investmentRate);
+                          if (roadChanged)
+                            this.onRoadInvestmentChange(
+                              this._roadInvestmentRate,
+                            );
+                          if (researchChanged)
+                            this.onResearchInvestmentChange(
+                              this._researchInvestmentRate,
+                            );
+
+                          localStorage.setItem(
+                            "settings.investmentRate",
+                            this.investmentRate.toString(),
+                          );
+                          localStorage.setItem(
+                            "settings.roadInvestmentRate",
+                            this._roadInvestmentRate.toString(),
+                          );
+                          localStorage.setItem(
+                            "settings.researchInvestmentRate",
+                            this._researchInvestmentRate.toString(),
+                          );
+                        }}
+                        class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
+                      />
+                    </div>
                   </div>
                 </div>
               `
