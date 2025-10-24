@@ -299,7 +299,7 @@ export class ControlPanel2 extends LitElement implements Layer {
       );
     }
 
-    // Enforce cap if treasury state changed (or at any time) so UI never exceeds allowed total
+    // Enforce cap so UI never exceeds allowed total; apply proportional cuts when necessary
     {
       const cap = this._maxTotalInvestment();
       const maxProd = this.game?.config?.().maxInvestmentRate?.() ?? 0.5;
@@ -307,14 +307,10 @@ export class ControlPanel2 extends LitElement implements Layer {
       let road = Math.max(0, Math.min(1, this._roadInvestmentRate));
       const sum = prod + road;
       if (sum > cap) {
-        let excess = sum - cap;
-        // Prefer reducing road first (keeps production stable)
-        const reduceRoad = Math.min(road, excess);
-        road -= reduceRoad;
-        excess -= reduceRoad;
-        if (excess > 0) {
-          prod = Math.max(0, prod - excess);
-        }
+        // Proportional reduction to exactly meet the cap
+        const scale = cap / sum; // 0 < scale < 1
+        prod = Math.min(maxProd, prod * scale);
+        road = road * scale;
 
         const prodChanged = prod !== this.investmentRate;
         const roadChanged = road !== this._roadInvestmentRate;
