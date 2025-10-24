@@ -73,6 +73,8 @@ export class PlayerImpl implements Player {
   // 0 to 100
   private _targetTroopRatio: bigint;
   private _investmentRate: number = 0.5;
+  // Client slider: pixels per 10 ticks (i.e., pixels/second). Range [0,5].
+  private _roadBuildSpeedPxPerSecond: number = 1.0;
   private _productivity = 1;
   private _productivityGrowthPerMinute = 0;
   private _maxproductivity = 1;
@@ -842,6 +844,16 @@ export class PlayerImpl implements Player {
       this.mg.config().maxInvestmentRate(),
       Math.max(0, rate),
     );
+  }
+
+  // Road construction speed (px per 10 ticks). Clamped to [0, 5].
+  roadBuildSpeed(): number {
+    return this._roadBuildSpeedPxPerSecond;
+  }
+  setRoadBuildSpeed(ratePxPerSecond: number): void {
+    // Keep within sane bounds; UI enforces 0..5 but clamp defensively
+    const clamped = Math.max(0, Math.min(5, ratePxPerSecond));
+    this._roadBuildSpeedPxPerSecond = clamped;
   }
 
   troops(): number {

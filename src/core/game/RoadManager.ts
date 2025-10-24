@@ -17,6 +17,20 @@ export interface Road {
   owner: PlayerID;
 }
 
+interface PlannedRoad {
+  owner: PlayerID;
+  start: TileRef;
+  end: TileRef;
+  path: TileRef[];
+  length: number;
+}
+
+interface ConstructionState {
+  planned: PlannedRoad;
+  builtIndex: number; // number of completed edges (between tile[i] and tile[i+1])
+  pxAccum: number; // remaining pixel progress towards next edge
+}
+
 let nextRoadId = 0;
 
 /**
@@ -48,6 +62,12 @@ export class RoadManager {
   private nodeOwnerIds = new Map<number, PlayerID>();
   private nodesByOwner = new Map<PlayerID, Unit[]>();
   private roadCache: RoadCache;
+
+  // New: per-player planned road queues and construction state
+  private plannedQueues = new Map<PlayerID, PlannedRoad[]>();
+  private currentConstruction = new Map<PlayerID, ConstructionState>();
+  private reservedEndpointSegments = new Set<string>(); // endpoints reserved for planned/construction
+  private underConstructionSegments = new Set<string>(); // tile-to-tile segments added before finalization
 
   // Performance optimization caches
   private roadTilesCache = new Set<TileRef>();
@@ -330,40 +350,15 @@ export class RoadManager {
             newNode.tile(),
             neighbor.tile(),
           );
-          if (!this.existingRoadSegments.has(segment)) {
+          if (!this.reservedEndpointSegments.has(segment)) {
             const path = this.getCachedPath(newNode.tile(), neighbor.tile());
             if (path) {
-              const newRoad: Road = {
-                id: nextRoadId++,
+              this.enqueuePlannedRoad(
+                ownerOfNewNode.id(),
+                newNode.tile(),
+                neighbor.tile(),
                 path,
-                owner: ownerOfNewNode.id(),
-              };
-              this.roads.set(newRoad.id, newRoad);
-
-              // Add to the new roadsByOwner map
-              if (!this.roadsByOwner.has(newRoad.owner)) {
-                this.roadsByOwner.set(newRoad.owner, new Set());
-              }
-              this.roadsByOwner.get(newRoad.owner)!.add(newRoad.id);
-              this.existingRoadSegments.add(segment);
-              this.updateRoadTilesCache([newRoad], []);
-
-              const startNode = this.findNodeByTile(path[0]);
-              const endNode = this.findNodeByTile(path[path.length - 1]);
-              if (startNode && endNode) {
-                this.structureGraph.addEdge(startNode, endNode, path);
-              }
-
-              // Update road network for renderer
-              for (let i = 0; i < path.length - 1; i++) {
-                const a = path[i];
-                const b = path[i + 1];
-                const seg = this.getCanonicalSegment(a, b);
-                if (!this.segmentSet.has(seg)) {
-                  this.segmentSet.add(seg);
-                  this.pendingAddedSegments.push(seg);
-                }
-              }
+              );
             }
           }
         }
@@ -423,42 +418,25 @@ export class RoadManager {
       processedThisTick++;
       this.pathfindingQueue.shift(); // Only remove if we're actually processing it
 
-      if (!this.existingRoadSegments.has(canonicalSegment)) {
+      if (!this.reservedEndpointSegments.has(canonicalSegment)) {
         const path = this.getCachedPath(from, to);
         if (path) {
           const owner = this.game.owner(from);
           if (owner.isPlayer()) {
-            const newRoad: Road = { id: nextRoadId++, path, owner: owner.id() };
-            this.roads.set(newRoad.id, newRoad);
-
-            // Add to the new roadsByOwner map
-            if (!this.roadsByOwner.has(newRoad.owner)) {
-              this.roadsByOwner.set(newRoad.owner, new Set());
-            }
-            this.roadsByOwner.get(newRoad.owner)!.add(newRoad.id);
-            this.existingRoadSegments.add(canonicalSegment);
-            this.updateRoadTilesCache([newRoad], []);
-
-            const startNode = this.findNodeByTile(path[0]);
-            const endNode = this.findNodeByTile(path[path.length - 1]);
-            if (startNode && endNode) {
-              this.structureGraph.addEdge(startNode, endNode, path);
-            }
-
-            // Update road network for renderer
-            for (let i = 0; i < path.length - 1; i++) {
-              const a = path[i];
-              const b = path[i + 1];
-              const seg = this.getCanonicalSegment(a, b);
-              if (!this.segmentSet.has(seg)) {
-                this.segmentSet.add(seg);
-                this.pendingAddedSegments.push(seg);
-              }
-            }
+            this.enqueuePlannedRoad(
+              owner.id(),
+              from,
+              to,
+              path,
+              /*priority*/ !!isPriority,
+            );
           }
         }
       }
     }
+
+    // Progressive construction per-player based on slider speed
+    this.progressConstruction(playersWithRoads);
 
     // Periodically reconcile the incremental segment set with authoritative roads
     this.maybeReconcileSegments();
@@ -470,6 +448,168 @@ export class RoadManager {
     this.pendingRemovedSegments = [];
 
     return { added, removed };
+  }
+
+  private enqueuePlannedRoad(
+    owner: PlayerID,
+    start: TileRef,
+    end: TileRef,
+    path: TileRef[],
+    isPriority: boolean = false,
+  ): void {
+    const segmentKey = this.getCanonicalSegment(start, end);
+    // Reserve endpoints to avoid duplicate planning
+    this.reservedEndpointSegments.add(segmentKey);
+
+    const planned: PlannedRoad = {
+      owner,
+      start,
+      end,
+      path,
+      length: Math.max(0, (path.length - 1) * 1), // pixels at 1px per tile edge (canvas grid is 1px per tile)
+    };
+
+    const queue = this.plannedQueues.get(owner) ?? [];
+    queue.push(planned);
+    // Sort by length ascending, but keep currentConstruction intact elsewhere
+    queue.sort((a, b) => a.length - b.length);
+    this.plannedQueues.set(owner, queue);
+
+    // If no construction currently running for owner, start this one
+    if (!this.currentConstruction.has(owner)) {
+      this.currentConstruction.set(owner, {
+        planned,
+        builtIndex: 0,
+        pxAccum: 0,
+      });
+      // Remove from queue head (we kept it sorted)
+      const idx = queue.indexOf(planned);
+      if (idx >= 0) queue.splice(idx, 1);
+    }
+  }
+
+  private progressConstruction(playersWithRoads: Player[]): void {
+    // Map players to their IDs for quick speed lookup
+    const playerById = new Map<PlayerID, Player>();
+    for (const p of playersWithRoads) playerById.set(p.id(), p);
+
+    for (const [pid, state] of this.currentConstruction) {
+      const player = playerById.get(pid);
+      if (!player) {
+        // Player no longer has roads or is gone; abandon construction
+        this.currentConstruction.delete(pid);
+        continue;
+      }
+      const speedPxPerSecond = player.roadBuildSpeed(); // pixels per 10 ticks
+      if (speedPxPerSecond <= 0) continue; // paused
+
+      // Convert to per-tick progress (10 ticks per second)
+      state.pxAccum += speedPxPerSecond / 10;
+
+      // Canvas grid uses 1px per tile step (see RoadLayer using game.x/y() directly)
+      const TILE_EDGE_PX = 1;
+      let edgesToBuild = Math.floor(state.pxAccum / TILE_EDGE_PX);
+      if (edgesToBuild <= 0) continue;
+
+      // Consume px and build edges
+      state.pxAccum -= edgesToBuild * TILE_EDGE_PX;
+
+      // Validate endpoints periodically; if invalid, abandon and move on
+      if (!this.isPlannedRoadValid(state.planned)) {
+        // Free reservation so it can be replanned later
+        this.reservedEndpointSegments.delete(
+          this.getCanonicalSegment(state.planned.start, state.planned.end),
+        );
+        // Do not remove already built segments; keep partials
+        this.currentConstruction.delete(pid);
+        this.startNextFor(pid);
+        continue;
+      }
+
+      const path = state.planned.path;
+      while (edgesToBuild > 0 && state.builtIndex < path.length - 1) {
+        const a = path[state.builtIndex];
+        const b = path[state.builtIndex + 1];
+        const seg = this.getCanonicalSegment(a, b);
+        if (!this.segmentSet.has(seg)) {
+          this.segmentSet.add(seg);
+          this.pendingAddedSegments.push(seg);
+        }
+        // Track as under construction until the entire road is finalized
+        this.underConstructionSegments.add(seg);
+        // Update road tiles cache incrementally to influence future pathfinding
+        this.roadTilesCache.add(a);
+        this.roadTilesCache.add(b);
+
+        state.builtIndex++;
+        edgesToBuild--;
+      }
+
+      // If completed, finalize as an authoritative road
+      if (state.builtIndex >= path.length - 1) {
+        const newRoad: Road = {
+          id: nextRoadId++,
+          path: path,
+          owner: pid,
+        };
+        this.roads.set(newRoad.id, newRoad);
+        if (!this.roadsByOwner.has(newRoad.owner)) {
+          this.roadsByOwner.set(newRoad.owner, new Set());
+        }
+        this.roadsByOwner.get(newRoad.owner)!.add(newRoad.id);
+
+        // Ensure reservation and existing-endpoint record are set
+        const endpointKey = this.getCanonicalSegment(
+          path[0],
+          path[path.length - 1],
+        );
+        this.existingRoadSegments.add(endpointKey);
+        this.reservedEndpointSegments.add(endpointKey);
+
+        // Link in structure graph now that it's built end-to-end
+        const startNode = this.findNodeByTile(path[0]);
+        const endNode = this.findNodeByTile(path[path.length - 1]);
+        if (startNode && endNode) {
+          this.structureGraph.addEdge(startNode, endNode, path);
+        }
+
+        // This road is now finalized; remove its segments from the temporary under-construction set
+        for (let i = 0; i < path.length - 1; i++) {
+          const seg = this.getCanonicalSegment(path[i], path[i + 1]);
+          this.underConstructionSegments.delete(seg);
+        }
+
+        // Already incrementally added tiles to roadTilesCache and segments to segmentSet
+        // Just clear construction and move to next
+        this.currentConstruction.delete(pid);
+        this.startNextFor(pid);
+      }
+    }
+  }
+
+  private startNextFor(pid: PlayerID): void {
+    const q = this.plannedQueues.get(pid);
+    if (!q || q.length === 0) return;
+    // Next item is always the first (already sorted shortest-first)
+    const planned = q.shift()!;
+    this.currentConstruction.set(pid, { planned, builtIndex: 0, pxAccum: 0 });
+  }
+
+  private isPlannedRoadValid(pr: PlannedRoad): boolean {
+    // Endpoints must remain land and owned by player or friendly
+    const ok = (r: TileRef) => {
+      if (!this.game.isLand(r)) return false;
+      const owner = this.game.owner(r);
+      if (!owner.isPlayer()) return false;
+      if (owner.id() === pr.owner) return true;
+      const roadOwner = this.game.player(pr.owner);
+      return roadOwner.isFriendly(owner as Player);
+    };
+    if (!ok(pr.start) || !ok(pr.end)) return false;
+
+    // Optionally verify that a path still exists (cheap via cache or recompute)
+    const cached = this.getCachedPath(pr.start, pr.end);
+    return cached !== null;
   }
 
   private maybeReconcileSegments(force: boolean = false): void {
@@ -498,7 +638,12 @@ export class RoadManager {
       if (!this.segmentSet.has(seg)) toAdd.push(seg);
     }
     for (const seg of this.segmentSet) {
-      if (!current.has(seg)) toRemove.push(seg);
+      if (!current.has(seg)) {
+        // Do not remove segments that are currently under construction
+        if (!this.underConstructionSegments.has(seg)) {
+          toRemove.push(seg);
+        }
+      }
     }
 
     if (toAdd.length === 0 && toRemove.length === 0) return;
@@ -632,6 +777,16 @@ export class RoadManager {
   public destroyPlayerRoads(player: Player): void {
     const roadIdsToDestroy = this.roadsByOwner.get(player.id());
     if (!roadIdsToDestroy) {
+      // Still clear any planned or in-progress roads for this player
+      this.plannedQueues.delete(player.id());
+      const inProg = this.currentConstruction.get(player.id());
+      if (inProg) {
+        // Free endpoint reservation so it can be planned again in the future
+        this.reservedEndpointSegments.delete(
+          this.getCanonicalSegment(inProg.planned.start, inProg.planned.end),
+        );
+        this.currentConstruction.delete(player.id());
+      }
       return;
     }
 
@@ -668,6 +823,16 @@ export class RoadManager {
     }
 
     this.roadsByOwner.delete(player.id());
+
+    // Also clear planned and in-progress work for this player
+    this.plannedQueues.delete(player.id());
+    const inProg = this.currentConstruction.get(player.id());
+    if (inProg) {
+      this.reservedEndpointSegments.delete(
+        this.getCanonicalSegment(inProg.planned.start, inProg.planned.end),
+      );
+      this.currentConstruction.delete(player.id());
+    }
 
     // Clear path cache as roads have been destroyed
     this.clearPathCache();

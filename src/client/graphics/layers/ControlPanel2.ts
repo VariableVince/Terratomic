@@ -18,6 +18,7 @@ import {
   SendPurchaseUpgradeIntentEvent,
   SendSetAutoBombingEvent,
   SendSetInvestmentRateEvent,
+  SendSetRoadSpeedEvent,
   SendSetTargetTroopRatioEvent,
 } from "../../Transport";
 import { UIState } from "../UIState";
@@ -41,6 +42,9 @@ export class ControlPanel2 extends LitElement implements Layer {
 
   @state()
   private investmentRate: number = 0; // default to 0%
+
+  @state()
+  private _roadSpeed: number = 1; // pixels per second (per 10 ticks)
 
   @state()
   private _population: number;
@@ -178,6 +182,7 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.investmentRate = Number(
       localStorage.getItem("settings.investmentRate") ?? "0",
     );
+    this._roadSpeed = Number(localStorage.getItem("settings.roadSpeed") ?? "1");
     this.uiState.investmentRate = this.investmentRate;
     this.init_ = true;
     this.uiState.attackRatio = this.attackRatio;
@@ -240,6 +245,7 @@ export class ControlPanel2 extends LitElement implements Layer {
         new SendSetTargetTroopRatioEvent(this.targetTroopRatio),
       );
       this.eventBus.emit(new SendSetInvestmentRateEvent(this.investmentRate));
+      this.eventBus.emit(new SendSetRoadSpeedEvent(this._roadSpeed));
       this.init_ = false;
     }
 
@@ -316,6 +322,9 @@ export class ControlPanel2 extends LitElement implements Layer {
   }
   onInvestmentRateChange(newRate: number) {
     this.eventBus.emit(new SendSetInvestmentRateEvent(newRate));
+  }
+  onRoadSpeedChange(newRate: number) {
+    this.eventBus.emit(new SendSetRoadSpeedEvent(newRate));
   }
 
   renderLayer(context: CanvasRenderingContext2D) {
@@ -1091,9 +1100,54 @@ export class ControlPanel2 extends LitElement implements Layer {
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
                           this.onInvestmentRateChange(this.investmentRate);
+                          localStorage.setItem(
+                            "settings.investmentRate",
+                            this.investmentRate.toString(),
+                          );
                         }}
                         class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
                       />
+                    </div>
+                  </div>
+                  <div class="relative mt-6">
+                    <label class="block military-label mb-1" translate="no">
+                      Road construction speed: ${this._roadSpeed.toFixed(2)}
+                      px/s
+                    </label>
+                    <div class="relative h-8">
+                      <div
+                        class="absolute left-0 right-0 top-3 h-2 rounded"
+                        style="background-color:rgba(24,39,66,0.85)"
+                      ></div>
+                      <div
+                        class="absolute left-0 top-3 h-2 rounded transition-all duration-300"
+                        style="width:${(this._roadSpeed / 5) *
+                        100}%; background-color: rgba(64,123,189,0.6);"
+                      ></div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        step="0.05"
+                        .value=${this._roadSpeed.toString()}
+                        @input=${(e: Event) => {
+                          this._roadSpeed = parseFloat(
+                            (e.target as HTMLInputElement).value,
+                          );
+                          this.onRoadSpeedChange(this._roadSpeed);
+                          localStorage.setItem(
+                            "settings.roadSpeed",
+                            this._roadSpeed.toString(),
+                          );
+                        }}
+                        class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
+                      />
+                    </div>
+                    <div
+                      class="text-right text-xs opacity-60 mt-1 military-label normal-case"
+                      translate="no"
+                    >
+                      Pixels per 10 ticks (1 second). 0 disables building.
                     </div>
                   </div>
                 </div>
