@@ -1008,19 +1008,24 @@ export class DefaultConfig implements Config {
     return Math.min(totalPop + toAdd, max) - totalPop;
   }
 
-  goldAdditionRate(player: Player): bigint {
-    const base = 0.06 * player.workers() ** 0.65;
+  // Gross gold per tick BEFORE any investments are subtracted
+  grossGoldAdditionRate(player: Player | PlayerView): number {
+    const base = 0.06 * Math.pow(player.workers(), 0.65);
     const productivity = player.productivity();
-    const investmentRate = player.investmentRate();
     const grossGold = base * productivity;
+    return Number.isFinite(grossGold) && grossGold >= 0 ? grossGold : 0;
+  }
+
+  goldAdditionRate(player: Player): bigint {
+    const grossGold = this.grossGoldAdditionRate(player);
+    const investmentRate = player.investmentRate();
     const netGold = grossGold * (1 - investmentRate);
 
     if (!Number.isFinite(netGold)) {
       console.warn("[goldAdditionRate] netGold is NaN or invalid", {
         workers: player.workers(),
-        productivity,
+        productivity: player.productivity(),
         investmentRate,
-        base,
         grossGold,
         netGold,
       });

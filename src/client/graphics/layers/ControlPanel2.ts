@@ -1099,9 +1099,17 @@ export class ControlPanel2 extends LitElement implements Layer {
                         max="${this.game?.config()?.maxInvestmentRate() * 100}"
                         .value=${(this.investmentRate * 100).toString()}
                         @input=${(e: Event) => {
-                          this.investmentRate =
+                          // Proposed new production investment rate
+                          const newRate =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
+                          // Also respect maxInvestmentRate config
+                          const maxProd =
+                            this.game?.config()?.maxInvestmentRate?.() ?? 0.5;
+                          this.investmentRate = Math.min(
+                            maxProd,
+                            Math.max(0, newRate),
+                          );
                           this.onInvestmentRateChange(this.investmentRate);
                           localStorage.setItem(
                             "settings.investmentRate",
@@ -1114,9 +1122,13 @@ export class ControlPanel2 extends LitElement implements Layer {
                   </div>
                   <div class="relative mt-6">
                     ${(() => {
-                      const goldPerSecond = Number(this._goldPerSecond ?? 0n);
+                      // Compute gross gold per second (pre-investment) for display using config
+                      const me = this.game?.myPlayer?.();
+                      const grossPerSecond = me
+                        ? this.game.config().grossGoldAdditionRate(me) * 10
+                        : 0;
                       const investedPerSecond =
-                        goldPerSecond * this._roadInvestmentRate;
+                        grossPerSecond * this._roadInvestmentRate;
                       const pxPerSecond = investedPerSecond / 1000; // 1000 gold/s => 1 px/s
                       return html`
                         <label class="block military-label mb-1" translate="no">
@@ -1145,9 +1157,14 @@ export class ControlPanel2 extends LitElement implements Layer {
                         step="1"
                         .value=${(this._roadInvestmentRate * 100).toString()}
                         @input=${(e: Event) => {
-                          this._roadInvestmentRate =
+                          // Proposed new road investment rate
+                          const newRate =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
+                          this._roadInvestmentRate = Math.max(
+                            0,
+                            Math.min(1, newRate),
+                          );
                           this.onRoadInvestmentChange(this._roadInvestmentRate);
                           localStorage.setItem(
                             "settings.roadInvestmentRate",

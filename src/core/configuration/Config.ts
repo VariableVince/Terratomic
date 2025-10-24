@@ -90,6 +90,8 @@ export interface Config {
 
   startManpower(playerInfo: PlayerInfo): number;
   populationIncreaseRate(player: Player | PlayerView): number;
+  // Gross gold per tick BEFORE any investments are subtracted (number, not bigint)
+  grossGoldAdditionRate(player: Player | PlayerView): number;
   goldAdditionRate(player: Player | PlayerView): Gold;
   troopAdjustmentRate(player: Player): number;
   attackTilesPerTick(

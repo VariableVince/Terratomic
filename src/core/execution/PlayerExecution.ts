@@ -72,17 +72,34 @@ export class PlayerExecution implements Execution {
     this.player.resetHospitalReturns();
     this.player.addWorkers(popInc * (1 - this.player.targetTroopRatio()));
     this.player.addTroops(popInc * this.player.targetTroopRatio());
-    const goldFromWorkers = this.config.goldAdditionRate(this.player);
-    // Subtract road investment from income stream
-    const investRate = this.player.hasUpgrade(UpgradeType.Roads)
+    // Compute gross gold from config (pre-investment), then apply both investments
+    const grossGoldDouble = this.config.grossGoldAdditionRate(this.player);
+    const grossGold = BigInt(
+      Math.floor(Number.isFinite(grossGoldDouble) ? grossGoldDouble : 0),
+    );
+
+    const prodInvest = this.player.investmentRate?.() ?? 0; // 0..0.5 (clamped in PlayerImpl)
+    const roadInvest = this.player.hasUpgrade(UpgradeType.Roads)
       ? (this.player.roadInvestmentRate?.() ?? 0)
       : 0;
-    const rateScaled = Math.max(
-      0,
-      Math.min(10000, Math.round(investRate * 10000)),
-    );
-    const investedGold = (goldFromWorkers * BigInt(rateScaled)) / 10000n;
-    const netGold = goldFromWorkers - investedGold;
+    let totalInvest = prodInvest + roadInvest; // can exceed 1
+
+    // Allow up to 110% total when treasury is positive, else cap at 100%
+    const hasTreasury = this.player.gold() > 0n;
+    const maxTotal = hasTreasury ? 1.1 : 1.0;
+    if (totalInvest > maxTotal) totalInvest = maxTotal;
+
+    // Net gold added this tick (can be negative when totalInvest > 1)
+    let netGoldDouble = grossGoldDouble * (1 - totalInvest);
+    if (!Number.isFinite(netGoldDouble)) netGoldDouble = 0;
+    let netGold = BigInt(Math.floor(netGoldDouble));
+    // Prevent gold from going below zero (server-side safety)
+    if (netGold < 0n) {
+      const goldNow = this.player.gold();
+      if (goldNow + netGold < 0n) {
+        netGold = -goldNow; // drain treasury to zero at most
+      }
+    }
     this.player.addGold(netGold);
     this.player.updateProductivity();
     // Record stats

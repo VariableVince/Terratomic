@@ -500,12 +500,12 @@ export class RoadManager {
         this.currentConstruction.delete(pid);
         continue;
       }
-      // Compute px per tick from investment:
-      // Invested gold per tick = goldPerTick * roadInvestmentRate
+      // Compute px per tick from investment based on GROSS gold (pre-investment):
+      // Invested gold per tick = grossGoldPerTick * roadInvestmentRate
       // Using parameter: 1000 gold invested per tick yields 1 px per tick
-      const goldPerTick = this.game.config().goldAdditionRate(player);
+      const grossGoldPerTick = this.game.config().grossGoldAdditionRate(player);
       const investRatio = player.roadInvestmentRate?.() ?? 0;
-      const investedPerTick = Number(goldPerTick) * investRatio; // gold/tick
+      const investedPerTick = grossGoldPerTick * investRatio; // gold/tick (double)
       const PX_PER_TICK_PER_GOLD = 1 / 1000; // 1 px/tick per 1000 gold/tick invested
       const pxPerTick = investedPerTick * PX_PER_TICK_PER_GOLD;
       if (pxPerTick <= 0) continue;

@@ -163,15 +163,23 @@ export class ControlPanel extends LitElement implements Layer {
     this._troops = player.troops();
     this._workers = player.workers();
     this.popRate = this.game.config().populationIncreaseRate(player) * 10;
-    this._goldPerSecond = this.game.config().goldAdditionRate(player) * 10n;
-
-    // Adjust displayed income for road investment (client-side estimate)
-    // Uses the persisted slider value from ControlPanel2
-    const investRateStr = localStorage.getItem("settings.roadInvestmentRate");
-    const investRate = investRateStr ? Number(investRateStr) : 0;
-    const scaled = Math.max(0, Math.min(10000, Math.round(investRate * 10000)));
-    const invested = (this._goldPerSecond * BigInt(scaled)) / 10000n;
-    this._netGoldPerSecond = this._goldPerSecond - invested;
+    // For display: estimate net gold/sec including BOTH investments
+    // Use centralized gross gold calculation from config
+    const grossPerSecond =
+      10 * this.game.config().grossGoldAdditionRate(player);
+    // Read persisted sliders
+    const prodStr = localStorage.getItem("settings.investmentRate");
+    const roadStr = localStorage.getItem("settings.roadInvestmentRate");
+    const prodRate = prodStr ? Number(prodStr) : 0;
+    const roadRate = roadStr ? Number(roadStr) : 0;
+    const hasTreasury = (this._gold ?? 0n) > 0n;
+    const maxTotal = hasTreasury ? 1.1 : 1.0;
+    const total = Math.min(prodRate + roadRate, maxTotal);
+    const netPerSecondDouble = grossPerSecond * (1 - total);
+    const netPerSecond = BigInt(
+      Math.floor(Number.isFinite(netPerSecondDouble) ? netPerSecondDouble : 0),
+    );
+    this._netGoldPerSecond = netPerSecond;
 
     this.investmentRate = player.investmentRate();
     this.currentTroopRatio = player.troops() / player.population();
@@ -365,7 +373,13 @@ export class ControlPanel extends LitElement implements Layer {
                       </span>
                       <span translate="no" class="military-label normal-case">
                         ${renderNumber(this._gold)}
-                        (+${renderNumber(this._netGoldPerSecond ?? 0n)})
+                        ${(() => {
+                          const net = this._netGoldPerSecond ?? 0n;
+                          const isNeg = net < 0n;
+                          const mag = isNeg ? -net : net;
+                          const sign = isNeg ? "-" : "+";
+                          return html`(${sign}${renderNumber(mag)})`;
+                        })()}
                       </span>
                     </div>
                   </div>
