@@ -260,19 +260,21 @@ label.option-card:hover {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+  background: transparent; /* ensure no white base behind custom track */
+  border: none;
 }
 
 /* Firefox */
 #bots-count::-moz-range-track,
 #private-lobby-bots-count::-moz-range-track {
   height: 8px;
-  background: white;
+  background: #0e1a33; /* deep navy remainder track */
 }
 
 #bots-count::-moz-range-progress,
 #private-lobby-bots-count::-moz-range-progress {
   height: 8px;
-  background-color: var(--primaryColor);
+  background-color: var(--primaryColor); /* filled track */
 }
 
 #bots-count::-moz-range-thumb,
@@ -291,7 +293,7 @@ label.option-card:hover {
   background: linear-gradient(
     to right,
     var(--primaryColor) var(--progress, 0%),
-    white var(--progress, 0%)
+    #0e1a33 var(--progress, 0%)
   );
 }
 
@@ -301,7 +303,7 @@ label.option-card:hover {
   height: 16px;
   width: 16px;
   background: var(--primaryColor);
-  border: none;
+  border: 1px solid var(--secondaryColor);
   border-radius: 50%;
   margin-top: -4px;
 }
