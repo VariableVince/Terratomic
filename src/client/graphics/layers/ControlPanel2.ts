@@ -50,6 +50,14 @@ export class ControlPanel2 extends LitElement implements Layer {
   @state()
   private _researchInvestmentRate: number = 0; // 0..1 of per-tick income allocated to research (UI only for now)
 
+  // Lock states for investment sliders
+  @state()
+  private _lockProd: boolean = false;
+  @state()
+  private _lockRoad: boolean = false;
+  @state()
+  private _lockResearch: boolean = false;
+
   @state()
   private _population: number;
 
@@ -297,7 +305,22 @@ export class ControlPanel2 extends LitElement implements Layer {
     this._troops = player.troops();
     this._workers = player.workers();
     this.popRate = this.game.config().populationIncreaseRate(player) * 10;
-    this._goldPerSecond = this.game.config().goldAdditionRate(player) * 10n;
+    // Compute net gold/sec consistent with server logic
+    {
+      const grossPerTick = this.game.config().grossGoldAdditionRate(player);
+      const prod = player.investmentRate?.() ?? 0;
+      const hasRoads = player.hasUpgrade(UpgradeType.Roads);
+      const effectiveRoad = hasRoads ? this._roadInvestmentRate : 0;
+      let totalInvest = prod + effectiveRoad + this._researchInvestmentRate;
+      const hasTreasury = (this._gold ?? 0n) > 0n;
+      const maxTotal = hasTreasury ? 1.1 : 1.0;
+      if (!Number.isFinite(totalInvest)) totalInvest = 0;
+      if (totalInvest > maxTotal) totalInvest = maxTotal;
+      let netPerTickDouble = grossPerTick * (1 - totalInvest);
+      if (!Number.isFinite(netPerTickDouble)) netPerTickDouble = 0;
+      const netPerTick = BigInt(Math.floor(netPerTickDouble));
+      this._goldPerSecond = netPerTick * 10n;
+    }
 
     this.investmentRate = player.investmentRate();
     // If Roads are not researched, force road investment to 0 and persist
@@ -311,7 +334,7 @@ export class ControlPanel2 extends LitElement implements Layer {
       );
     }
 
-    // Enforce cap so UI never exceeds allowed total; apply proportional cuts when necessary
+    // Enforce cap so UI never exceeds allowed total; prefer reducing unlocked sliders first
     {
       const cap = this._maxTotalInvestment();
       const maxProd = this.game?.config?.().maxInvestmentRate?.() ?? 0.5;
@@ -320,11 +343,56 @@ export class ControlPanel2 extends LitElement implements Layer {
       let research = Math.max(0, Math.min(1, this._researchInvestmentRate));
       const sum = prod + road + research;
       if (sum > cap) {
-        // Proportional reduction across all three to exactly meet the cap
-        const scale = cap / sum; // 0 < scale < 1
-        prod = Math.min(maxProd, prod * scale);
-        road = road * scale;
-        research = research * scale;
+        let over = sum - cap;
+        const values: Record<"prod" | "road" | "research", number> = {
+          prod,
+          road,
+          research,
+        };
+        const locks: Record<"prod" | "road" | "research", boolean> = {
+          prod: this._lockProd,
+          road: this._lockRoad,
+          research: this._lockResearch,
+        };
+
+        // Reduce unlocked sliders first
+        const unlocked = (
+          Object.keys(values) as Array<"prod" | "road" | "research">
+        ).filter((k) => !locks[k] && values[k] > 0);
+        const unlockedSum = unlocked.reduce((a, k) => a + values[k], 0);
+        if (unlockedSum > 0) {
+          if (unlockedSum >= over - 1e-9) {
+            for (const k of unlocked) {
+              const v = values[k];
+              const delta = over * (v / unlockedSum) || 0;
+              values[k] = Math.max(0, v - delta);
+            }
+            over = 0;
+          } else {
+            for (const k of unlocked) values[k] = 0;
+            over -= unlockedSum;
+          }
+        }
+
+        // If still over, reduce locked sliders as last resort
+        if (over > 1e-9) {
+          const locked = (
+            Object.keys(values) as Array<"prod" | "road" | "research">
+          ).filter((k) => locks[k] && values[k] > 0);
+          const lockedSum = locked.reduce((a, k) => a + values[k], 0);
+          if (lockedSum > 0) {
+            for (const k of locked) {
+              const v = values[k];
+              const delta = over * (v / lockedSum) || 0;
+              values[k] = Math.max(0, v - delta);
+            }
+            over = 0;
+          }
+        }
+
+        prod = Math.max(0, Math.min(maxProd, values.prod));
+        road = Math.max(0, Math.min(1, values.road));
+        research = Math.max(0, Math.min(1, values.research));
 
         const prodChanged = prod !== this.investmentRate;
         const roadChanged = road !== this._roadInvestmentRate;
@@ -336,7 +404,8 @@ export class ControlPanel2 extends LitElement implements Layer {
           if (prodChanged) this.onInvestmentRateChange(this.investmentRate);
           if (roadChanged)
             this.onRoadInvestmentChange(this._roadInvestmentRate);
-          // research currently client-only
+          if (researchChanged)
+            this.onResearchInvestmentChange(this._researchInvestmentRate);
           localStorage.setItem(
             "settings.investmentRate",
             this.investmentRate.toString(),
@@ -425,73 +494,78 @@ export class ControlPanel2 extends LitElement implements Layer {
     proposed: number,
   ): { prod: number; road: number; research: number } {
     const maxProd = this.game?.config?.().maxInvestmentRate?.() ?? 0.5;
-    let prod = Math.max(
+
+    const currentProd = this.investmentRate;
+    const currentRoad = this._roadInvestmentRate;
+    const currentResearch = this._researchInvestmentRate;
+
+    // If the changed slider is locked, block the change entirely
+    if (
+      (changed === "prod" && this._lockProd) ||
+      (changed === "road" && this._lockRoad) ||
+      (changed === "research" && this._lockResearch)
+    ) {
+      return {
+        prod: currentProd,
+        road: currentRoad,
+        research: currentResearch,
+      };
+    }
+
+    const prod = Math.max(
       0,
-      Math.min(maxProd, changed === "prod" ? proposed : this.investmentRate),
+      Math.min(maxProd, changed === "prod" ? proposed : currentProd),
     );
-    let road = Math.max(
+    const road = Math.max(
       0,
-      Math.min(1, changed === "road" ? proposed : this._roadInvestmentRate),
+      Math.min(1, changed === "road" ? proposed : currentRoad),
     );
-    let research = Math.max(
+    const research = Math.max(
       0,
-      Math.min(
-        1,
-        changed === "research" ? proposed : this._researchInvestmentRate,
-      ),
+      Math.min(1, changed === "research" ? proposed : currentResearch),
     );
 
     const cap = this._maxTotalInvestment();
     const sum = prod + road + research;
     if (sum <= cap) return { prod, road, research };
 
-    // Keep the changed value (already clamped), proportionally reduce the other two
-    const others =
+    // Over cap: try to reduce only the other unlocked sliders; if not enough, block the change
+    const over = sum - cap;
+    const values: Record<"prod" | "road" | "research", number> = {
+      prod,
+      road,
+      research,
+    };
+    const locks: Record<"prod" | "road" | "research", boolean> = {
+      prod: this._lockProd,
+      road: this._lockRoad,
+      research: this._lockResearch,
+    };
+
+    const others: Array<"prod" | "road" | "research"> =
       changed === "prod"
-        ? road + research
+        ? ["road", "research"]
         : changed === "road"
-          ? prod + research
-          : prod + road;
-    const available = Math.max(
-      0,
-      cap - (changed === "prod" ? prod : changed === "road" ? road : research),
-    );
-    if (others <= 0) {
-      // No room for others
-      if (changed === "prod") {
-        road = 0;
-        research = 0;
-        if (prod > cap) prod = Math.min(maxProd, cap);
-      } else if (changed === "road") {
-        prod = Math.min(maxProd, Math.max(0, Math.min(prod, cap)));
-        research = 0;
-        if (road > cap) road = cap;
-      } else {
-        prod = Math.min(maxProd, Math.max(0, Math.min(prod, cap)));
-        road = 0;
-        if (research > cap) research = cap;
+          ? ["prod", "research"]
+          : ["prod", "road"];
+    const reducible = others.filter((k) => !locks[k] && values[k] > 0);
+    const reducibleSum = reducible.reduce((a, k) => a + values[k], 0);
+
+    if (reducibleSum >= over - 1e-9) {
+      for (const k of reducible) {
+        const v = values[k];
+        const delta = over * (v / reducibleSum) || 0;
+        values[k] = Math.max(0, v - delta);
       }
-      return { prod, road, research };
+      return {
+        prod: values.prod,
+        road: values.road,
+        research: values.research,
+      };
     }
 
-    const scale = available / others; // 0..1
-    if (changed === "prod") {
-      road = Math.max(0, road * scale);
-      research = Math.max(0, research * scale);
-    } else if (changed === "road") {
-      prod = Math.min(maxProd, Math.max(0, prod * scale));
-      research = Math.max(0, research * scale);
-    } else {
-      // changed === "research"
-      prod = Math.min(maxProd, Math.max(0, prod * scale));
-      road = Math.max(0, road * scale);
-    }
-
-    // Final safety clamp
-    prod = Math.max(0, Math.min(maxProd, prod));
-    road = Math.max(0, Math.min(1, road));
-    research = Math.max(0, Math.min(1, research));
-    return { prod, road, research };
+    // Not enough room in other sliders; block the change to the changed slider
+    return { prod: currentProd, road: currentRoad, research: currentResearch };
   }
 
   renderLayer(context: CanvasRenderingContext2D) {
@@ -979,6 +1053,15 @@ export class ControlPanel2 extends LitElement implements Layer {
           opacity: 0.5;
           filter: grayscale(0.3);
         }
+        /* Locked slider visual */
+        .slider-locked::-webkit-slider-thumb {
+          border-color: #f59e0b; /* amber */
+          box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.45) inset;
+        }
+        .slider-locked::-moz-range-thumb {
+          border-color: #f59e0b; /* amber */
+          box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.45) inset;
+        }
         .lock-badge {
           display: inline-flex;
           align-items: center;
@@ -1253,6 +1336,23 @@ export class ControlPanel2 extends LitElement implements Layer {
                     <label class="block military-label mb-1" translate="no">
                       Production Investment Rate:
                       ${(this.investmentRate * 100).toFixed(0)}%
+                      ${this._lockProd
+                        ? html`<span
+                            class="lock-badge"
+                            title="Slider is locked. Double-click the slider to unlock."
+                          >
+                            <svg
+                              class="lock-icon"
+                              viewBox="0 0 24 24"
+                              aria-hidden="true"
+                            >
+                              <path
+                                d="M8 10V7a4 4 0 118 0v3h1a2 2 0 012 2v8a2 2 0 01-2 2H7a2 2 0 01-2-2v-8a2 2 0 012-2h1zm2 0h4V7a2 2 0 10-4 0v3z"
+                              />
+                            </svg>
+                            Locked
+                          </span>`
+                        : ""}
                     </label>
                     <div
                       class="text-right text-xs opacity-60 mt-1 military-label normal-case"
@@ -1279,7 +1379,18 @@ export class ControlPanel2 extends LitElement implements Layer {
                         min="0"
                         max="${this.game?.config()?.maxInvestmentRate() * 100}"
                         .value=${(this.investmentRate * 100).toString()}
+                        class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider ${this
+                          ._lockProd
+                          ? "slider-locked"
+                          : ""}"
+                        @dblclick=${() => (this._lockProd = !this._lockProd)}
                         @input=${(e: Event) => {
+                          if (this._lockProd) {
+                            (e.target as HTMLInputElement).value = (
+                              this.investmentRate * 100
+                            ).toString();
+                            return;
+                          }
                           const proposed =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
@@ -1291,6 +1402,8 @@ export class ControlPanel2 extends LitElement implements Layer {
 
                           const prodChanged = prod !== this.investmentRate;
                           const roadChanged = road !== this._roadInvestmentRate;
+                          const researchChanged =
+                            research !== this._researchInvestmentRate;
 
                           this.investmentRate = prod;
                           this._roadInvestmentRate = road;
@@ -1301,6 +1414,10 @@ export class ControlPanel2 extends LitElement implements Layer {
                           if (roadChanged)
                             this.onRoadInvestmentChange(
                               this._roadInvestmentRate,
+                            );
+                          if (researchChanged)
+                            this.onResearchInvestmentChange(
+                              this._researchInvestmentRate,
                             );
 
                           localStorage.setItem(
@@ -1315,8 +1432,11 @@ export class ControlPanel2 extends LitElement implements Layer {
                             "settings.researchInvestmentRate",
                             this._researchInvestmentRate.toString(),
                           );
+                          // Snap slider back to the effective value in case constraint blocked change
+                          (e.target as HTMLInputElement).value = (
+                            this.investmentRate * 100
+                          ).toString();
                         }}
-                        class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
                       />
                     </div>
                   </div>
@@ -1341,6 +1461,23 @@ export class ControlPanel2 extends LitElement implements Layer {
                           <span class="opacity-70"
                             >(${pxPerSecond.toFixed(2)} px/s)</span
                           >
+                          ${this._lockRoad && hasRoads
+                            ? html`<span
+                                class="lock-badge"
+                                title="Slider is locked. Double-click the slider to unlock."
+                              >
+                                <svg
+                                  class="lock-icon"
+                                  viewBox="0 0 24 24"
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    d="M8 10V7a4 4 0 118 0v3h1a2 2 0 012 2v8a2 2 0 01-2 2H7a2 2 0 01-2-2v-8a2 2 0 012-2h1zm2 0h4V7a2 2 0 10-4 0v3z"
+                                  />
+                                </svg>
+                                Locked
+                              </span>`
+                            : ""}
                           ${!hasRoads
                             ? html`<span
                                 class="lock-badge"
@@ -1384,6 +1521,12 @@ export class ControlPanel2 extends LitElement implements Layer {
                           : ""}
                         @input=${(e: Event) => {
                           if (!hasRoads) return;
+                          if (this._lockRoad) {
+                            (e.target as HTMLInputElement).value = (
+                              this._roadInvestmentRate * 100
+                            ).toString();
+                            return;
+                          }
                           const proposed =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
@@ -1395,6 +1538,8 @@ export class ControlPanel2 extends LitElement implements Layer {
 
                           const prodChanged = prod !== this.investmentRate;
                           const roadChanged = road !== this._roadInvestmentRate;
+                          const researchChanged =
+                            research !== this._researchInvestmentRate;
 
                           this.investmentRate = prod;
                           this._roadInvestmentRate = road;
@@ -1406,6 +1551,10 @@ export class ControlPanel2 extends LitElement implements Layer {
                             );
                           if (prodChanged)
                             this.onInvestmentRateChange(this.investmentRate);
+                          if (researchChanged)
+                            this.onResearchInvestmentChange(
+                              this._researchInvestmentRate,
+                            );
 
                           localStorage.setItem(
                             "settings.roadInvestmentRate",
@@ -1419,8 +1568,17 @@ export class ControlPanel2 extends LitElement implements Layer {
                             "settings.researchInvestmentRate",
                             this._researchInvestmentRate.toString(),
                           );
+                          // Snap slider to effective value
+                          (e.target as HTMLInputElement).value = (
+                            this._roadInvestmentRate * 100
+                          ).toString();
                         }}
-                        class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
+                        class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider ${this
+                          ._lockRoad && hasRoads
+                          ? "slider-locked"
+                          : ""}"
+                        @dblclick=${() =>
+                          hasRoads && (this._lockRoad = !this._lockRoad)}
                       />
                     </div>
                     <div
@@ -1435,6 +1593,23 @@ export class ControlPanel2 extends LitElement implements Layer {
                         <label class="block military-label mb-1" translate="no">
                           Research investment:
                           ${(this._researchInvestmentRate * 100).toFixed(0)}%
+                          ${this._lockResearch
+                            ? html`<span
+                                class="lock-badge"
+                                title="Slider is locked. Double-click the slider to unlock."
+                              >
+                                <svg
+                                  class="lock-icon"
+                                  viewBox="0 0 24 24"
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    d="M8 10V7a4 4 0 118 0v3h1a2 2 0 012 2v8a2 2 0 01-2 2H7a2 2 0 01-2-2v-8a2 2 0 012-2h1zm2 0h4V7a2 2 0 10-4 0v3z"
+                                  />
+                                </svg>
+                                Locked
+                              </span>`
+                            : ""}
                         </label>
                       `;
                     })()}
@@ -1458,6 +1633,12 @@ export class ControlPanel2 extends LitElement implements Layer {
                           this._researchInvestmentRate * 100
                         ).toString()}
                         @input=${(e: Event) => {
+                          if (this._lockResearch) {
+                            (e.target as HTMLInputElement).value = (
+                              this._researchInvestmentRate * 100
+                            ).toString();
+                            return;
+                          }
                           const proposed =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
@@ -1499,8 +1680,17 @@ export class ControlPanel2 extends LitElement implements Layer {
                             "settings.researchInvestmentRate",
                             this._researchInvestmentRate.toString(),
                           );
+                          // Snap slider to effective value
+                          (e.target as HTMLInputElement).value = (
+                            this._researchInvestmentRate * 100
+                          ).toString();
                         }}
-                        class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
+                        class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider ${this
+                          ._lockResearch
+                          ? "slider-locked"
+                          : ""}"
+                        @dblclick=${() =>
+                          (this._lockResearch = !this._lockResearch)}
                       />
                     </div>
                   </div>
