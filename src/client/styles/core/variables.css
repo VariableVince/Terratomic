@@ -5,20 +5,41 @@
   --fontColorLight: #fff;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Cold War / 1950s–60s military command aesthetic */
-  /* Primary (buttons, main elements) = Olive Green */
-  --primaryColor: #4a5d23;
-  --primaryColorHover: #3a4a1c;
-  --primaryColorDisabled: #2c3e50; /* Dark Gray for disabled/matte metal */
+  /* Submarine/Bunker dark blue theme (UI) */
+  --primaryColor: #183152; /* navy button */
+  --primaryColorHover: #1d3a60; /* hover navy */
+  --primaryColorDisabled: #0f172a; /* deep slate/navy for disabled */
 
-  /* Secondary (outline / pale fills) = Tan */
-  --secondaryColor: #d4c7a5;
-  --secondaryColorHover: #c2b490;
+  --secondaryColor: #27476e; /* blue rim/secondary */
+  --secondaryColorHover: #32629b; /* brighter hover */
 
-  /* Alert / highlight (selected lobby, warnings) = Muted Red */
-  --alertColor: #8b0000;
-  --alertColorHover: #a00000;
+  /* Alerts use a vivid red within the blue theme */
+  --alertColor: #b91c1c; /* red-700 */
+  --alertColorHover: #dc2626; /* red-600 */
 
-  /* Accent text on pale backgrounds */
-  --accentTextColor: #374151; /* Dark Gray */
+  /* Accent text on submarine surfaces */
+  --accentTextColor: #dbe7ff; /* soft light blue */
+}
+
+/* Dark mode overrides (scoped by the .dark class on <html> or <body>) */
+.dark {
+  /* Provide explicit dark variants and mirror base tokens when dark */
+  --primaryColorDark: #132036; /* darker navy */
+  --primaryColorHoverDark: #0e1a33;
+  --primaryColorDisabledDark: #0b1629;
+  --secondaryColorDark: #1f3a5a;
+  --secondaryColorHoverDark: #27476e;
+  --alertColorDark: #991b1b;
+  --alertColorHoverDark: #b91c1c;
+
+  /* Mirror base tokens to dark variants for components using base names */
+  --primaryColor: var(--primaryColorDark);
+  --primaryColorHover: var(--primaryColorHoverDark);
+  --primaryColorDisabled: var(--primaryColorDisabledDark);
+  --secondaryColor: var(--secondaryColorDark);
+  --secondaryColorHover: var(--secondaryColorHoverDark);
+  --alertColor: var(--alertColorDark);
+  --alertColorHover: var(--alertColorHoverDark);
+  --accentTextColor: #e3edff;
+  --fontColorLight: #e5e7eb;
 }

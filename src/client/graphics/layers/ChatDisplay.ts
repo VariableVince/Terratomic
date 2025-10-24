@@ -155,7 +155,7 @@ export class ChatDisplay extends LitElement implements Layer {
             <span
               class="${this.newEvents
                 ? ""
-                : "hidden"} inline-block px-2 bg-muted-red rounded-sm"
+                : "hidden"} inline-block px-2 bg-red-700 rounded-sm"
               >${this.newEvents}</span
             >
           </button>
@@ -170,7 +170,7 @@ export class ChatDisplay extends LitElement implements Layer {
             <tbody>
               ${this.chatEvents.map(
                 (chat) => html`
-                  <tr class="border-b border-steel border-opacity-50">
+                  <tr class="border-b border-gray-500 border-opacity-50">
                     <td class="lg:p-3 p-1 text-left">
                       ${this.getChatContent(chat)}
                     </td>

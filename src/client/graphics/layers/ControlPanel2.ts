@@ -898,7 +898,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                     ${this._isAutoBombingEnabled
                       ? html`
                           <div
-                            class="flex flex-col items-center justify-center h-full text-crt-green font-bold text-center"
+                            class="flex flex-col items-center justify-center h-full text-blue-300 font-bold text-center"
                           >
                             Automatic bombing is enabled.
                           </div>
@@ -938,7 +938,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                               ].map((s) => {
                                 return html`
                                   <label
-                                    class="flex items-center space-x-1 p-1 border border-gray-700 rounded-sm cursor-pointer has-checked:border-crt-green"
+                                    class="flex items-center space-x-1 p-1 border border-gray-700 rounded-sm cursor-pointer has-checked:border-blue-400"
                                   >
                                     <img
                                       src="${this.unitIconMap[s]}"
@@ -950,7 +950,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                                       name="structure"
                                       value="${s}"
                                       ?checked=${s === UnitType.City}
-                                      class="form-checkbox h-4 w-4 text-crt-green bg-gray-700 border-gray-500 rounded-sm focus:ring-crt-green"
+                                      class="form-checkbox h-4 w-4 text-blue-400 bg-gray-700 border-gray-500 rounded-sm focus:ring-blue-400"
                                       @change=${this.handleStructureChange}
                                     />
                                   </label>

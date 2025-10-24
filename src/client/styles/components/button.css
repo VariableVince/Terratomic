@@ -1,22 +1,16 @@
 .c-button {
-  background: linear-gradient(
-    to bottom,
-    #2f3223,
-    #3b3e2c
-  ); /* From military-panel */
-  color: #d8d1b1; /* From military-panel */
+  background: var(--primaryColor);
+  color: var(--fontColorLight);
   cursor: pointer;
   outline: none;
   display: inline-block;
   font-size: 16px;
-  border: 2px solid #1f2018; /* From military-panel */
+  border: 2px solid transparent;
   text-align: center;
   padding: 0.8rem 1rem;
-  border-radius: 6px; /* From military-panel */
+  border-radius: 6px;
   transition: all 0.2s ease-in-out;
-  box-shadow:
-    inset 0 0 10px rgba(0, 0, 0, 0.5),
-    0 2px 6px rgba(0, 0, 0, 0.4); /* From military-panel */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 
   @media (min-width: 1024px) {
     font-size: 18px;
@@ -39,53 +33,33 @@
 .c-button:hover,
 .c-button:active,
 .c-button:focus {
-  background: linear-gradient(
-    to bottom,
-    #3b3e2c,
-    #2f3223
-  ); /* Darker gradient on hover */
-  box-shadow:
-    inset 0 0 10px rgba(0, 0, 0, 0.5),
-    0 2px 8px rgba(0, 0, 0, 0.6); /* Slightly stronger shadow on hover */
-  border-color: #4e513a; /* Slightly lighter border on hover */
-  color: white; /* Lighter text color on hover */
+  background: var(--primaryColorHover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--fontColorLight);
 }
 
 .c-button:disabled {
-  background: linear-gradient(
-    to bottom,
-    #222,
-    #1a1a1a
-  ); /* Darker, muted background for disabled */
-  opacity: 0.6; /* Slightly more opaque for disabled */
+  background: var(--primaryColorDisabled);
+  opacity: 0.7;
   cursor: not-allowed;
-  box-shadow: none; /* No shadow for disabled */
-  border-color: #111; /* Darker border for disabled */
+  box-shadow: none;
+  border-color: rgba(0, 0, 0, 0.6);
 }
 
 .c-button--secondary {
-  background: linear-gradient(
-    to bottom,
-    var(--secondaryColor),
-    #a9a9a9
-  ); /* Tan to darker gray gradient */
-  color: var(--accentTextColor); /* Darker text for secondary */
-  border-color: #808080; /* Gray border */
+  background: var(--secondaryColor);
+  color: var(--accentTextColor);
+  border-color: rgba(0, 0, 0, 0.3);
 }
 
 .c-button--secondary:hover,
 .c-button--secondary:active,
 .c-button--secondary:focus {
-  background: linear-gradient(
-    to bottom,
-    #3b3e2c,
-    #2f3223
-  ); /* Darker gradient on hover */
-  box-shadow:
-    inset 0 0 10px rgba(0, 0, 0, 0.5),
-    0 2px 8px rgba(0, 0, 0, 0.6); /* Slightly stronger shadow on hover */
-  border-color: #4e513a; /* Slightly lighter border on hover */
-  color: white; /* Lighter text color on hover */
+  background: var(--secondaryColorHover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  border-color: rgba(0, 0, 0, 0.4);
+  color: var(--accentTextColor);
 }
 
 .c-button--block {

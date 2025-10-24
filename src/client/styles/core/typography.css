@@ -1,3 +1,7 @@
+.t-body-base {
+  color: var(--fontColorLight);
+}
+
 .t-link {
   color: #ffffffb3;
   transition: var(--transition);
