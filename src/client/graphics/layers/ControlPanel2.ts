@@ -331,6 +331,61 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.eventBus.emit(new SendSetRoadInvestmentEvent(newRate));
   }
 
+  /**
+   * Compute the dynamic cap for total investments.
+   * Matches server logic: allow up to 110% if treasury > 0, else cap at 100%.
+   */
+  private _maxTotalInvestment(): number {
+    try {
+      return (this._gold ?? 0n) > 0n ? 1.1 : 1.0;
+    } catch {
+      return 1.1; // safe default
+    }
+  }
+
+  /**
+   * Adjust the two investment sliders so their sum does not exceed the cap.
+   * If the changed one tries to push the total above the cap, reduce the other accordingly.
+   */
+  private _applyCoupledInvestmentConstraint(
+    changed: "prod" | "road",
+    proposed: number,
+  ): { prod: number; road: number } {
+    const maxProd = this.game?.config?.().maxInvestmentRate?.() ?? 0.5;
+    let prod = Math.max(
+      0,
+      Math.min(maxProd, changed === "prod" ? proposed : this.investmentRate),
+    );
+    let road = Math.max(
+      0,
+      Math.min(1, changed === "road" ? proposed : this._roadInvestmentRate),
+    );
+
+    const cap = this._maxTotalInvestment();
+    const sum = prod + road;
+    if (sum <= cap) return { prod, road };
+
+    // Reduce the opposite slider first by the excess
+    const excess = sum - cap;
+    if (changed === "prod") {
+      // Try to reduce road first
+      const newRoad = Math.max(0, road - excess);
+      road = newRoad;
+      // If still above cap (road hit 0), clamp prod
+      if (prod + road > cap) {
+        prod = Math.max(0, cap - road);
+      }
+    } else {
+      // changed === "road": try to reduce prod first
+      const newProd = Math.max(0, prod - excess);
+      prod = Math.min(maxProd, newProd);
+      if (prod + road > cap) {
+        road = Math.max(0, cap - prod);
+      }
+    }
+    return { prod, road };
+  }
+
   renderLayer(context: CanvasRenderingContext2D) {
     // Render any necessary canvas elements
   }
@@ -1100,20 +1155,36 @@ export class ControlPanel2 extends LitElement implements Layer {
                         .value=${(this.investmentRate * 100).toString()}
                         @input=${(e: Event) => {
                           // Proposed new production investment rate
-                          const newRate =
+                          const proposed =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
-                          // Also respect maxInvestmentRate config
-                          const maxProd =
-                            this.game?.config()?.maxInvestmentRate?.() ?? 0.5;
-                          this.investmentRate = Math.min(
-                            maxProd,
-                            Math.max(0, newRate),
-                          );
-                          this.onInvestmentRateChange(this.investmentRate);
+                          const { prod, road } =
+                            this._applyCoupledInvestmentConstraint(
+                              "prod",
+                              proposed,
+                            );
+
+                          const prodChanged = prod !== this.investmentRate;
+                          const roadChanged = road !== this._roadInvestmentRate;
+
+                          this.investmentRate = prod;
+                          this._roadInvestmentRate = road;
+
+                          if (prodChanged)
+                            this.onInvestmentRateChange(this.investmentRate);
+                          if (roadChanged)
+                            this.onRoadInvestmentChange(
+                              this._roadInvestmentRate,
+                            );
+
+                          // Persist both since they may shift together
                           localStorage.setItem(
                             "settings.investmentRate",
                             this.investmentRate.toString(),
+                          );
+                          localStorage.setItem(
+                            "settings.roadInvestmentRate",
+                            this._roadInvestmentRate.toString(),
                           );
                         }}
                         class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
@@ -1158,17 +1229,36 @@ export class ControlPanel2 extends LitElement implements Layer {
                         .value=${(this._roadInvestmentRate * 100).toString()}
                         @input=${(e: Event) => {
                           // Proposed new road investment rate
-                          const newRate =
+                          const proposed =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
-                          this._roadInvestmentRate = Math.max(
-                            0,
-                            Math.min(1, newRate),
-                          );
-                          this.onRoadInvestmentChange(this._roadInvestmentRate);
+                          const { prod, road } =
+                            this._applyCoupledInvestmentConstraint(
+                              "road",
+                              proposed,
+                            );
+
+                          const prodChanged = prod !== this.investmentRate;
+                          const roadChanged = road !== this._roadInvestmentRate;
+
+                          this.investmentRate = prod;
+                          this._roadInvestmentRate = road;
+
+                          if (roadChanged)
+                            this.onRoadInvestmentChange(
+                              this._roadInvestmentRate,
+                            );
+                          if (prodChanged)
+                            this.onInvestmentRateChange(this.investmentRate);
+
+                          // Persist both since they may shift together
                           localStorage.setItem(
                             "settings.roadInvestmentRate",
                             this._roadInvestmentRate.toString(),
+                          );
+                          localStorage.setItem(
+                            "settings.investmentRate",
+                            this.investmentRate.toString(),
                           );
                         }}
                         class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
