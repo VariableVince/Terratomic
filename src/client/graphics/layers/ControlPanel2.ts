@@ -298,6 +298,43 @@ export class ControlPanel2 extends LitElement implements Layer {
         this._roadInvestmentRate.toString(),
       );
     }
+
+    // Enforce cap if treasury state changed (or at any time) so UI never exceeds allowed total
+    {
+      const cap = this._maxTotalInvestment();
+      const maxProd = this.game?.config?.().maxInvestmentRate?.() ?? 0.5;
+      let prod = Math.max(0, Math.min(maxProd, this.investmentRate));
+      let road = Math.max(0, Math.min(1, this._roadInvestmentRate));
+      const sum = prod + road;
+      if (sum > cap) {
+        let excess = sum - cap;
+        // Prefer reducing road first (keeps production stable)
+        const reduceRoad = Math.min(road, excess);
+        road -= reduceRoad;
+        excess -= reduceRoad;
+        if (excess > 0) {
+          prod = Math.max(0, prod - excess);
+        }
+
+        const prodChanged = prod !== this.investmentRate;
+        const roadChanged = road !== this._roadInvestmentRate;
+        if (prodChanged || roadChanged) {
+          this.investmentRate = prod;
+          this._roadInvestmentRate = road;
+          if (prodChanged) this.onInvestmentRateChange(this.investmentRate);
+          if (roadChanged)
+            this.onRoadInvestmentChange(this._roadInvestmentRate);
+          localStorage.setItem(
+            "settings.investmentRate",
+            this.investmentRate.toString(),
+          );
+          localStorage.setItem(
+            "settings.roadInvestmentRate",
+            this._roadInvestmentRate.toString(),
+          );
+        }
+      }
+    }
     this.currentTroopRatio = player.troops() / player.population();
 
     // Track relevant state for dynamic updates
