@@ -78,6 +78,7 @@ export class PlayerImpl implements Player {
   private _productivity = 1;
   private _productivityGrowthPerMinute = 0;
   private _maxproductivity = 1;
+  private _roadInvestmentRate: number = 0; // 0..1, fraction of per-tick income allocated to roads
 
   markedTraitorTick = -1;
 
@@ -854,6 +855,15 @@ export class PlayerImpl implements Player {
     // Keep within sane bounds; UI enforces 0..5 but clamp defensively
     const clamped = Math.max(0, Math.min(5, ratePxPerSecond));
     this._roadBuildSpeedPxPerSecond = clamped;
+  }
+
+  // Road investment ratio (0..1)
+  roadInvestmentRate(): number {
+    return this._roadInvestmentRate;
+  }
+  setRoadInvestmentRate(rate: number): void {
+    const clamped = Math.max(0, Math.min(1, rate));
+    this._roadInvestmentRate = clamped;
   }
 
   troops(): number {

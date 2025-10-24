@@ -500,11 +500,17 @@ export class RoadManager {
         this.currentConstruction.delete(pid);
         continue;
       }
-      const speedPxPerSecond = player.roadBuildSpeed(); // pixels per 10 ticks
-      if (speedPxPerSecond <= 0) continue; // paused
+      // Compute px per tick from investment:
+      // Invested gold per tick = goldPerTick * roadInvestmentRate
+      // Using parameter: 1000 gold invested per tick yields 1 px per tick
+      const goldPerTick = this.game.config().goldAdditionRate(player);
+      const investRatio = player.roadInvestmentRate?.() ?? 0;
+      const investedPerTick = Number(goldPerTick) * investRatio; // gold/tick
+      const PX_PER_TICK_PER_GOLD = 1 / 1000; // 1 px/tick per 1000 gold/tick invested
+      const pxPerTick = investedPerTick * PX_PER_TICK_PER_GOLD;
+      if (pxPerTick <= 0) continue;
 
-      // Convert to per-tick progress (10 ticks per second)
-      state.pxAccum += speedPxPerSecond / 10;
+      state.pxAccum += pxPerTick;
 
       // Canvas grid uses 1px per tile step (see RoadLayer using game.x/y() directly)
       const TILE_EDGE_PX = 1;

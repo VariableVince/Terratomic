@@ -37,6 +37,7 @@ export type Intent =
   | TargetTroopRatioIntent
   | InvestmentRateIntent
   | RoadSpeedIntent
+  | RoadInvestmentIntent
   | BuildUnitIntent
   | PurchaseUpgradeIntent
   | ResearchTreeSelectIntent
@@ -69,6 +70,7 @@ export type TargetTroopRatioIntent = z.infer<
 >;
 export type InvestmentRateIntent = z.infer<typeof InvestmentRateIntentSchema>;
 export type RoadSpeedIntent = z.infer<typeof RoadSpeedIntentSchema>;
+export type RoadInvestmentIntent = z.infer<typeof RoadInvestmentIntentSchema>;
 export type BuildUnitIntent = z.infer<typeof BuildUnitIntentSchema>;
 export type PurchaseUpgradeIntent = z.infer<typeof PurchaseUpgradeIntentSchema>;
 export type ResearchTreeSelectIntent = z.infer<
@@ -336,6 +338,12 @@ export const RoadSpeedIntentSchema = BaseIntentSchema.extend({
   rate: z.number().min(0).max(5),
 });
 
+export const RoadInvestmentIntentSchema = BaseIntentSchema.extend({
+  type: z.literal("road_investment_rate"),
+  // fraction of per-tick income invested into roads
+  rate: z.number().min(0).max(1),
+});
+
 export const BuildUnitIntentSchema = BaseIntentSchema.extend({
   type: z.literal("build_unit"),
   unit: z.enum(UnitType),
@@ -418,6 +426,7 @@ const IntentSchema = z.discriminatedUnion("type", [
   TargetTroopRatioIntentSchema,
   InvestmentRateIntentSchema,
   RoadSpeedIntentSchema,
+  RoadInvestmentIntentSchema,
   BuildUnitIntentSchema,
   PurchaseUpgradeIntentSchema,
   ResearchTreeSelectIntentSchema,

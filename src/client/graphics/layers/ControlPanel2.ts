@@ -18,7 +18,7 @@ import {
   SendPurchaseUpgradeIntentEvent,
   SendSetAutoBombingEvent,
   SendSetInvestmentRateEvent,
-  SendSetRoadSpeedEvent,
+  SendSetRoadInvestmentEvent,
   SendSetTargetTroopRatioEvent,
 } from "../../Transport";
 import { UIState } from "../UIState";
@@ -44,7 +44,7 @@ export class ControlPanel2 extends LitElement implements Layer {
   private investmentRate: number = 0; // default to 0%
 
   @state()
-  private _roadSpeed: number = 1; // pixels per second (per 10 ticks)
+  private _roadInvestmentRate: number = 0; // 0..1 of per-tick income allocated to roads
 
   @state()
   private _population: number;
@@ -182,7 +182,9 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.investmentRate = Number(
       localStorage.getItem("settings.investmentRate") ?? "0",
     );
-    this._roadSpeed = Number(localStorage.getItem("settings.roadSpeed") ?? "1");
+    this._roadInvestmentRate = Number(
+      localStorage.getItem("settings.roadInvestmentRate") ?? "0",
+    );
     this.uiState.investmentRate = this.investmentRate;
     this.init_ = true;
     this.uiState.attackRatio = this.attackRatio;
@@ -245,7 +247,9 @@ export class ControlPanel2 extends LitElement implements Layer {
         new SendSetTargetTroopRatioEvent(this.targetTroopRatio),
       );
       this.eventBus.emit(new SendSetInvestmentRateEvent(this.investmentRate));
-      this.eventBus.emit(new SendSetRoadSpeedEvent(this._roadSpeed));
+      this.eventBus.emit(
+        new SendSetRoadInvestmentEvent(this._roadInvestmentRate),
+      );
       this.init_ = false;
     }
 
@@ -323,8 +327,8 @@ export class ControlPanel2 extends LitElement implements Layer {
   onInvestmentRateChange(newRate: number) {
     this.eventBus.emit(new SendSetInvestmentRateEvent(newRate));
   }
-  onRoadSpeedChange(newRate: number) {
-    this.eventBus.emit(new SendSetRoadSpeedEvent(newRate));
+  onRoadInvestmentChange(newRate: number) {
+    this.eventBus.emit(new SendSetRoadInvestmentEvent(newRate));
   }
 
   renderLayer(context: CanvasRenderingContext2D) {
@@ -589,7 +593,6 @@ export class ControlPanel2 extends LitElement implements Layer {
       const cost = getUpgradeCost(upgradeType);
       const hasUpgrade = player?.hasUpgrade(upgradeType);
       const canAfford = player && player.gold() >= cost;
-
       const buttonClass = hasUpgrade
         ? "build-button upgrade-unlocked"
         : canAfford
@@ -1110,10 +1113,21 @@ export class ControlPanel2 extends LitElement implements Layer {
                     </div>
                   </div>
                   <div class="relative mt-6">
-                    <label class="block military-label mb-1" translate="no">
-                      Road construction speed: ${this._roadSpeed.toFixed(2)}
-                      px/s
-                    </label>
+                    ${(() => {
+                      const goldPerSecond = Number(this._goldPerSecond ?? 0n);
+                      const investedPerSecond =
+                        goldPerSecond * this._roadInvestmentRate;
+                      const pxPerSecond = investedPerSecond / 1000; // 1000 gold/s => 1 px/s
+                      return html`
+                        <label class="block military-label mb-1" translate="no">
+                          Road investment:
+                          ${(this._roadInvestmentRate * 100).toFixed(0)}%
+                          <span class="opacity-70"
+                            >(${pxPerSecond.toFixed(2)} px/s)</span
+                          >
+                        </label>
+                      `;
+                    })()}
                     <div class="relative h-8">
                       <div
                         class="absolute left-0 right-0 top-3 h-2 rounded"
@@ -1121,23 +1135,23 @@ export class ControlPanel2 extends LitElement implements Layer {
                       ></div>
                       <div
                         class="absolute left-0 top-3 h-2 rounded transition-all duration-300"
-                        style="width:${(this._roadSpeed / 5) *
+                        style="width:${this._roadInvestmentRate *
                         100}%; background-color: rgba(64,123,189,0.6);"
                       ></div>
                       <input
                         type="range"
                         min="0"
-                        max="5"
-                        step="0.05"
-                        .value=${this._roadSpeed.toString()}
+                        max="100"
+                        step="1"
+                        .value=${(this._roadInvestmentRate * 100).toString()}
                         @input=${(e: Event) => {
-                          this._roadSpeed = parseFloat(
-                            (e.target as HTMLInputElement).value,
-                          );
-                          this.onRoadSpeedChange(this._roadSpeed);
+                          this._roadInvestmentRate =
+                            parseInt((e.target as HTMLInputElement).value) /
+                            100;
+                          this.onRoadInvestmentChange(this._roadInvestmentRate);
                           localStorage.setItem(
-                            "settings.roadSpeed",
-                            this._roadSpeed.toString(),
+                            "settings.roadInvestmentRate",
+                            this._roadInvestmentRate.toString(),
                           );
                         }}
                         class="absolute left-0 right-0 top-2 m-0 h-4 cursor-pointer military-slider"
@@ -1146,9 +1160,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                     <div
                       class="text-right text-xs opacity-60 mt-1 military-label normal-case"
                       translate="no"
-                    >
-                      Pixels per 10 ticks (1 second). 0 disables building.
-                    </div>
+                    ></div>
                   </div>
                 </div>
               `

@@ -1,6 +1,13 @@
 import { renderNumber } from "../../client/Utils";
 import { Config } from "../configuration/Config";
-import { Execution, Game, MessageType, Player, UnitType } from "../game/Game";
+import {
+  Execution,
+  Game,
+  MessageType,
+  Player,
+  UnitType,
+  UpgradeType,
+} from "../game/Game";
 import { GameImpl } from "../game/GameImpl";
 import { GameMap, TileRef } from "../game/GameMap";
 import { calculateBoundingBox, getMode, inscribed, simpleHash } from "../Util";
@@ -66,10 +73,21 @@ export class PlayerExecution implements Execution {
     this.player.addWorkers(popInc * (1 - this.player.targetTroopRatio()));
     this.player.addTroops(popInc * this.player.targetTroopRatio());
     const goldFromWorkers = this.config.goldAdditionRate(this.player);
-    this.player.addGold(goldFromWorkers);
+    // Subtract road investment from income stream
+    const investRate = this.player.hasUpgrade(UpgradeType.Roads)
+      ? (this.player.roadInvestmentRate?.() ?? 0)
+      : 0;
+    const rateScaled = Math.max(
+      0,
+      Math.min(10000, Math.round(investRate * 10000)),
+    );
+    const investedGold = (goldFromWorkers * BigInt(rateScaled)) / 10000n;
+    const netGold = goldFromWorkers - investedGold;
+    this.player.addGold(netGold);
     this.player.updateProductivity();
     // Record stats
-    this.mg.stats().goldWork(this.player, goldFromWorkers);
+    // Track net income after investment in stats
+    this.mg.stats().goldWork(this.player, netGold);
 
     const adjustRate = this.config.troopAdjustmentRate(this.player);
     this.player.addTroops(adjustRate);

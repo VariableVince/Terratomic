@@ -26,6 +26,7 @@ import { ResearchTreeSelectExecution } from "./ResearchTreeSelectExecution";
 import { RetreatExecution } from "./RetreatExecution";
 import { SetAutoBombingExecution } from "./SetAutoBombingExecution";
 import { SetInvestmentRateExecution } from "./SetInvestmentRateExecution";
+import { SetRoadInvestmentExecution } from "./SetRoadInvestmentExecution";
 import { SetRoadSpeedExecution } from "./SetRoadSpeedExecution";
 import { SetTargetTroopRatioExecution } from "./SetTargetTroopRatioExecution";
 import { SpawnExecution } from "./SpawnExecution";
@@ -120,6 +121,8 @@ export class Executor {
         return new SetInvestmentRateExecution(player, intent.rate);
       case "road_speed":
         return new SetRoadSpeedExecution(player, intent.rate);
+      case "road_investment_rate":
+        return new SetRoadInvestmentExecution(player, intent.rate);
       case "embargo":
         return new EmbargoExecution(player, intent.targetID, intent.action);
       case "build_unit":

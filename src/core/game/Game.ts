@@ -547,6 +547,9 @@ export interface Player {
   // Roads: client-controlled build speed in pixels per 10 ticks (px/s)
   roadBuildSpeed(): number;
   setRoadBuildSpeed(ratePxPerSecond: number): void;
+  // Roads: investment ratio (0..1) of per-tick income allocated to roads
+  roadInvestmentRate(): number;
+  setRoadInvestmentRate(rate: number): void;
   addGold(toAdd: Gold): void;
   removeGold(toRemove: Gold): Gold;
   addWorkers(toAdd: number): void;

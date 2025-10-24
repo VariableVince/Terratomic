@@ -72,6 +72,9 @@ export class ControlPanel extends LitElement implements Layer {
   private _goldPerSecond: Gold;
 
   @state()
+  private _netGoldPerSecond: Gold;
+
+  @state()
   private isBuildPanelOpen = false;
 
   private _lastPopulationIncreaseRate: number;
@@ -161,6 +164,14 @@ export class ControlPanel extends LitElement implements Layer {
     this._workers = player.workers();
     this.popRate = this.game.config().populationIncreaseRate(player) * 10;
     this._goldPerSecond = this.game.config().goldAdditionRate(player) * 10n;
+
+    // Adjust displayed income for road investment (client-side estimate)
+    // Uses the persisted slider value from ControlPanel2
+    const investRateStr = localStorage.getItem("settings.roadInvestmentRate");
+    const investRate = investRateStr ? Number(investRateStr) : 0;
+    const scaled = Math.max(0, Math.min(10000, Math.round(investRate * 10000)));
+    const invested = (this._goldPerSecond * BigInt(scaled)) / 10000n;
+    this._netGoldPerSecond = this._goldPerSecond - invested;
 
     this.investmentRate = player.investmentRate();
     this.currentTroopRatio = player.troops() / player.population();
@@ -354,7 +365,7 @@ export class ControlPanel extends LitElement implements Layer {
                       </span>
                       <span translate="no" class="military-label normal-case">
                         ${renderNumber(this._gold)}
-                        (+${renderNumber(this._goldPerSecond)})
+                        (+${renderNumber(this._netGoldPerSecond ?? 0n)})
                       </span>
                     </div>
                   </div>
