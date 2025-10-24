@@ -103,9 +103,13 @@ export class PublicLobby extends LitElement {
         class="isolate grid h-40 grid-cols-[100%] grid-rows-[100%] place-content-stretch
        w-full overflow-hidden
        bg-gradient-to-r from-[var(--primaryColor)] to-[var(--primaryColorHover)]
-       text-white font-medium rounded-xl
-       transition-opacity duration-200 hover:opacity-90
-       ${this.isLobbyHighlighted ? "ring-4 ring-[#9f1239]" : ""}
+       text-white font-medium rounded-xl will-change-transform
+       transition-opacity transition-transform duration-200 ease-out hover:opacity-90
+       ${
+         this.isLobbyHighlighted
+           ? "ring-4 ring-[var(--accentTextColor)] ring-offset-2 ring-offset-[rgba(10,16,28,0.65)] shadow-[0_0_24px_rgba(147,197,253,0.35)] outline outline-1 outline-[rgba(147,197,253,0.25)] scale-[1.01] filter brightness-110"
+           : ""
+       }
        ${this.isButtonDebounced ? "opacity-70 cursor-not-allowed" : ""}"
 
 
