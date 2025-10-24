@@ -179,11 +179,17 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.targetTroopRatio = Number(
       localStorage.getItem("settings.troopRatio") ?? "0.6",
     );
-    this.investmentRate = Number(
-      localStorage.getItem("settings.investmentRate") ?? "0",
+    // Force both investment sliders to start at 0 at the beginning of the game
+    this.investmentRate = 0;
+    this._roadInvestmentRate = 0;
+    // Persist zeros so UI and any other readers start from 0
+    localStorage.setItem(
+      "settings.investmentRate",
+      this.investmentRate.toString(),
     );
-    this._roadInvestmentRate = Number(
-      localStorage.getItem("settings.roadInvestmentRate") ?? "0",
+    localStorage.setItem(
+      "settings.roadInvestmentRate",
+      this._roadInvestmentRate.toString(),
     );
     this.uiState.investmentRate = this.investmentRate;
     this.init_ = true;
@@ -282,6 +288,16 @@ export class ControlPanel2 extends LitElement implements Layer {
     this._goldPerSecond = this.game.config().goldAdditionRate(player) * 10n;
 
     this.investmentRate = player.investmentRate();
+    // If Roads are not researched, force road investment to 0 and persist
+    const hasRoadsUpgrade = player.hasUpgrade(UpgradeType.Roads);
+    if (!hasRoadsUpgrade && this._roadInvestmentRate !== 0) {
+      this._roadInvestmentRate = 0;
+      this.onRoadInvestmentChange(0);
+      localStorage.setItem(
+        "settings.roadInvestmentRate",
+        this._roadInvestmentRate.toString(),
+      );
+    }
     this.currentTroopRatio = player.troops() / player.population();
 
     // Track relevant state for dynamic updates
@@ -618,6 +634,7 @@ export class ControlPanel2 extends LitElement implements Layer {
     }
 
     const player = this.game.myPlayer();
+    const hasRoads = player?.hasUpgrade(UpgradeType.Roads) ?? false;
 
     const getUpgradeCost = (upgradeType: UpgradeType) => {
       if (!player) return 0n;
@@ -683,7 +700,6 @@ export class ControlPanel2 extends LitElement implements Layer {
 
     return html`
       <style>
-        /* Copied and adapted from BuildMenu.ts for consistency */
         .build-button {
           position: relative;
           width: 100%; /* Full width of the column */
@@ -1154,7 +1170,6 @@ export class ControlPanel2 extends LitElement implements Layer {
                         max="${this.game?.config()?.maxInvestmentRate() * 100}"
                         .value=${(this.investmentRate * 100).toString()}
                         @input=${(e: Event) => {
-                          // Proposed new production investment rate
                           const proposed =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
@@ -1177,7 +1192,6 @@ export class ControlPanel2 extends LitElement implements Layer {
                               this._roadInvestmentRate,
                             );
 
-                          // Persist both since they may shift together
                           localStorage.setItem(
                             "settings.investmentRate",
                             this.investmentRate.toString(),
@@ -1193,18 +1207,20 @@ export class ControlPanel2 extends LitElement implements Layer {
                   </div>
                   <div class="relative mt-6">
                     ${(() => {
-                      // Compute gross gold per second (pre-investment) for display using config
                       const me = this.game?.myPlayer?.();
                       const grossPerSecond = me
                         ? this.game.config().grossGoldAdditionRate(me) * 10
                         : 0;
-                      const investedPerSecond =
-                        grossPerSecond * this._roadInvestmentRate;
-                      const pxPerSecond = investedPerSecond / 1000; // 1000 gold/s => 1 px/s
+                      const effectiveRoad = this.game
+                        ?.myPlayer?.()
+                        ?.hasUpgrade(UpgradeType.Roads)
+                        ? this._roadInvestmentRate
+                        : 0;
+                      const investedPerSecond = grossPerSecond * effectiveRoad;
+                      const pxPerSecond = investedPerSecond / 1000;
                       return html`
                         <label class="block military-label mb-1" translate="no">
-                          Road investment:
-                          ${(this._roadInvestmentRate * 100).toFixed(0)}%
+                          Road investment: ${(effectiveRoad * 100).toFixed(0)}%
                           <span class="opacity-70"
                             >(${pxPerSecond.toFixed(2)} px/s)</span
                           >
@@ -1218,8 +1234,9 @@ export class ControlPanel2 extends LitElement implements Layer {
                       ></div>
                       <div
                         class="absolute left-0 top-3 h-2 rounded transition-all duration-300"
-                        style="width:${this._roadInvestmentRate *
-                        100}%; background-color: rgba(64,123,189,0.6);"
+                        style="width:${(
+                          (hasRoads ? this._roadInvestmentRate : 0) * 100
+                        ).toFixed(2)}%; background-color: rgba(64,123,189,0.6);"
                       ></div>
                       <input
                         type="range"
@@ -1227,8 +1244,12 @@ export class ControlPanel2 extends LitElement implements Layer {
                         max="100"
                         step="1"
                         .value=${(this._roadInvestmentRate * 100).toString()}
+                        ?disabled=${!hasRoads}
+                        title=${!hasRoads
+                          ? "Research Roads to enable road investment"
+                          : ""}
                         @input=${(e: Event) => {
-                          // Proposed new road investment rate
+                          if (!hasRoads) return;
                           const proposed =
                             parseInt((e.target as HTMLInputElement).value) /
                             100;
@@ -1251,7 +1272,6 @@ export class ControlPanel2 extends LitElement implements Layer {
                           if (prodChanged)
                             this.onInvestmentRateChange(this.investmentRate);
 
-                          // Persist both since they may shift together
                           localStorage.setItem(
                             "settings.roadInvestmentRate",
                             this._roadInvestmentRate.toString(),
