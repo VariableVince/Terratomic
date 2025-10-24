@@ -145,6 +145,8 @@ export class PublicLobby extends LitElement {
                 }</span
               >
               <span
+                class="ml-2 inline-block px-2 py-[2px] rounded-md border border-[#27476e]
+                  bg-[rgba(14,26,51,0.55)] text-blue-100 font-semibold shadow-[0_0_8px_rgba(14,26,51,0.35)]"
                 >${translateText(
                   `map.${lobby.gameConfig.gameMap.toLowerCase().replace(/\s+/g, "")}`,
                 )}</span
