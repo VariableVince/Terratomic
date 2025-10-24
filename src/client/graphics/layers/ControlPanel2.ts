@@ -10,6 +10,10 @@ import {
   UpgradeType,
 } from "../../../core/game/Game";
 import { GameView, PlayerView } from "../../../core/game/GameView";
+import {
+  RESEARCH_TECH_IDS,
+  TECH_METADATA,
+} from "../../../core/tech/TechEffects";
 import { PlayerListChangedEvent } from "../../events/PlayerListChangedEvent";
 import { AttackRatioEvent } from "../../InputHandler";
 import "../../ResearchTreeModal";
@@ -1481,7 +1485,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                           ${!hasRoads
                             ? html`<span
                                 class="lock-badge"
-                                title="Research Roads to enable road investment"
+                                title=${`Research '${TECH_METADATA[RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION]?.name ?? "Post-War Reconstruction"}' to enable road investment`}
                               >
                                 <svg
                                   class="lock-icon"
@@ -1517,7 +1521,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                         .value=${(this._roadInvestmentRate * 100).toString()}
                         ?disabled=${!hasRoads}
                         title=${!hasRoads
-                          ? "Research Roads to enable road investment"
+                          ? `Research '${TECH_METADATA[RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION]?.name ?? "Post-War Reconstruction"}' to enable road investment`
                           : ""}
                         @input=${(e: Event) => {
                           if (!hasRoads) return;
@@ -1706,19 +1710,14 @@ export class ControlPanel2 extends LitElement implements Layer {
                       ? html`
                           <div class="grid grid-cols-3 gap-4">
                             ${renderUpgradeButton(
-                              UpgradeType.Roads,
-                              "Roads",
-                              1,
-                            )}
-                            ${renderUpgradeButton(
                               UpgradeType.InternationalTrade,
                               "International Trade",
-                              2,
+                              1,
                             )}
                             ${renderUpgradeButton(
                               UpgradeType.ScorchedEarth,
                               "Scorched Earth",
-                              3,
+                              2,
                               "This upgrade will remove your road network",
                             )}
                           </div>

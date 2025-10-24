@@ -4,7 +4,28 @@ import { Player } from "../game/Game";
 // Keep IDs aligned with ResearchTreeModal generation (e.g., "Land-1").
 export const RESEARCH_TECH_IDS = {
   WWII_LESSONS: "Land-1",
+  POST_WAR_RECONSTRUCTION: "Economy-1",
 } as const;
+
+export interface TechMeta {
+  name: string;
+  description?: string;
+}
+
+// Central metadata registry for tech names and descriptions.
+// UI should consult this map for display, instead of hardcoding strings.
+export const TECH_METADATA: Readonly<Record<string, TechMeta>> = Object.freeze({
+  [RESEARCH_TECH_IDS.WWII_LESSONS]: {
+    name: "WWII Lessons Learned",
+    description:
+      "Doctrine refined by hard-won experience improves defensive readiness, logistics, and counter-attack planning. Effects: While defending, your troop losses are reduced by 10% and the attacker's troop losses are increased by 10%.",
+  },
+  [RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION]: {
+    name: "Post-War Reconstruction",
+    description:
+      "Revitalize infrastructure and industry by mobilizing civilian labor and resources to rebuild the national economy. Effects: Unlocks Roads investment and enables construction/expansion of your road network.",
+  },
+});
 
 export interface DefenseCasualtyModifiers {
   // Multiplier to apply to the attacker's troop loss when the defender is a player

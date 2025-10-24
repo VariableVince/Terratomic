@@ -2,8 +2,9 @@ import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { EventBus } from "../core/EventBus";
 import { GameView } from "../core/game/GameView";
-import { SendResearchTreeSelectIntentEvent } from "./Transport";
+import { TECH_METADATA } from "../core/tech/TechEffects";
 import "./components/baseComponents/Modal";
+import { SendResearchTreeSelectIntentEvent } from "./Transport";
 
 type Category = "Land" | "Sea" | "Air" | "Nuclear" | "Economy";
 
@@ -81,15 +82,13 @@ export class ResearchTreeModal extends LitElement {
     for (let lvl = 1; lvl <= 5; lvl++) {
       for (const cat of ["Land", "Sea", "Air", "Nuclear", "Economy"] as const) {
         const id = mkId(cat, lvl);
+        const meta = TECH_METADATA[id];
         const node: TechNode = {
           id,
-          name: id === "Land-1" ? "WWII Lessons Learned" : `${cat} Tech ${lvl}`,
+          name: meta?.name ?? `${cat} Tech ${lvl}`,
           category: cat,
           level: lvl,
-          description:
-            id === "Land-1"
-              ? "Doctrine refined by hard-won experience improves defensive readiness, logistics, and counter-attack planning. Effects: While defending, your troop losses are reduced by 10% and the attacker's troop losses are increased by 10%."
-              : undefined,
+          description: meta?.description,
         };
         if (lvl > 1) node.requiresAllOf = [mkId(cat, lvl - 1)];
         t.push(node);
