@@ -114,7 +114,10 @@
 
 .option-card.selected {
   border-color: var(--primaryColor);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(14, 26, 51, 0.35); /* deeper translucent navy */
+  box-shadow:
+    0 0 0 2px rgba(39, 71, 110, 0.5),
+    0 0 12px rgba(39, 71, 110, 0.35); /* subtle blue halo */
 }
 
 .option-card-title {

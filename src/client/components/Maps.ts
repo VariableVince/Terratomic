@@ -63,8 +63,11 @@ export class MapDisplay extends LitElement {
     }
 
     .option-card.selected {
-      border-color: #4a9eff;
-      background: rgba(74, 158, 255, 0.1);
+      border-color: var(--primaryColor);
+      background: rgba(14, 26, 51, 0.35);
+      box-shadow:
+        0 0 0 2px rgba(39, 71, 110, 0.5),
+        0 0 12px rgba(39, 71, 110, 0.35);
     }
 
     .option-card-title {
