@@ -25,6 +25,18 @@ export class StructureGraph {
     }
   }
 
+  // Expose neighbors for read-only graph traversal
+  public neighbors(unit: Unit): Unit[] {
+    const node = this.nodes.get(unit.id());
+    if (!node) return [];
+    const out: Unit[] = [];
+    for (const neighborId of node.connections.keys()) {
+      const neighborNode = this.nodes.get(neighborId);
+      if (neighborNode) out.push(neighborNode.unit);
+    }
+    return out;
+  }
+
   public removeNode(unit: Unit): void {
     const unitId = unit.id();
     if (this.nodes.has(unitId)) {

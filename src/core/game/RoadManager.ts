@@ -339,12 +339,16 @@ export class RoadManager {
         .slice(0, 5); // Consider up to 5 closest neighbors
 
       for (const neighbor of nearbyNodes) {
-        const existingPath = this.structureGraph.findPath(newNode, neighbor);
+        // Consider both built and planned connections when checking redundancy
+        const existingOrPlannedPath = this.findPathIncludingPlanned(
+          newNode,
+          neighbor,
+        );
         const roadNetworkMaxRedundantPathLength = 5; // Making it configurable is a good idea for the future
 
         if (
-          existingPath === null ||
-          existingPath.length > roadNetworkMaxRedundantPathLength
+          existingOrPlannedPath === null ||
+          existingOrPlannedPath.length > roadNetworkMaxRedundantPathLength
         ) {
           const segment = this.getCanonicalSegment(
             newNode.tile(),
@@ -663,6 +667,105 @@ export class RoadManager {
 
   private getCanonicalSegment(tile1: TileRef, tile2: TileRef): string {
     return tile1 < tile2 ? `${tile1}-${tile2}` : `${tile2}-${tile1}`;
+  }
+
+  // Find a path using the built structure graph plus any planned or in-progress edges
+  private findPathIncludingPlanned(
+    startUnit: Unit,
+    endUnit: Unit,
+  ): Unit[] | null {
+    // Quick win: if built graph already connects them, use that
+    const built = this.structureGraph.findPath(startUnit, endUnit);
+    if (built) return built;
+
+    // Build a temporary adjacency that augments the built graph with planned edges
+    // Gather planned edges (both queued and in-progress)
+    const extraEdges = new Map<number, Set<number>>();
+
+    const addEdge = (a?: Unit, b?: Unit) => {
+      if (!a || !b) return;
+      const aid = a.id();
+      const bid = b.id();
+      if (!extraEdges.has(aid)) extraEdges.set(aid, new Set());
+      if (!extraEdges.has(bid)) extraEdges.set(bid, new Set());
+      extraEdges.get(aid)!.add(bid);
+      extraEdges.get(bid)!.add(aid);
+    };
+
+    // In-progress constructions
+    for (const { planned } of this.currentConstruction.values()) {
+      const u1 = this.findNodeByTile(planned.start);
+      const u2 = this.findNodeByTile(planned.end);
+      addEdge(u1, u2);
+    }
+
+    // Queued, not-yet-started plans
+    for (const queue of this.plannedQueues.values()) {
+      for (const pr of queue) {
+        const u1 = this.findNodeByTile(pr.start);
+        const u2 = this.findNodeByTile(pr.end);
+        addEdge(u1, u2);
+      }
+    }
+
+    // If no extra edges, nothing more to do
+    if (extraEdges.size === 0) return null;
+
+    // BFS over built neighbors + extra edges
+    const startId = startUnit.id();
+    const goalId = endUnit.id();
+    const visited = new Set<number>([startId]);
+    const cameFrom = new Map<number, number>();
+    const q: Unit[] = [startUnit];
+
+    while (q.length > 0) {
+      const cur = q.shift()!;
+      const curId = cur.id();
+      if (curId === goalId) break;
+
+      // Built neighbors
+      const builtNeighbors = this.structureGraph.neighbors(cur);
+      for (const nb of builtNeighbors) {
+        const nid = nb.id();
+        if (!visited.has(nid)) {
+          visited.add(nid);
+          cameFrom.set(nid, curId);
+          q.push(nb);
+        }
+      }
+
+      // Planned neighbors
+      const plannedSet = extraEdges.get(curId);
+      if (plannedSet) {
+        for (const nid of plannedSet) {
+          if (!visited.has(nid)) {
+            // Neighbor might not be directly connected in built graph yet; locate among known nodes
+            const nb =
+              builtNeighbors.find((u) => u.id() === nid) ||
+              this.nodes.find((u) => u.id() === nid);
+            if (nb) {
+              visited.add(nid);
+              cameFrom.set(nid, curId);
+              q.push(nb);
+            }
+          }
+        }
+      }
+    }
+
+    if (!visited.has(goalId)) return null;
+
+    // Reconstruct path
+    const path: Unit[] = [];
+    let at = goalId;
+    while (at !== startId) {
+      const node = this.nodes.find((u) => u.id() === at);
+      if (!node) break;
+      path.unshift(node);
+      at = cameFrom.get(at)!;
+    }
+    path.unshift(startUnit);
+    return path;
   }
 
   private computePath(start: TileRef, goal: TileRef): TileRef[] | null {
