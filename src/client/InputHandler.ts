@@ -72,6 +72,10 @@ export class CloseViewEvent implements GameEvent {}
 
 export class RefreshGraphicsEvent implements GameEvent {}
 
+export class ToggleStructureEvent implements GameEvent {
+  constructor(public readonly structureType: UnitType | null) {}
+}
+
 export class ShowBuildMenuEvent implements GameEvent {
   constructor(
     public readonly x: number,

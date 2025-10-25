@@ -6,7 +6,8 @@ import cityIcon from "../../../../resources/images/CityIcon.png";
 import hospitalIcon from "../../../../resources/images/HospitalIconWhite.svg";
 import missileSiloIcon from "../../../../resources/images/MissileSiloUnit.png";
 import SAMMissileIcon from "../../../../resources/images/SamLauncherUnit.png";
-import shieldIcon from "../../../../resources/images/ShieldIcon.png";
+// Use the new non-commercial shield icon
+import shieldIcon from "../../../../resources/non-commercial/images/buildings/fortAlt3.png";
 import { Theme } from "../../../core/configuration/Config";
 import { EventBus } from "../../../core/EventBus";
 import { Cell, PlayerID, UnitType } from "../../../core/game/Game";
@@ -29,6 +30,19 @@ class StructureRenderInfo {
 const ICON_SIZE = 24;
 const UNDER_CONSTRUCTION_FILL = "rgb(198, 198, 198)";
 const UNDER_CONSTRUCTION_BORDER = "rgb(128, 127, 127)";
+
+// Background shape per structure type
+type BgShape = "circle" | "square" | "hex";
+const STRUCTURE_BG_SHAPES: Partial<Record<UnitType, BgShape>> = {
+  [UnitType.City]: "circle",
+  [UnitType.Port]: "circle",
+  [UnitType.DefensePost]: "hex",
+  [UnitType.MissileSilo]: "square",
+  [UnitType.SAMLauncher]: "square",
+  [UnitType.Airfield]: "square",
+  [UnitType.Hospital]: "square",
+  [UnitType.Academy]: "square",
+};
 
 export class StructureLayer implements Layer {
   private pixicanvas: HTMLCanvasElement;
@@ -230,24 +244,45 @@ export class StructureLayer implements Layer {
       context.fillStyle = UNDER_CONSTRUCTION_FILL;
       borderColor = UNDER_CONSTRUCTION_BORDER;
     } else {
+      // Subtler shading per cherry-pick
       context.fillStyle = this.theme
         .territoryColor(unit.owner())
-        .lighten(0.1)
+        .lighten(0.06)
         .toRgbString();
       borderColor = this.theme
         .borderColor(unit.owner())
-        .darken(0.2)
+        .darken(0.08)
         .toRgbString();
     }
     context.strokeStyle = borderColor;
     context.beginPath();
-    context.arc(
-      ICON_SIZE / 2,
-      ICON_SIZE / 2,
-      ICON_SIZE / 2 - 1,
-      0,
-      Math.PI * 2,
-    );
+    // Draw background shape
+    const shape: BgShape =
+      STRUCTURE_BG_SHAPES[structureType as UnitType] ?? "circle";
+    if (shape === "circle") {
+      context.arc(
+        ICON_SIZE / 2,
+        ICON_SIZE / 2,
+        ICON_SIZE / 2 - 1,
+        0,
+        Math.PI * 2,
+      );
+    } else if (shape === "square") {
+      const pad = 1;
+      context.rect(pad, pad, ICON_SIZE - pad * 2, ICON_SIZE - pad * 2);
+    } else if (shape === "hex") {
+      const r = ICON_SIZE / 2 - 1;
+      const cx = ICON_SIZE / 2;
+      const cy = ICON_SIZE / 2;
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i - Math.PI / 6; // flat-top hex
+        const x = cx + r * Math.cos(angle);
+        const y = cy + r * Math.sin(angle);
+        if (i === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.closePath();
+    }
     context.fill();
     context.lineWidth = 1;
     context.stroke();
