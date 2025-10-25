@@ -12,6 +12,11 @@ export class RoadLayer implements Layer {
   private static readonly BASE_ROAD_WIDTH = 1.8; // base inner stroke width in screen px at/under threshold
   private static readonly OUTLINE_EXTRA = 1.6; // extra px for outline relative to inner stroke
   private theme: Theme;
+  // Cache geometry as a Path2D to avoid re-tracing every frame
+  private path: Path2D | null = null;
+  private dirty = true;
+  private lastWidth = 0;
+  private lastHeight = 0;
 
   constructor(
     private game: GameView,
@@ -27,6 +32,10 @@ export class RoadLayer implements Layer {
 
   init() {
     // No offscreen canvas needed; we'll draw vector paths directly each frame
+    this.dirty = true;
+    this.path = null;
+    this.lastWidth = this.game.width();
+    this.lastHeight = this.game.height();
   }
 
   tick() {
@@ -53,6 +62,7 @@ export class RoadLayer implements Layer {
         }
       }
       // No immediate redraw required; we render paths each frame
+      if (changed) this.dirty = true; // mark geometry cache dirty
     }
   }
 
@@ -65,6 +75,20 @@ export class RoadLayer implements Layer {
 
     // Draw vector paths directly under the active transform to avoid pixelation
     // Note: Coordinates are in game space; offset by half map size to align with transform origin
+    // Rebuild cached geometry if needed (road changes or size changed)
+    if (
+      this.dirty ||
+      this.lastWidth !== this.game.width() ||
+      this.lastHeight !== this.game.height()
+    ) {
+      this.path = this.buildPath();
+      this.dirty = false;
+      this.lastWidth = this.game.width();
+      this.lastHeight = this.game.height();
+    }
+
+    if (!this.path) return;
+
     const s = this.transform.scale || 1;
     const t = RoadLayer.ROAD_GROW_ZOOM_THRESHOLD;
     // Match StructureLayer behavior: stable up to threshold, then grow with zoom
@@ -84,30 +108,20 @@ export class RoadLayer implements Layer {
       : "rgb(128, 127, 127)"; // fallback similar to UNDER_CONSTRUCTION_BORDER
     context.strokeStyle = outlineRgb;
     context.lineWidth = outlineWorldWidth;
-    context.beginPath();
-    for (const segment of this.roadSegments) {
-      const [tile1Str, tile2Str] = segment.split("-");
-      const tile1 = parseInt(tile1Str, 10) as TileRef;
-      const tile2 = parseInt(tile2Str, 10) as TileRef;
-      this.traceSegment(context, tile1, tile2);
-    }
-    context.stroke();
+    context.stroke(this.path);
 
     // Inner semi-transparent white stroke similar to structure icon fill
     context.strokeStyle = "rgba(255, 255, 255, 1)";
     context.lineWidth = innerWorldWidth;
-    context.beginPath();
-    for (const segment of this.roadSegments) {
-      const [tile1Str, tile2Str] = segment.split("-");
-      const tile1 = parseInt(tile1Str, 10) as TileRef;
-      const tile2 = parseInt(tile2Str, 10) as TileRef;
-      this.traceSegment(context, tile1, tile2);
-    }
-    context.stroke();
+    context.stroke(this.path);
   }
 
+  // Minimal sink interface implemented by both CanvasRenderingContext2D and Path2D
   private traceSegment(
-    ctx: CanvasRenderingContext2D,
+    ctx: {
+      moveTo(x: number, y: number): void;
+      lineTo(x: number, y: number): void;
+    },
     tile1: TileRef,
     tile2: TileRef,
   ) {
@@ -120,5 +134,17 @@ export class RoadLayer implements Layer {
     const y2 = this.game.y(tile2) - oy + 0.5;
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
+  }
+
+  private buildPath(): Path2D | null {
+    if (this.roadSegments.size === 0) return null;
+    const p = new Path2D();
+    for (const segment of this.roadSegments) {
+      const [tile1Str, tile2Str] = segment.split("-");
+      const tile1 = parseInt(tile1Str, 10) as TileRef;
+      const tile2 = parseInt(tile2Str, 10) as TileRef;
+      this.traceSegment(p, tile1, tile2);
+    }
+    return p;
   }
 }
