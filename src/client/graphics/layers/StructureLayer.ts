@@ -27,17 +27,28 @@ class StructureRenderInfo {
   ) {}
 }
 
-const ICON_SIZE = 24;
+const ICON_SIZE = 24; // legacy default; specific shapes use ICON_SIZES below
+const ICON_SIZES: Record<BgShape, number> = {
+  circle: 28,
+  octagon: 28,
+  pentagon: 30,
+  square: 28,
+  triangle: 28,
+};
+// Icon scale behavior vs map zoom:
+// - Up to ICON_GROW_ZOOM_THRESHOLD, icons behave as before: they shrink with zoom-out and cap at 1x when zoomed in
+// - Beyond ICON_GROW_ZOOM_THRESHOLD, icons grow with the map zoom (proportionally)
+const ICON_GROW_ZOOM_THRESHOLD = 2;
 const UNDER_CONSTRUCTION_FILL = "rgb(198, 198, 198)";
 const UNDER_CONSTRUCTION_BORDER = "rgb(128, 127, 127)";
 
 // Background shape per structure type
-type BgShape = "circle" | "square" | "hex";
+type BgShape = "circle" | "square" | "triangle" | "pentagon" | "octagon";
 const STRUCTURE_BG_SHAPES: Partial<Record<UnitType, BgShape>> = {
   [UnitType.City]: "circle",
-  [UnitType.Port]: "circle",
-  [UnitType.DefensePost]: "hex",
-  [UnitType.MissileSilo]: "square",
+  [UnitType.Port]: "pentagon",
+  [UnitType.DefensePost]: "octagon",
+  [UnitType.MissileSilo]: "triangle",
   [UnitType.SAMLauncher]: "square",
   [UnitType.Airfield]: "square",
   [UnitType.Hospital]: "square",
@@ -235,79 +246,120 @@ export class StructureLayer implements Layer {
     if (this.textureCache.has(cacheKey)) {
       return this.textureCache.get(cacheKey)!;
     }
-    const structureCanvas = document.createElement("canvas");
-    structureCanvas.width = ICON_SIZE;
-    structureCanvas.height = ICON_SIZE;
-    const context = structureCanvas.getContext("2d")!;
-    let borderColor: string;
-    if (isConstruction) {
-      context.fillStyle = UNDER_CONSTRUCTION_FILL;
-      borderColor = UNDER_CONSTRUCTION_BORDER;
-    } else {
-      // Use semi-transparent white interior fill and a darker border
-      // (ignores territory hue for the interior to ensure consistent appearance)
-      const territory = this.theme.territoryColor(unit.owner());
-      const border = this.theme.borderColor(unit.owner());
-      context.fillStyle = "#FFFFFF";
-      borderColor = border.darken(0.15).toRgbString();
-    }
-    context.strokeStyle = borderColor;
-    context.beginPath();
-    // Draw background shape
+
     const shape: BgShape =
       STRUCTURE_BG_SHAPES[structureType as UnitType] ?? "circle";
+    const ICON_DIM = ICON_SIZES[shape] ?? ICON_SIZE;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = ICON_DIM;
+    canvas.height = ICON_DIM;
+    const ctx = canvas.getContext("2d")!;
+
+    // Fill and border colors
+    let borderColor: string;
+    if (isConstruction) {
+      ctx.fillStyle = UNDER_CONSTRUCTION_FILL;
+      borderColor = UNDER_CONSTRUCTION_BORDER;
+    } else {
+      ctx.fillStyle = "#FFFFFF"; // semi-transparent white applied via globalAlpha
+      const border = this.theme.borderColor(unit.owner());
+      borderColor = border.darken(0.17).toRgbString();
+    }
+
+    // Draw background shape
+    ctx.beginPath();
     if (shape === "circle") {
-      context.arc(
-        ICON_SIZE / 2,
-        ICON_SIZE / 2,
-        ICON_SIZE / 2 - 1,
-        0,
-        Math.PI * 2,
-      );
+      ctx.arc(ICON_DIM / 2, ICON_DIM / 2, ICON_DIM / 2 - 1, 0, Math.PI * 2);
     } else if (shape === "square") {
       const pad = 1;
-      context.rect(pad, pad, ICON_SIZE - pad * 2, ICON_SIZE - pad * 2);
-    } else if (shape === "hex") {
-      const r = ICON_SIZE / 2 - 1;
-      const cx = ICON_SIZE / 2;
-      const cy = ICON_SIZE / 2;
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i - Math.PI / 6; // flat-top hex
+      ctx.rect(pad, pad, ICON_DIM - pad * 2, ICON_DIM - pad * 2);
+    } else if (shape === "triangle") {
+      const s = ICON_DIM;
+      const half = s / 2;
+      ctx.moveTo(half, 1);
+      ctx.lineTo(s - 1, s - 1);
+      ctx.lineTo(1, s - 1);
+      ctx.closePath();
+    } else if (shape === "pentagon") {
+      const r = ICON_DIM / 2 - 1;
+      const cx = ICON_DIM / 2;
+      const cy = ICON_DIM / 2;
+      const step = (Math.PI * 2) / 5;
+      for (let i = 0; i < 5; i++) {
+        const angle = step * i - Math.PI / 2;
         const x = cx + r * Math.cos(angle);
         const y = cy + r * Math.sin(angle);
-        if (i === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       }
-      context.closePath();
+      ctx.closePath();
+    } else if (shape === "octagon") {
+      const r = ICON_DIM / 2 - 1;
+      const cx = ICON_DIM / 2;
+      const cy = ICON_DIM / 2;
+      const step = (Math.PI * 2) / 8;
+      for (let i = 0; i < 8; i++) {
+        const angle = step * i - Math.PI / 8;
+        const x = cx + r * Math.cos(angle);
+        const y = cy + r * Math.sin(angle);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
     }
-    // Apply alpha to inside fill similar to the original approach
-    const prevAlpha = context.globalAlpha;
+
+    // Apply alpha to interior fill
+    const prevAlpha = ctx.globalAlpha;
     if (!isConstruction) {
-      context.globalAlpha = 0.65; // slightly translucent interior fill
+      ctx.globalAlpha = 0.65;
     }
-    context.fill();
-    context.globalAlpha = prevAlpha;
-    context.lineWidth = 1;
-    context.stroke();
+    ctx.fill();
+    ctx.globalAlpha = prevAlpha;
+
+    // Stroke border on top
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
     const structureInfo = this.structures.get(structureType);
     if (!structureInfo?.image) {
       console.warn(`Image not loaded for unit type: ${structureType}`);
-      return PIXI.Texture.from(structureCanvas);
+      return PIXI.Texture.from(canvas);
     }
-    // Center and scale the icon within the background shape with padding
-    const padded = 4; // padding on each side
-    const maxW = ICON_SIZE - padded * 2;
-    const maxH = ICON_SIZE - padded * 2;
+
+    // Draw icon: center+scale for a subset of unit types; otherwise use fixed offsets
+    const SHAPE_OFFSETS: Record<BgShape, [number, number]> = {
+      triangle: [6, 11],
+      square: [5, 5],
+      octagon: [6, 6],
+      pentagon: [7, 7],
+      circle: [6, 6],
+    };
     const colored = this.getImageColored(structureInfo.image, borderColor);
-    const iw = Math.max(1, colored.width);
-    const ih = Math.max(1, colored.height);
-    const scale = Math.min(maxW / iw, maxH / ih);
-    const dw = Math.max(1, Math.round(iw * scale));
-    const dh = Math.max(1, Math.round(ih * scale));
-    const dx = Math.round((ICON_SIZE - dw) / 2);
-    const dy = Math.round((ICON_SIZE - dh) / 2);
-    context.drawImage(colored, dx, dy, dw, dh);
-    const texture = PIXI.Texture.from(structureCanvas);
+    const centerScaledTypes = new Set<UnitType>([
+      UnitType.Airfield,
+      UnitType.Hospital,
+      UnitType.Academy,
+    ]);
+    if (centerScaledTypes.has(structureType as UnitType)) {
+      const padded = 4;
+      const maxW = ICON_DIM - padded * 2;
+      const maxH = ICON_DIM - padded * 2;
+      const iw = Math.max(1, colored.width);
+      const ih = Math.max(1, colored.height);
+      const scale = Math.min(maxW / iw, maxH / ih);
+      const dw = Math.max(1, Math.round(iw * scale));
+      const dh = Math.max(1, Math.round(ih * scale));
+      const dx = Math.round((ICON_DIM - dw) / 2);
+      const dy = Math.round((ICON_DIM - dh) / 2);
+      ctx.drawImage(colored, dx, dy, dw, dh);
+    } else {
+      const [offX, offY] = SHAPE_OFFSETS[shape] ?? [4, 4];
+      ctx.drawImage(colored, offX, offY);
+    }
+
+    const texture = PIXI.Texture.from(canvas);
     this.textureCache.set(cacheKey, texture);
     return texture;
   }
@@ -323,9 +375,19 @@ export class StructureLayer implements Layer {
     );
     sprite.x = screenPos.x;
     sprite.y = screenPos.y;
-    sprite.scale.set(Math.min(1, this.transformHandler.scale));
+    sprite.scale.set(this.iconScreenScale());
     this.stage.addChild(sprite);
     return sprite;
+  }
+
+  private iconScreenScale(): number {
+    const s = this.transformHandler.scale;
+    if (s <= ICON_GROW_ZOOM_THRESHOLD) {
+      // Original behavior: shrink with zoom-out, cap at 1x for zoom-in up to threshold
+      return Math.min(1, s);
+    }
+    // Beyond threshold: grow proportionally with map zoom (continuous at threshold)
+    return s / ICON_GROW_ZOOM_THRESHOLD;
   }
 
   private getImageColored(
@@ -353,7 +415,17 @@ export class StructureLayer implements Layer {
     screenPos.x = Math.round(screenPos.x);
     screenPos.y = Math.round(screenPos.y);
 
-    const margin = ICON_SIZE;
+    // Margin reflects the current icon's shape size scaled on screen
+    const unitType =
+      render.unit.type() === UnitType.Construction
+        ? render.unit.constructionType()
+        : render.unit.type();
+    const shape: BgShape =
+      unitType !== undefined
+        ? (STRUCTURE_BG_SHAPES[unitType as UnitType] ?? "circle")
+        : "circle";
+    const iconDim = ICON_SIZES[shape] ?? ICON_SIZE;
+    const margin = iconDim * this.iconScreenScale();
     const onScreen =
       screenPos.x + margin > 0 &&
       screenPos.x - margin < this.pixicanvas.width &&
@@ -363,7 +435,7 @@ export class StructureLayer implements Layer {
     if (onScreen) {
       render.pixiSprite.x = screenPos.x;
       render.pixiSprite.y = screenPos.y;
-      render.pixiSprite.scale.set(Math.min(1, this.transformHandler.scale));
+      render.pixiSprite.scale.set(this.iconScreenScale());
     }
     if (render.isOnScreen !== onScreen) {
       render.isOnScreen = onScreen;
