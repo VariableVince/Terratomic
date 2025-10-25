@@ -1,3 +1,4 @@
+import { Theme } from "../../../core/configuration/Config";
 import { TileRef } from "../../../core/game/GameMap";
 import { GameUpdateType, RoadsUpdate } from "../../../core/game/GameUpdates";
 import { GameView } from "../../../core/game/GameView";
@@ -7,14 +8,18 @@ import { Layer } from "./Layer";
 export class RoadLayer implements Layer {
   private roadSegments = new Set<string>();
   // Keep this threshold aligned with StructureLayer's ICON_GROW_ZOOM_THRESHOLD
-  private static readonly ROAD_GROW_ZOOM_THRESHOLD = 1.5;
-  private static readonly BASE_ROAD_WIDTH = 1.2; // base inner stroke width in screen px at/under threshold
-  private static readonly OUTLINE_EXTRA = 0.6; // extra px for outline relative to inner stroke
+  private static readonly ROAD_GROW_ZOOM_THRESHOLD = 2;
+  private static readonly BASE_ROAD_WIDTH = 1.8; // base inner stroke width in screen px at/under threshold
+  private static readonly OUTLINE_EXTRA = 1.6; // extra px for outline relative to inner stroke
+  private theme: Theme;
 
   constructor(
     private game: GameView,
     private transform: TransformHandler,
-  ) {}
+  ) {
+    // initialize theme from game config to match StructureLayer
+    this.theme = this.game.config().theme();
+  }
 
   shouldTransform(): boolean {
     return true;
@@ -71,8 +76,13 @@ export class RoadLayer implements Layer {
     context.lineJoin = "round";
     context.lineCap = "round";
 
-    // Outline (subtle shadow) for contrast on light backgrounds
-    context.strokeStyle = "rgba(0, 0, 0, 0.18)";
+    // Outline color identical to StructureLayer icon border color:
+    // theme.borderColor(player).darken(0.17)
+    const player = this.game.focusedPlayer() ?? this.game.myPlayer();
+    const outlineRgb = player
+      ? this.theme.borderColor(player).darken(0.17).toRgbString()
+      : "rgb(128, 127, 127)"; // fallback similar to UNDER_CONSTRUCTION_BORDER
+    context.strokeStyle = outlineRgb;
     context.lineWidth = outlineWorldWidth;
     context.beginPath();
     for (const segment of this.roadSegments) {
@@ -84,7 +94,7 @@ export class RoadLayer implements Layer {
     context.stroke();
 
     // Inner semi-transparent white stroke similar to structure icon fill
-    context.strokeStyle = "rgba(255, 255, 255, 0.55)";
+    context.strokeStyle = "rgba(255, 255, 255, 1)";
     context.lineWidth = innerWorldWidth;
     context.beginPath();
     for (const segment of this.roadSegments) {

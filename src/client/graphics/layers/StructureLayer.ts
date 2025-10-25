@@ -317,7 +317,7 @@ export class StructureLayer implements Layer {
     // Apply alpha to interior fill
     const prevAlpha = ctx.globalAlpha;
     if (!isConstruction) {
-      ctx.globalAlpha = 0.65;
+      ctx.globalAlpha = 1;
     }
     ctx.fill();
     ctx.globalAlpha = prevAlpha;
