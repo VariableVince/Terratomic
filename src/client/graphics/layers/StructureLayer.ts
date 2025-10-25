@@ -244,15 +244,12 @@ export class StructureLayer implements Layer {
       context.fillStyle = UNDER_CONSTRUCTION_FILL;
       borderColor = UNDER_CONSTRUCTION_BORDER;
     } else {
-      // Subtler shading per cherry-pick
-      context.fillStyle = this.theme
-        .territoryColor(unit.owner())
-        .lighten(0.06)
-        .toRgbString();
-      borderColor = this.theme
-        .borderColor(unit.owner())
-        .darken(0.08)
-        .toRgbString();
+      // Use semi-transparent white interior fill and a darker border
+      // (ignores territory hue for the interior to ensure consistent appearance)
+      const territory = this.theme.territoryColor(unit.owner());
+      const border = this.theme.borderColor(unit.owner());
+      context.fillStyle = "#FFFFFF";
+      borderColor = border.darken(0.15).toRgbString();
     }
     context.strokeStyle = borderColor;
     context.beginPath();
@@ -283,7 +280,13 @@ export class StructureLayer implements Layer {
       }
       context.closePath();
     }
+    // Apply alpha to inside fill similar to the original approach
+    const prevAlpha = context.globalAlpha;
+    if (!isConstruction) {
+      context.globalAlpha = 0.65; // slightly translucent interior fill
+    }
     context.fill();
+    context.globalAlpha = prevAlpha;
     context.lineWidth = 1;
     context.stroke();
     const structureInfo = this.structures.get(structureType);
