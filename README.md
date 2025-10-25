@@ -2,9 +2,11 @@
 
 [![Join Discord](https://img.shields.io/discord/1380341945603330148?label=Join%20Us%20on%20Discord&logo=discord&style=for-the-badge)](https://discord.gg/JNZbp4pg5y)
 
-**Terratomic.io** is a fast-paced real-time strategy game focused on **territorial conquest**, **alliance-building**, and **resource management**.
+**Terratomic.io** is a large-scale Cold War strategy game featuring **nuclear warfare**, **naval and air combat**, and **economic expansion**. Players command nations through the global balance of power — managing **trade, production, alliances, and military escalation** in a tense race for dominance.
 
-It is a fork of [OpenFront.io](https://github.com/openfrontio/OpenFrontIO), which itself is based on [WarFront.io](https://github.com/WarFrontIO).
+It is a fork of [OpenFront.io](https://github.com/openfrontio/OpenFrontIO), which itself was derived from [WarFront.io](https://github.com/WarFrontIO).
+
+---
 
 ## 💬 Why This Fork
 
@@ -13,6 +15,8 @@ While OpenFront laid a strong foundation, Terratomic takes a different approach 
 This project aims to evolve based on what players actually want, with transparent priorities and active community input shaping the game's future.
 
 This is a game built _with_ its players, not just _for_ them.
+
+---
 
 ## 🤝 Contributing
 
@@ -27,7 +31,9 @@ npm run dev
 
 You're now ready to start developing locally. A formal contribution guide will be published soon.
 
-Until then, open issues, submit pull requests or join the discussion [on Discord](https://discord.gg/JNZbp4pg5y) — we're listening.
+Until then, open issues, submit pull requests, or join the discussion [on Discord](https://discord.gg/JNZbp4pg5y) — we're listening.
+
+---
 
 ## 🗂️ Project Structure
 
@@ -38,18 +44,37 @@ Until then, open issues, submit pull requests or join the discussion [on Discord
 - `resources/` – Static assets (flags, fonts, icons, maps, sprites, images)
 - `tests/` – Unit and integration tests for client, core logic, and utilities
 
-## 🛠 Licensing
+---
 
-Terratomic is a fork of [OpenFront.io](https://github.com/openfrontio/OpenFrontIO), which was originally licensed under a combination of GPLv3 (for `src/client`) and MIT (for the rest of the code). That project did not include license headers in individual files.
+## 🛠️ Licensing
 
-As part of this fork, we have **unified the license under GPLv3** for all parts of the project, **except** the `proprietary/` folder, which is governed by a separate proprietary license and a Contributor License Agreement (CLA).
+Terratomic is a fork of [OpenFront.io](https://github.com/openfrontio/OpenFrontIO).
 
-### 📂 Folder Licensing Summary
+The original OpenFront project was first released under the **MIT License**, later re-licensed to **GPLv3**, and subsequently upgraded to **AGPLv3**. Terratomic incorporates changes from both the GPLv3 and AGPLv3 versions. Accordingly, **the entire codebase of this repository is distributed under the GNU Affero General Public License v3.0 (AGPLv3)**.
 
-- `src/client`, `src/core`, `src/server`, `src/scripts`, `tests/`: **GPLv3**
-- `resources/`: **GPLv3**
-- `proprietary/`: **Proprietary** – See [CLA.md](./CLA.md) for contributor terms
+### 📜 Code License
 
-Some third-party files may retain their original licenses (e.g. MIT); where applicable, these are noted in headers or accompanying files.
+**License:** [GNU Affero General Public License v3.0](LICENSE)  
+Based on OpenFront (https://github.com/openfrontio/OpenFrontIO)  
+© 2020–2025 OpenFront contributors  
+Modifications © 2025 Terratomic contributors
+
+You are free to use, modify, and redistribute this code under the terms of the AGPLv3. See the [LICENSE](LICENSE) file for the full text.
+
+### 🎨 Asset License
+
+All assets located in the `resources/` folder are licensed under  
+**[Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/)**  
+© 2020–2025 OpenFront contributors  
+© 2025 Terratomic contributors
+
+These assets are **not** relicensed under AGPLv3 and must remain under CC BY-SA 4.0 with proper attribution.  
+If you redistribute or modify these assets, preserve this notice and the license file within the folder.
+
+### 🔒 Proprietary Content
+
+The `proprietary/` folder (if present) is governed by a separate proprietary license and a Contributor License Agreement (CLA). See [CLA.md](./CLA.md) for contributor terms.
+
+---
 
 © 2025 Terratomic Team
