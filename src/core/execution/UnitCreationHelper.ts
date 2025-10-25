@@ -12,6 +12,10 @@ export class UnitCreationHelper {
   private static readonly MIN_DISTANCE_FROM_BORDER_SQUARED = 100; // 10 tiles squared
   private static readonly MIN_DISTANCE_BETWEEN_DEFENSE_POSTS_SQUARED = 900; // 30 tiles squared
   private static readonly MAX_PLACEMENT_ATTEMPTS = 100;
+  // Spatial bucket size for proximity checks around existing buildings.
+  // Using the minimum allowed distance (~40) ensures we only examine buildings
+  // that could possibly violate spacing for a candidate tile.
+  private static readonly BUILDING_BUCKET_SIZE = 40;
 
   constructor(
     private random: PseudoRandom,
@@ -19,7 +23,26 @@ export class UnitCreationHelper {
     private player: Player,
   ) {}
 
+  // Per-handleUnits invocation caches to avoid repeated heavy work.
+  // They are reset at the start of handleUnits().
+  private spawnCache: Map<UnitType, TileRef | null> = new Map();
+  private ownedTilesCache: TileRef[] | null = null;
+  private shoreOwnedTilesCache: TileRef[] | null = null;
+
+  // Bucketed map of existing non-defense buildings for fast radius checks.
+  private buildingBuckets: Map<
+    string,
+    Array<{ tile: TileRef; x: number; y: number }>
+  > | null = null;
+
   handleUnits() {
+    // Reset per-tick caches – this helper may be called multiple times per tick
+    // and structureSpawnTile can be expensive without caching.
+    this.spawnCache.clear();
+    this.ownedTilesCache = null;
+    this.shoreOwnedTilesCache = null;
+    this.buildingBuckets = null;
+
     const cityInfo = this.getDensityBasedStructureInfo(UnitType.City);
     const portInfo = this.getDensityBasedStructureInfo(UnitType.Port);
 
@@ -116,39 +139,97 @@ export class UnitCreationHelper {
   }
 
   private structureSpawnTile(type: UnitType): TileRef | null {
-    let tiles = Array.from(this.player.tiles());
+    // Use memoized result if available within the same handleUnits() pass.
+    const cached = this.spawnCache.get(type);
+    if (cached !== undefined) return cached;
 
-    if (type === UnitType.Port) {
-      tiles = tiles.filter((t) => this.mg.isOceanShore(t));
+    // Get owned tiles (cached)
+    if (this.ownedTilesCache === null) {
+      this.ownedTilesCache = Array.from(this.player.tiles());
     }
 
-    if (
+    // Restrict to shoreline for ports (cached)
+    let candidateTiles: TileRef[];
+    if (type === UnitType.Port) {
+      if (this.shoreOwnedTilesCache === null) {
+        // Filter once per tick; mg.isOceanShore is relatively cheap but can add up.
+        this.shoreOwnedTilesCache = this.ownedTilesCache.filter((t) =>
+          this.mg.isOceanShore(t),
+        );
+      }
+      candidateTiles = this.shoreOwnedTilesCache;
+    } else {
+      candidateTiles = this.ownedTilesCache;
+    }
+
+    if (candidateTiles.length === 0) {
+      this.spawnCache.set(type, null);
+      return null;
+    }
+
+    // For most structures we must keep a minimum distance from existing non-defense buildings.
+    const mustRespectSpacing =
       type !== UnitType.DefensePost &&
       type !== UnitType.SAMLauncher &&
-      type !== UnitType.MissileSilo
-    ) {
-      const existingBuildings = this.player
-        .units()
-        .filter(
-          (unit) =>
-            unit.type() !== UnitType.DefensePost &&
-            unit.type() !== UnitType.SAMLauncher,
-        );
-      tiles = tiles.filter((tile) => {
-        for (const building of existingBuildings) {
-          if (
-            this.mg.euclideanDistSquared(tile, building.tile()) <
-            UnitCreationHelper.MIN_BUILDING_DISTANCE_SQUARED
-          ) {
-            return false;
-          }
-        }
-        return true;
-      });
+      type !== UnitType.MissileSilo;
+
+    // Build spatial buckets of existing buildings once per tick for fast neighborhood checks.
+    if (mustRespectSpacing && this.buildingBuckets === null) {
+      this.buildingBuckets = this.buildBuildingBuckets();
     }
 
-    if (tiles.length === 0) return null;
-    return this.random.randElement(tiles);
+    const isValid = (tile: TileRef): boolean => {
+      if (!mustRespectSpacing) return true;
+      if (this.buildingBuckets === null) return true; // defensive
+      const minDistSq = UnitCreationHelper.MIN_BUILDING_DISTANCE_SQUARED;
+      const tx = this.mg.x(tile);
+      const ty = this.mg.y(tile);
+      const cellSize = UnitCreationHelper.BUILDING_BUCKET_SIZE;
+      const cx = Math.floor(tx / cellSize);
+      const cy = Math.floor(ty / cellSize);
+
+      // Only check nearby buckets (3x3 neighborhood)
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const key = `${cx + dx},${cy + dy}`;
+          const bucket = this.buildingBuckets.get(key);
+          if (!bucket) continue;
+          for (const b of bucket) {
+            // Early prune on axis if obviously far
+            const ddx = tx - b.x;
+            if (ddx > cellSize || ddx < -cellSize) continue;
+            const ddy = ty - b.y;
+            if (ddy > cellSize || ddy < -cellSize) continue;
+            const dist = ddx * ddx + ddy * ddy;
+            if (dist < minDistSq) return false;
+          }
+        }
+      }
+      return true;
+    };
+
+    // 1) Fast path: random rejection sampling with bounded attempts (uniform over valid tiles in expectation).
+    for (let i = 0; i < UnitCreationHelper.MAX_PLACEMENT_ATTEMPTS; i++) {
+      const tile = this.random.randElement(candidateTiles);
+      if (isValid(tile)) {
+        this.spawnCache.set(type, tile);
+        return tile;
+      }
+    }
+
+    // 2) Fallback: linear scan starting at a random offset to reduce bias.
+    const n = candidateTiles.length;
+    const start = this.random.nextInt(0, Math.max(0, n - 1));
+    for (let k = 0; k < n; k++) {
+      const tile = candidateTiles[(start + k) % n];
+      if (isValid(tile)) {
+        this.spawnCache.set(type, tile);
+        return tile;
+      }
+    }
+
+    this.spawnCache.set(type, null);
+    return null;
   }
 
   private maybeSpawnWarship(): boolean {
@@ -334,5 +415,43 @@ export class UnitCreationHelper {
     }
 
     return result;
+  }
+
+  // Build buckets of existing buildings (excluding DefensePost and SAMLauncher)
+  // grouped by coarse grid cells for near-neighbor queries.
+  private buildBuildingBuckets(): Map<
+    string,
+    Array<{ tile: TileRef; x: number; y: number }>
+  > {
+    const buckets = new Map<
+      string,
+      Array<{ tile: TileRef; x: number; y: number }>
+    >();
+    const cellSize = UnitCreationHelper.BUILDING_BUCKET_SIZE;
+
+    const existingBuildings = this.player
+      .units()
+      .filter(
+        (unit) =>
+          unit.type() !== UnitType.DefensePost &&
+          unit.type() !== UnitType.SAMLauncher,
+      );
+
+    for (const b of existingBuildings) {
+      const tile = b.tile();
+      const x = this.mg.x(tile);
+      const y = this.mg.y(tile);
+      const cx = Math.floor(x / cellSize);
+      const cy = Math.floor(y / cellSize);
+      const key = `${cx},${cy}`;
+      let arr = buckets.get(key);
+      if (!arr) {
+        arr = [];
+        buckets.set(key, arr);
+      }
+      arr.push({ tile, x, y });
+    }
+
+    return buckets;
   }
 }
