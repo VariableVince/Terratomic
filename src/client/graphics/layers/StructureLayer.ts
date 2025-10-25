@@ -28,6 +28,8 @@ class StructureRenderInfo {
 }
 
 const ICON_SIZE = 24; // legacy default; specific shapes use ICON_SIZES below
+// Render structure textures at higher pixel density to stay crisp when scaled
+const ICON_TEXTURE_QUALITY = 2; // 2x logical size -> sharper when zooming in
 const ICON_SIZES: Record<BgShape, number> = {
   circle: 28,
   octagon: 28,
@@ -252,9 +254,12 @@ export class StructureLayer implements Layer {
     const ICON_DIM = ICON_SIZES[shape] ?? ICON_SIZE;
 
     const canvas = document.createElement("canvas");
-    canvas.width = ICON_DIM;
-    canvas.height = ICON_DIM;
+    const CANVAS_PX = Math.max(1, Math.round(ICON_DIM * ICON_TEXTURE_QUALITY));
+    canvas.width = CANVAS_PX;
+    canvas.height = CANVAS_PX;
     const ctx = canvas.getContext("2d")!;
+    // Draw in logical units (ICON_DIM) but render at higher pixel density
+    ctx.scale(ICON_TEXTURE_QUALITY, ICON_TEXTURE_QUALITY);
 
     // Fill and border colors
     let borderColor: string;
@@ -319,7 +324,7 @@ export class StructureLayer implements Layer {
 
     // Stroke border on top
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1; // logical pixel; turns into crisp 2px at 2x quality
     ctx.stroke();
 
     const structureInfo = this.structures.get(structureType);
@@ -384,10 +389,10 @@ export class StructureLayer implements Layer {
     const s = this.transformHandler.scale;
     if (s <= ICON_GROW_ZOOM_THRESHOLD) {
       // Original behavior: shrink with zoom-out, cap at 1x for zoom-in up to threshold
-      return Math.min(1, s);
+      return Math.min(1, s) / ICON_TEXTURE_QUALITY;
     }
     // Beyond threshold: grow proportionally with map zoom (continuous at threshold)
-    return s / ICON_GROW_ZOOM_THRESHOLD;
+    return s / ICON_GROW_ZOOM_THRESHOLD / ICON_TEXTURE_QUALITY;
   }
 
   private getImageColored(

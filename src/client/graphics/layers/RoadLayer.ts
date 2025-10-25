@@ -6,6 +6,10 @@ import { Layer } from "./Layer";
 
 export class RoadLayer implements Layer {
   private roadSegments = new Set<string>();
+  // Keep this threshold aligned with StructureLayer's ICON_GROW_ZOOM_THRESHOLD
+  private static readonly ROAD_GROW_ZOOM_THRESHOLD = 1.5;
+  private static readonly BASE_ROAD_WIDTH = 1.2; // base inner stroke width in screen px at/under threshold
+  private static readonly OUTLINE_EXTRA = 0.6; // extra px for outline relative to inner stroke
 
   constructor(
     private game: GameView,
@@ -56,13 +60,20 @@ export class RoadLayer implements Layer {
 
     // Draw vector paths directly under the active transform to avoid pixelation
     // Note: Coordinates are in game space; offset by half map size to align with transform origin
-    const roadWidth = 1.2; // thinner roads; world units, scales with zoom
+    const s = this.transform.scale || 1;
+    const t = RoadLayer.ROAD_GROW_ZOOM_THRESHOLD;
+    // Match StructureLayer behavior: stable up to threshold, then grow with zoom
+    const screenScale = s <= t ? Math.min(1, s) : s / t;
+    // Convert desired on-screen widths to world units by compensating for current transform scale
+    const innerWorldWidth = (RoadLayer.BASE_ROAD_WIDTH * screenScale) / s;
+    const outlineWorldWidth =
+      ((RoadLayer.BASE_ROAD_WIDTH + RoadLayer.OUTLINE_EXTRA) * screenScale) / s;
     context.lineJoin = "round";
     context.lineCap = "round";
 
     // Outline (subtle shadow) for contrast on light backgrounds
     context.strokeStyle = "rgba(0, 0, 0, 0.18)";
-    context.lineWidth = roadWidth + 0.6;
+    context.lineWidth = outlineWorldWidth;
     context.beginPath();
     for (const segment of this.roadSegments) {
       const [tile1Str, tile2Str] = segment.split("-");
@@ -74,7 +85,7 @@ export class RoadLayer implements Layer {
 
     // Inner semi-transparent white stroke similar to structure icon fill
     context.strokeStyle = "rgba(255, 255, 255, 0.55)";
-    context.lineWidth = roadWidth;
+    context.lineWidth = innerWorldWidth;
     context.beginPath();
     for (const segment of this.roadSegments) {
       const [tile1Str, tile2Str] = segment.split("-");
