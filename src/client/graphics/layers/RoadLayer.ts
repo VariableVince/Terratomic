@@ -1,13 +1,10 @@
-import { colord } from "colord";
 import { TileRef } from "../../../core/game/GameMap";
 import { GameUpdateType, RoadsUpdate } from "../../../core/game/GameUpdates";
-import { GameView, PlayerView } from "../../../core/game/GameView";
+import { GameView } from "../../../core/game/GameView";
 import { TransformHandler } from "../TransformHandler";
 import { Layer } from "./Layer";
 
 export class RoadLayer implements Layer {
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
   private roadSegments = new Set<string>();
 
   constructor(
@@ -20,12 +17,7 @@ export class RoadLayer implements Layer {
   }
 
   init() {
-    this.canvas = document.createElement("canvas");
-    const ctx = this.canvas.getContext("2d");
-    if (!ctx) throw new Error("2D context not supported");
-    this.ctx = ctx;
-    this.canvas.width = this.game.width();
-    this.canvas.height = this.game.height();
+    // No offscreen canvas needed; we'll draw vector paths directly each frame
   }
 
   tick() {
@@ -51,80 +43,46 @@ export class RoadLayer implements Layer {
           }
         }
       }
-      if (changed) {
-        this.redraw();
-      }
+      // No immediate redraw required; we render paths each frame
     }
   }
 
   redraw() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    if (this.roadSegments.size === 0) return;
-
-    const roadWidth = 1.2;
-    const edgeWidth = 1.8;
-
-    // Group segments by owner to apply the correct color
-    const segmentsByOwner = new Map<PlayerView | null, string[]>();
-    for (const segment of this.roadSegments) {
-      const [tile1Str] = segment.split("-");
-      const tile1 = parseInt(tile1Str, 10) as TileRef;
-      const owner = this.game.owner(tile1);
-      const playerOwner = owner.isPlayer() ? (owner as PlayerView) : null;
-
-      if (!segmentsByOwner.has(playerOwner)) {
-        segmentsByOwner.set(playerOwner, []);
-      }
-      segmentsByOwner.get(playerOwner)!.push(segment);
-    }
-
-    for (const [owner, segments] of segmentsByOwner.entries()) {
-      let baseColor;
-      if (owner) {
-        baseColor = this.game.config().theme().territoryColor(owner);
-      } else {
-        baseColor = colord("#808080");
-      }
-      const darkerColor = baseColor.darken(0.05).toRgbString();
-      const evenDarkerColor = baseColor.darken(0.1).toRgbString();
-
-      this.ctx.lineJoin = "round";
-      this.ctx.lineCap = "round";
-
-      // Outer darker edge
-      this.ctx.strokeStyle = evenDarkerColor;
-      this.ctx.lineWidth = edgeWidth;
-      this.ctx.beginPath();
-      for (const segment of segments) {
-        const [tile1Str, tile2Str] = segment.split("-");
-        const tile1 = parseInt(tile1Str, 10) as TileRef;
-        const tile2 = parseInt(tile2Str, 10) as TileRef;
-        this.traceSegment(this.ctx, tile1, tile2);
-      }
-      this.ctx.stroke();
-
-      // Inner lighter road surface
-      this.ctx.strokeStyle = darkerColor;
-      this.ctx.lineWidth = roadWidth;
-      this.ctx.beginPath();
-      for (const segment of segments) {
-        const [tile1Str, tile2Str] = segment.split("-");
-        const tile1 = parseInt(tile1Str, 10) as TileRef;
-        const tile2 = parseInt(tile2Str, 10) as TileRef;
-        this.traceSegment(this.ctx, tile1, tile2);
-      }
-      this.ctx.stroke();
-    }
+    // No-op: kept for interface compatibility
   }
 
   renderLayer(context: CanvasRenderingContext2D) {
-    context.drawImage(
-      this.canvas,
-      -this.game.width() / 2,
-      -this.game.height() / 2,
-      this.game.width(),
-      this.game.height(),
-    );
+    if (this.roadSegments.size === 0) return;
+
+    // Draw vector paths directly under the active transform to avoid pixelation
+    // Note: Coordinates are in game space; offset by half map size to align with transform origin
+    const roadWidth = 1.2; // thinner roads; world units, scales with zoom
+    context.lineJoin = "round";
+    context.lineCap = "round";
+
+    // Outline (subtle shadow) for contrast on light backgrounds
+    context.strokeStyle = "rgba(0, 0, 0, 0.18)";
+    context.lineWidth = roadWidth + 0.6;
+    context.beginPath();
+    for (const segment of this.roadSegments) {
+      const [tile1Str, tile2Str] = segment.split("-");
+      const tile1 = parseInt(tile1Str, 10) as TileRef;
+      const tile2 = parseInt(tile2Str, 10) as TileRef;
+      this.traceSegment(context, tile1, tile2);
+    }
+    context.stroke();
+
+    // Inner semi-transparent white stroke similar to structure icon fill
+    context.strokeStyle = "rgba(255, 255, 255, 0.55)";
+    context.lineWidth = roadWidth;
+    context.beginPath();
+    for (const segment of this.roadSegments) {
+      const [tile1Str, tile2Str] = segment.split("-");
+      const tile1 = parseInt(tile1Str, 10) as TileRef;
+      const tile2 = parseInt(tile2Str, 10) as TileRef;
+      this.traceSegment(context, tile1, tile2);
+    }
+    context.stroke();
   }
 
   private traceSegment(
@@ -132,10 +90,13 @@ export class RoadLayer implements Layer {
     tile1: TileRef,
     tile2: TileRef,
   ) {
-    const x1 = this.game.x(tile1) + 0.5;
-    const y1 = this.game.y(tile1) + 0.5;
-    const x2 = this.game.x(tile2) + 0.5;
-    const y2 = this.game.y(tile2) + 0.5;
+    // Align world coordinates with the transform's centered origin
+    const ox = this.game.width() / 2;
+    const oy = this.game.height() / 2;
+    const x1 = this.game.x(tile1) - ox + 0.5;
+    const y1 = this.game.y(tile1) - oy + 0.5;
+    const x2 = this.game.x(tile2) - ox + 0.5;
+    const y2 = this.game.y(tile2) - oy + 0.5;
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
   }
