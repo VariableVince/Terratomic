@@ -16,17 +16,19 @@ import { MouseUpEvent } from "../../InputHandler";
 import { TransformHandler } from "../TransformHandler";
 import { Layer } from "./Layer";
 import { UnitInfoModal } from "./UnitInfoModal";
-
 class StructureRenderInfo {
   public isOnScreen: boolean = false;
   constructor(
     public unit: UnitView,
     public owner: PlayerID,
     public pixiSprite: PIXI.Sprite,
+    public underConstruction: boolean,
   ) {}
 }
 
 const ICON_SIZE = 24;
+const UNDER_CONSTRUCTION_FILL = "rgb(198, 198, 198)";
+const UNDER_CONSTRUCTION_BORDER = "rgb(128, 127, 127)";
 
 export class StructureLayer implements Layer {
   private pixicanvas: HTMLCanvasElement;
@@ -145,14 +147,18 @@ export class StructureLayer implements Layer {
             (r) => r.unit.id() === unitView.id(),
           );
           if (render) {
-            this.ownerChangeCheck(render, unitView);
+            this.updateRenderState(render, unitView);
           }
-        } else if (this.structures.has(unitView.type())) {
+        } else if (
+          this.structures.has(unitView.type()) ||
+          unitView.type() === UnitType.Construction
+        ) {
           this.seenUnits.add(unitView);
           const render = new StructureRenderInfo(
             unitView,
             unitView.owner().id(),
             this.createPixiSprite(unitView),
+            unitView.type() === UnitType.Construction,
           );
           this.renders.push(render);
           this.computeNewLocation(render);
@@ -190,9 +196,14 @@ export class StructureLayer implements Layer {
     mainContext.drawImage(this.renderer.canvas, 0, 0);
   }
 
-  private ownerChangeCheck(render: StructureRenderInfo, unit: UnitView) {
-    if (render.owner !== unit.owner().id()) {
+  private updateRenderState(render: StructureRenderInfo, unit: UnitView) {
+    const isConstruction = unit.type() === UnitType.Construction;
+    const ownerChanged = render.owner !== unit.owner().id();
+    const constructionStateChanged =
+      render.underConstruction !== isConstruction;
+    if (ownerChanged || constructionStateChanged) {
       render.owner = unit.owner().id();
+      render.underConstruction = isConstruction;
       render.pixiSprite?.destroy();
       render.pixiSprite = this.createPixiSprite(unit);
       this.shouldRedraw = true;
@@ -200,7 +211,13 @@ export class StructureLayer implements Layer {
   }
 
   private createTexture(unit: UnitView): PIXI.Texture {
-    const cacheKey = `${unit.owner().id()}-${unit.type()}`;
+    const isConstruction = unit.type() === UnitType.Construction;
+    const structureType = isConstruction
+      ? (unit.constructionType() ?? unit.type())
+      : unit.type();
+    const cacheKey = isConstruction
+      ? `construction-${structureType}`
+      : `${unit.owner().id()}-${structureType}`;
     if (this.textureCache.has(cacheKey)) {
       return this.textureCache.get(cacheKey)!;
     }
@@ -208,14 +225,20 @@ export class StructureLayer implements Layer {
     structureCanvas.width = ICON_SIZE;
     structureCanvas.height = ICON_SIZE;
     const context = structureCanvas.getContext("2d")!;
-    context.fillStyle = this.theme
-      .territoryColor(unit.owner())
-      .lighten(0.1)
-      .toRgbString();
-    const borderColor = this.theme
-      .borderColor(unit.owner())
-      .darken(0.2)
-      .toRgbString();
+    let borderColor: string;
+    if (isConstruction) {
+      context.fillStyle = UNDER_CONSTRUCTION_FILL;
+      borderColor = UNDER_CONSTRUCTION_BORDER;
+    } else {
+      context.fillStyle = this.theme
+        .territoryColor(unit.owner())
+        .lighten(0.1)
+        .toRgbString();
+      borderColor = this.theme
+        .borderColor(unit.owner())
+        .darken(0.2)
+        .toRgbString();
+    }
     context.strokeStyle = borderColor;
     context.beginPath();
     context.arc(
@@ -228,9 +251,9 @@ export class StructureLayer implements Layer {
     context.fill();
     context.lineWidth = 1;
     context.stroke();
-    const structureInfo = this.structures.get(unit.type());
+    const structureInfo = this.structures.get(structureType);
     if (!structureInfo?.image) {
-      console.warn(`Image not loaded for unit type: ${unit.type()}`);
+      console.warn(`Image not loaded for unit type: ${structureType}`);
       return PIXI.Texture.from(structureCanvas);
     }
     context.drawImage(
