@@ -71,6 +71,8 @@ export class RoadManager {
 
   // Performance optimization caches
   private roadTilesCache = new Set<TileRef>();
+  // Tiles belonging to queued or in-progress planned roads (bias pathfinding towards these)
+  private plannedTilesCache = new Set<TileRef>();
   private pathCache = new Map<string, TileRef[]>();
   private tileToNode = new Map<TileRef, Unit>();
   private findingCargoPath = false;
@@ -479,6 +481,9 @@ export class RoadManager {
     queue.sort((a, b) => a.length - b.length);
     this.plannedQueues.set(owner, queue);
 
+    // Bias future pathfinding to prefer this planned corridor
+    this.addPlannedPath(path);
+
     // If no construction currently running for owner, start this one
     if (!this.currentConstruction.has(owner)) {
       this.currentConstruction.set(owner, {
@@ -504,25 +509,36 @@ export class RoadManager {
         this.currentConstruction.delete(pid);
         continue;
       }
-      // Compute px per tick from investment based on GROSS gold (pre-investment):
-      // Invested gold per tick = grossGoldPerTick * roadInvestmentRate
-      // Using parameter: 1000 gold invested per tick yields 1 px per tick
-      const grossGoldPerTick = this.game.config().grossGoldAdditionRate(player);
-      const investRatio = player.roadInvestmentRate?.() ?? 0;
-      const investedPerTick = grossGoldPerTick * investRatio; // gold/tick (double)
-      const PX_PER_TICK_PER_GOLD = 1 / 1000; // 1 px/tick per 1000 gold/tick invested
-      const pxPerTick = investedPerTick * PX_PER_TICK_PER_GOLD;
-      if (pxPerTick <= 0) continue;
+      // Compute build speed
+      const instant = this.game.config().instantBuild();
+      let edgesToBuild = 0;
+      if (instant) {
+        // Build the entire planned path this tick
+        const remaining = state.planned.path.length - 1 - state.builtIndex;
+        edgesToBuild = Math.max(0, remaining);
+      } else {
+        // Compute px per tick from investment based on GROSS gold (pre-investment):
+        // Invested gold per tick = grossGoldPerTick * roadInvestmentRate
+        // Using parameter: 1000 gold invested per tick yields 1 px per tick
+        const grossGoldPerTick = this.game
+          .config()
+          .grossGoldAdditionRate(player);
+        const investRatio = player.roadInvestmentRate?.() ?? 0;
+        const investedPerTick = grossGoldPerTick * investRatio; // gold/tick (double)
+        const PX_PER_TICK_PER_GOLD = 1 / 1000; // 1 px/tick per 1000 gold/tick invested
+        const pxPerTick = investedPerTick * PX_PER_TICK_PER_GOLD;
+        if (pxPerTick <= 0) continue;
 
-      state.pxAccum += pxPerTick;
+        state.pxAccum += pxPerTick;
 
-      // Canvas grid uses 1px per tile step (see RoadLayer using game.x/y() directly)
-      const TILE_EDGE_PX = 1;
-      let edgesToBuild = Math.floor(state.pxAccum / TILE_EDGE_PX);
-      if (edgesToBuild <= 0) continue;
+        // Canvas grid uses 1px per tile step (see RoadLayer using game.x/y() directly)
+        const TILE_EDGE_PX = 1;
+        edgesToBuild = Math.floor(state.pxAccum / TILE_EDGE_PX);
+        if (edgesToBuild <= 0) continue;
 
-      // Consume px and build edges
-      state.pxAccum -= edgesToBuild * TILE_EDGE_PX;
+        // Consume px and build edges
+        state.pxAccum -= edgesToBuild * TILE_EDGE_PX;
+      }
 
       // Validate endpoints periodically; if invalid, abandon and move on
       if (!this.isPlannedRoadValid(state.planned)) {
@@ -530,6 +546,8 @@ export class RoadManager {
         this.reservedEndpointSegments.delete(
           this.getCanonicalSegment(state.planned.start, state.planned.end),
         );
+        // Remove planned bias for this abandoned plan
+        this.removePlannedPath(state.planned.path);
         // Do not remove already built segments; keep partials
         this.currentConstruction.delete(pid);
         this.startNextFor(pid);
@@ -588,6 +606,9 @@ export class RoadManager {
           const seg = this.getCanonicalSegment(path[i], path[i + 1]);
           this.underConstructionSegments.delete(seg);
         }
+
+        // Remove planned bias now that it's built
+        this.removePlannedPath(path);
 
         // Already incrementally added tiles to roadTilesCache and segments to segmentSet
         // Just clear construction and move to next
@@ -667,6 +688,14 @@ export class RoadManager {
 
   private getCanonicalSegment(tile1: TileRef, tile2: TileRef): string {
     return tile1 < tile2 ? `${tile1}-${tile2}` : `${tile2}-${tile1}`;
+  }
+
+  private addPlannedPath(path: TileRef[]): void {
+    for (const t of path) this.plannedTilesCache.add(t);
+  }
+
+  private removePlannedPath(path: TileRef[]): void {
+    for (const t of path) this.plannedTilesCache.delete(t);
   }
 
   // Find a path using the built structure graph plus any planned or in-progress edges
@@ -820,7 +849,10 @@ export class RoadManager {
       for (const neighbor of this.game.neighbors(current)) {
         if (!ok(neighbor)) continue;
 
-        const cost = this.roadTilesCache.has(neighbor) ? 1 : 2;
+        // Prefer built and planned roads equally over fresh land
+        let cost = 2;
+        if (this.roadTilesCache.has(neighbor)) cost = 1;
+        else if (this.plannedTilesCache.has(neighbor)) cost = 1;
         const newCost = currentCost + cost;
 
         // Stop exploring paths that are already too long
@@ -887,6 +919,15 @@ export class RoadManager {
     const roadIdsToDestroy = this.roadsByOwner.get(player.id());
     if (!roadIdsToDestroy) {
       // Still clear any planned or in-progress roads for this player
+      const queued = this.plannedQueues.get(player.id());
+      if (queued) {
+        for (const pr of queued) {
+          this.reservedEndpointSegments.delete(
+            this.getCanonicalSegment(pr.start, pr.end),
+          );
+          this.removePlannedPath(pr.path);
+        }
+      }
       this.plannedQueues.delete(player.id());
       const inProg = this.currentConstruction.get(player.id());
       if (inProg) {
@@ -894,6 +935,7 @@ export class RoadManager {
         this.reservedEndpointSegments.delete(
           this.getCanonicalSegment(inProg.planned.start, inProg.planned.end),
         );
+        this.removePlannedPath(inProg.planned.path);
         this.currentConstruction.delete(player.id());
       }
       return;
@@ -917,6 +959,8 @@ export class RoadManager {
             endNode.tile(),
           );
           this.existingRoadSegments.delete(segment);
+          // Free reservation so endpoints can be replanned later
+          this.reservedEndpointSegments.delete(segment);
         }
 
         this.roads.delete(roadId);
@@ -934,12 +978,32 @@ export class RoadManager {
     this.roadsByOwner.delete(player.id());
 
     // Also clear planned and in-progress work for this player
+    const queued = this.plannedQueues.get(player.id());
+    if (queued) {
+      for (const pr of queued) {
+        this.reservedEndpointSegments.delete(
+          this.getCanonicalSegment(pr.start, pr.end),
+        );
+        this.removePlannedPath(pr.path);
+      }
+    }
     this.plannedQueues.delete(player.id());
     const inProg = this.currentConstruction.get(player.id());
     if (inProg) {
+      // Remove any partially built segments from the incremental state
+      const path = inProg.planned.path;
+      const builtIdx = inProg.builtIndex;
+      for (let i = 0; i < builtIdx; i++) {
+        const seg = this.getCanonicalSegment(path[i], path[i + 1]);
+        if (this.segmentSet.delete(seg)) {
+          this.pendingRemovedSegments.push(seg);
+        }
+        this.underConstructionSegments.delete(seg);
+      }
       this.reservedEndpointSegments.delete(
         this.getCanonicalSegment(inProg.planned.start, inProg.planned.end),
       );
+      this.removePlannedPath(inProg.planned.path);
       this.currentConstruction.delete(player.id());
     }
 
