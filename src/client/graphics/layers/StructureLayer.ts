@@ -1,13 +1,13 @@
 import * as PIXI from "pixi.js";
-import airfieldIcon from "../../../../resources/images/AirfieldIcon.svg";
 import anchorIcon from "../../../../resources/images/AnchorIcon.png";
 import academyIcon from "../../../../resources/images/buildings/academy_icon.png";
+import airfieldIcon from "../../../../resources/images/buildings/airfield.png";
+import hospitalIcon from "../../../../resources/images/buildings/hospital.png";
 import cityIcon from "../../../../resources/images/CityIcon.png";
-import hospitalIcon from "../../../../resources/images/HospitalIconWhite.svg";
 import missileSiloIcon from "../../../../resources/images/MissileSiloUnit.png";
 import SAMMissileIcon from "../../../../resources/images/SamLauncherUnit.png";
-// Use the new non-commercial shield icon
-import shieldIcon from "../../../../resources/non-commercial/images/buildings/fortAlt3.png";
+// Use the standard shield icon from resources/images
+import shieldIcon from "../../../../resources/images/ShieldIcon.png";
 import { Theme } from "../../../core/configuration/Config";
 import { EventBus } from "../../../core/EventBus";
 import { Cell, PlayerID, UnitType } from "../../../core/game/Game";
@@ -291,11 +291,19 @@ export class StructureLayer implements Layer {
       console.warn(`Image not loaded for unit type: ${structureType}`);
       return PIXI.Texture.from(structureCanvas);
     }
-    context.drawImage(
-      this.getImageColored(structureInfo.image, borderColor),
-      4,
-      4,
-    );
+    // Center and scale the icon within the background shape with padding
+    const padded = 4; // padding on each side
+    const maxW = ICON_SIZE - padded * 2;
+    const maxH = ICON_SIZE - padded * 2;
+    const colored = this.getImageColored(structureInfo.image, borderColor);
+    const iw = Math.max(1, colored.width);
+    const ih = Math.max(1, colored.height);
+    const scale = Math.min(maxW / iw, maxH / ih);
+    const dw = Math.max(1, Math.round(iw * scale));
+    const dh = Math.max(1, Math.round(ih * scale));
+    const dx = Math.round((ICON_SIZE - dw) / 2);
+    const dy = Math.round((ICON_SIZE - dh) / 2);
+    context.drawImage(colored, dx, dy, dw, dh);
     const texture = PIXI.Texture.from(structureCanvas);
     this.textureCache.set(cacheKey, texture);
     return texture;
