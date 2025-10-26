@@ -562,13 +562,13 @@ export class RoadManager {
       } else {
         // Compute px per tick from investment based on GROSS gold (pre-investment):
         // Invested gold per tick = grossGoldPerTick * roadInvestmentRate
-        // Using parameter: 800 gold invested per tick yields 1 px per tick
+        // Using parameter: 600 gold invested per tick yields 1 px per tick
         const grossGoldPerTick = this.game
           .config()
           .grossGoldAdditionRate(player);
         const investRatio = player.roadInvestmentRate?.() ?? 0;
         const investedPerTick = grossGoldPerTick * investRatio; // gold/tick (double)
-        const PX_PER_TICK_PER_GOLD = 1 / 800; // 1 px/tick per 800 gold/tick invested
+        const PX_PER_TICK_PER_GOLD = 1 / 600; // 1 px/tick per 800 gold/tick invested
         const pxPerTick = investedPerTick * PX_PER_TICK_PER_GOLD;
         if (pxPerTick <= 0) continue;
 
@@ -958,29 +958,53 @@ export class RoadManager {
 
       const currentCost = costs.get(current) ?? Infinity;
 
-      for (const neighbor of this.game.neighbors(current)) {
+      // Enumerate 8-directional neighbors without allocations
+      const cx = this.game.x(current);
+      const cy = this.game.y(current);
+      // dx,dy pairs: 4-orthogonal + 4-diagonals
+      // Order chosen to prefer straight expansions first for small PQ ties
+      const OFFS = [
+        [0, -1],
+        [0, 1],
+        [-1, 0],
+        [1, 0],
+        [-1, -1],
+        [1, -1],
+        [-1, 1],
+        [1, 1],
+      ] as const;
+      for (let i = 0; i < 8; i++) {
+        const dx = OFFS[i][0];
+        const dy = OFFS[i][1];
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (!this.game.isValidCoord(nx, ny)) continue;
+        const neighbor = this.game.ref(nx, ny);
         if (!ok(neighbor)) continue;
 
         // Prefer built and planned roads equally over fresh land
         // Base land cost = 2, Water/Shore cost = 20, Built/Planned = 1
-        let cost = 2;
+        let stepCost = 2;
         if (
           this.roadTilesCache.has(neighbor) ||
           this.plannedTilesCache.has(neighbor)
         ) {
-          cost = 1;
+          stepCost = 1;
         } else if (!this.game.isLand(neighbor) || this.game.isShore(neighbor)) {
-          cost = 20;
+          stepCost = 20;
         }
+        // Scale diagonal steps by sqrt(2) to better reflect distance
+        const isDiagonal = dx !== 0 && dy !== 0;
+        const moveScale = isDiagonal ? 1.41421356237 : 1;
 
         // Add a small penalty if turning relative to how we entered `current`
         let turnPenalty = 0;
         const prevOfCurrent = prev.get(current) ?? null;
         if (prevOfCurrent !== null) {
-          const dxPrev = this.game.x(current) - this.game.x(prevOfCurrent);
-          const dyPrev = this.game.y(current) - this.game.y(prevOfCurrent);
-          const dxNew = this.game.x(neighbor) - this.game.x(current);
-          const dyNew = this.game.y(neighbor) - this.game.y(current);
+          const dxPrev = cx - this.game.x(prevOfCurrent);
+          const dyPrev = cy - this.game.y(prevOfCurrent);
+          const dxNew = dx;
+          const dyNew = dy;
           // Only penalize when the move direction changes
           if (dxPrev !== 0 || dyPrev !== 0) {
             if (dxPrev !== dxNew || dyPrev !== dyNew) {
@@ -989,12 +1013,10 @@ export class RoadManager {
           }
         }
 
-        const newCost = currentCost + cost + turnPenalty;
+        const newCost = currentCost + stepCost * moveScale + turnPenalty;
 
-        // Stop exploring paths that are already too long
-        if (newCost > maxRoadLength) {
-          continue;
-        }
+        // Stop exploring paths that are already too long (cost threshold)
+        if (newCost > maxRoadLength) continue;
 
         if (newCost < (costs.get(neighbor) ?? Infinity)) {
           costs.set(neighbor, newCost);
