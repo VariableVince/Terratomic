@@ -708,6 +708,8 @@ export interface Game extends GameMap {
   hasRoadOnTile(tile: TileRef): boolean;
   destroyPlayerRoads(player: Player): void;
   markPlayerNodesForReconnection(player: Player): void;
+  // Road KPIs
+  getRoadNetworkQualityForPlayer(playerId: PlayerID): number;
   // Helper for player road KPI calculations
   getRoadCountsForPlayer(player: Player): {
     completed: number;

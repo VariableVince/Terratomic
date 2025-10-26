@@ -1478,8 +1478,19 @@ export class ControlPanel2 extends LitElement implements Layer {
                         .roadMaintenanceMultiplier();
                       const length = me?.roadNetworkLength?.() ?? 0;
                       const prod = me?.productivity?.() ?? 1;
+                      // Scale maintenance by current road quality (client mirrors server logic)
+                      const quality = me?.roadNetworkQuality?.() ?? 100;
+                      const minQ = this.game.config().roadQualityMin?.() ?? 0;
+                      const maxQ = this.game.config().roadQualityMax?.() ?? 150;
+                      const clampedQ = Math.max(minQ, Math.min(maxQ, quality));
+                      const qFactor = clampedQ / 100;
                       const maintenancePerSecond =
-                        base * maintMult * Math.max(0.0001, prod) * length * 10; // per second
+                        base *
+                        maintMult *
+                        Math.max(0.0001, prod) *
+                        length *
+                        qFactor *
+                        10; // per second
                       const grossPerSecond = me
                         ? this.game.config().grossGoldAdditionRate(me) * 10
                         : 0;
@@ -1561,11 +1572,22 @@ export class ControlPanel2 extends LitElement implements Layer {
                           .roadMaintenanceMultiplier();
                         const length = me?.roadNetworkLength?.() ?? 0;
                         const prod = me?.productivity?.() ?? 1;
+                        // Scale maintenance by current road quality (client mirrors server logic)
+                        const quality = me?.roadNetworkQuality?.() ?? 100;
+                        const minQ = this.game.config().roadQualityMin?.() ?? 0;
+                        const maxQ =
+                          this.game.config().roadQualityMax?.() ?? 150;
+                        const clampedQ = Math.max(
+                          minQ,
+                          Math.min(maxQ, quality),
+                        );
+                        const qFactor = clampedQ / 100;
                         const maintenancePerSecond =
                           base *
                           maintMult *
                           Math.max(0.0001, prod) *
                           length *
+                          qFactor *
                           10;
                         const grossPerSecond = me
                           ? this.game.config().grossGoldAdditionRate(me) * 10
@@ -1670,7 +1692,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                         const completion = p ? p.roadNetworkCompletion() : 100;
                         return html`Road network:
                           <span class="nowrap"
-                            >Quality ${Math.round(quality)}%</span
+                            >Quality ${quality.toFixed(1)}%</span
                           >
                           ·
                           <span class="nowrap"

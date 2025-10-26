@@ -493,6 +493,11 @@ export class GameImpl implements Game {
     return this.roadManager.getRoadNetPixelsPerSecond(playerId);
   }
 
+  // Expose computed road network quality [0..100]
+  public getRoadNetworkQualityForPlayer(playerId: PlayerID): number {
+    return this.roadManager.getRoadNetworkQualityForPlayer(playerId);
+  }
+
   private maybeAssignTeam(player: PlayerInfo): Team | null {
     if (this._config.gameConfig().gameMode !== GameMode.Team) {
       return null;

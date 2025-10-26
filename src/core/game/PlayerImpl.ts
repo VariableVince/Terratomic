@@ -944,8 +944,8 @@ export class PlayerImpl implements Player {
   }
   // Roads - KPIs
   roadNetworkQuality(): number {
-    // Placeholder for future degradation/improvement metrics
-    return 100;
+    // Delegate to RoadManager's computed weighted quality
+    return this.mg.getRoadNetworkQualityForPlayer(this.id());
   }
 
   roadNetworkCompletion(): number {

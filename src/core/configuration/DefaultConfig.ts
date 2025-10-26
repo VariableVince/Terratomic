@@ -362,6 +362,22 @@ export class DefaultConfig implements Config {
     return 0.0001;
   }
 
+  // Roads: quality dynamics
+  // Min/Max bounds for road network quality percentage
+  roadQualityMin(): number {
+    return 0;
+  }
+  roadQualityMax(): number {
+    return 150;
+  }
+  // Per-second adjustment amount (in percentage points on a 0..100 scale)
+  // used to improve/degrade road quality.
+  // Effective delta per second (percentage points) = factor * (gap / breakevenLevel),
+  // where gap = |investment - maintenance| and breakevenLevel = maintenance.
+  roadQualityAdjustmentRate(): number {
+    return 0.2; // 0.2 percentage points per second when gap == maintenance
+  }
+
   // Cargoplanes (Turned off for now)
   cargoPlanesEnabled(): boolean {
     return false;

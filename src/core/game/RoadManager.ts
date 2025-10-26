@@ -71,6 +71,8 @@ export class RoadManager {
   private tileCreditedOwners = new Map<TileRef, Set<PlayerID>>();
   // Cached per-owner credited road length (fractional). Used for maintenance without scanning tiles.
   private roadLengthByOwner = new Map<PlayerID, number>();
+  // Per-owner weighted quality sum (sum of tileShare * tileQuality[0..100])
+  private roadQualityWeightedSum = new Map<PlayerID, number>();
   // Per-owner segment reference counts to compute network length per player
   private segmentsByOwner = new Map<PlayerID, Map<string, number>>();
   private structureGraph = new StructureGraph();
@@ -693,6 +695,72 @@ export class RoadManager {
     const playerById = new Map<PlayerID, Player>();
     for (const p of playersWithRoads) playerById.set(p.id(), p);
 
+    // Always update road quality for all players with roads, even if no construction is underway
+    const BASE_COST = this.game.config().roadConstructionBaseCost();
+    const MAINT_MULT = this.game.config().roadMaintenanceMultiplier();
+    const TICKS_PER_SECOND = 10; // engine runs ~10 ticks per second
+    const ratePerSecond =
+      this.game.config().roadQualityAdjustmentRate?.() ?? 0.002;
+    const ratePerTick = ratePerSecond / TICKS_PER_SECOND;
+
+    for (const p of playersWithRoads) {
+      const pid = p.id();
+      const creditedLength = this.roadLengthByOwner.get(pid) ?? 0;
+      if (creditedLength <= 0) continue;
+      const grossGoldPerTick = this.game.config().grossGoldAdditionRate(p);
+      const investRatio = p.roadInvestmentRate?.() ?? 0;
+      const investedPerTick = grossGoldPerTick * investRatio;
+      const productivity = p.productivity?.() ?? 1;
+      const prodGuard = Math.max(0.0001, productivity);
+      // Scale maintenance by current road quality (quality factor = avg/100)
+      const minQ_forMaint = this.game.config().roadQualityMin?.() ?? 0;
+      const maxQ_forMaint = this.game.config().roadQualityMax?.() ?? 150;
+      const curSum_forMaint = this.roadQualityWeightedSum.get(pid) ?? 0;
+      const curAvg_forMaint =
+        creditedLength > 0 ? curSum_forMaint / creditedLength : 100;
+      const clampedAvg_forMaint = Math.max(
+        minQ_forMaint,
+        Math.min(maxQ_forMaint, curAvg_forMaint),
+      );
+      const qualityFactor_forMaint = clampedAvg_forMaint / 100;
+      const maintenancePerTick =
+        MAINT_MULT *
+        BASE_COST *
+        prodGuard *
+        creditedLength *
+        qualityFactor_forMaint;
+      const breakeven = Math.max(1e-9, maintenancePerTick);
+      const gap = investedPerTick - maintenancePerTick;
+
+      // Gate improvements on full completion
+      const completed = this.roadsByOwner.get(pid)?.size ?? 0;
+      const queued = this.plannedQueues.get(pid)?.length ?? 0;
+      const inProgress = this.currentConstruction.has(pid) ? 1 : 0;
+      const total = completed + queued + inProgress;
+      const allowImprove = total > 0 && completed === total;
+
+      let delta = 0;
+      if (gap < 0) {
+        // Degradation scales with how far below maintenance we are; not bounded.
+        const ratio = Math.abs(gap) / breakeven;
+        delta = -ratePerTick * ratio;
+      } else if (gap > 0 && allowImprove) {
+        // Improvement scales with surplus investment; not bounded.
+        const ratio = gap / breakeven;
+        delta = ratePerTick * ratio;
+      }
+
+      if (delta !== 0) {
+        const minQ = this.game.config().roadQualityMin?.() ?? 0;
+        const maxQ = this.game.config().roadQualityMax?.() ?? 150;
+        const curLen = creditedLength;
+        const curSum = this.roadQualityWeightedSum.get(pid) ?? 0;
+        const curAvg = curLen > 0 ? curSum / curLen : 100;
+        const nextAvg = Math.max(minQ, Math.min(maxQ, curAvg + delta));
+        this.roadQualityWeightedSum.set(pid, nextAvg * curLen);
+      }
+    }
+
     for (const [pid, state] of this.currentConstruction) {
       const player = playerById.get(pid);
       if (!player) {
@@ -721,12 +789,26 @@ export class RoadManager {
       const investedPerTick = grossGoldPerTick * investRatio; // gold/tick (double)
       // Compute maintenance using cached fractional road length credited to this owner
       const creditedLength = this.roadLengthByOwner.get(pid) ?? 0;
-      const BASE_COST = this.game.config().roadConstructionBaseCost();
-      const MAINT_MULT = this.game.config().roadMaintenanceMultiplier();
+      // BASE_COST and MAINT_MULT already computed above
       const productivity = player.productivity?.() ?? 1;
       const prodGuard = Math.max(0.0001, productivity);
+      // Scale maintenance by current road quality (quality factor = avg/100)
+      const minQ_forMaint_c = this.game.config().roadQualityMin?.() ?? 0;
+      const maxQ_forMaint_c = this.game.config().roadQualityMax?.() ?? 150;
+      const curSum_forMaint_c = this.roadQualityWeightedSum.get(pid) ?? 0;
+      const curAvg_forMaint_c =
+        creditedLength > 0 ? curSum_forMaint_c / creditedLength : 100;
+      const clampedAvg_forMaint_c = Math.max(
+        minQ_forMaint_c,
+        Math.min(maxQ_forMaint_c, curAvg_forMaint_c),
+      );
+      const qualityFactor_forMaint_c = clampedAvg_forMaint_c / 100;
       const maintenancePerTick =
-        MAINT_MULT * BASE_COST * prodGuard * creditedLength;
+        MAINT_MULT *
+        BASE_COST *
+        prodGuard *
+        creditedLength *
+        qualityFactor_forMaint_c;
       const newInvestment = Math.max(0, investedPerTick - maintenancePerTick);
       const costPerPixel = BASE_COST * prodGuard; // guard tiny/zero
       const pxPerTick = newInvestment / costPerPixel;
@@ -736,6 +818,7 @@ export class RoadManager {
         pid,
         Number.isFinite(pxPerSecond) ? pxPerSecond : 0,
       );
+      // Quality already adjusted above for all players; do not duplicate here
       if (pxPerTick <= 0) continue;
 
       state.pxAccum += pxPerTick;
@@ -986,6 +1069,9 @@ export class RoadManager {
           oid,
           (this.roadLengthByOwner.get(oid) ?? 0) + share,
         );
+        // New tiles are assumed quality 100%
+        const prevQSum = this.roadQualityWeightedSum.get(oid) ?? 0;
+        this.roadQualityWeightedSum.set(oid, prevQSum + share * 100);
       }
       this.tileCreditedOwners.set(tile, credited);
     }
@@ -1009,6 +1095,12 @@ export class RoadManager {
             oid,
             (this.roadLengthByOwner.get(oid) ?? 0) - share,
           );
+          // Remove this share's contribution using owner's current average
+          const curLen = this.roadLengthByOwner.get(oid) ?? 0;
+          const curSum = this.roadQualityWeightedSum.get(oid) ?? 0;
+          const curAvg = curLen > 0 ? curSum / curLen : 100;
+          const newSum = curSum - share * curAvg;
+          this.roadQualityWeightedSum.set(oid, Math.max(0, newSum));
         }
       }
       this.tileCreditedOwners.delete(tile);
@@ -1040,9 +1132,42 @@ export class RoadManager {
     const oldShare = 1 / oldSize;
     const newShare = 1 / newSize;
 
+    // Determine source quality for any newly added owners: average of removed owners' current qualities
+    // If none removed, average of previously credited owners; fallback to 100
+    const sourceQualities: number[] = [];
+    const pushQual = (oid: PlayerID) => {
+      const len = this.roadLengthByOwner.get(oid) ?? 0;
+      const sum = this.roadQualityWeightedSum.get(oid) ?? 0;
+      sourceQualities.push(len > 0 ? sum / len : 100);
+    };
+    if (removeOwners.length > 0) {
+      for (const oid of removeOwners) pushQual(oid);
+    } else if (credited.size > 0) {
+      for (const oid of credited) pushQual(oid);
+    }
+    const sourceQualityForAdds =
+      sourceQualities.length > 0
+        ? Math.max(
+            0,
+            Math.min(
+              100,
+              sourceQualities.reduce((a, b) => a + b, 0) /
+                sourceQualities.length,
+            ),
+          )
+        : 100;
+
     // Owners removed: lose oldShare
     for (const oid of removeOwners) {
       if (credited.has(oid)) {
+        // Adjust weighted sum using owner's current average
+        const curLen = this.roadLengthByOwner.get(oid) ?? 0;
+        const curSum = this.roadQualityWeightedSum.get(oid) ?? 0;
+        const curAvg = curLen > 0 ? curSum / curLen : 100;
+        this.roadQualityWeightedSum.set(
+          oid,
+          Math.max(0, curSum - oldShare * curAvg),
+        );
         this.roadLengthByOwner.set(
           oid,
           (this.roadLengthByOwner.get(oid) ?? 0) - oldShare,
@@ -1054,6 +1179,14 @@ export class RoadManager {
       if (newOwners.has(oid)) {
         const delta = newShare - oldShare;
         if (delta !== 0) {
+          // Change weighted sum by delta using owner's current average
+          const curLen = this.roadLengthByOwner.get(oid) ?? 0;
+          const curSum = this.roadQualityWeightedSum.get(oid) ?? 0;
+          const curAvg = curLen > 0 ? curSum / curLen : 100;
+          this.roadQualityWeightedSum.set(
+            oid,
+            Math.max(0, curSum + delta * curAvg),
+          );
           this.roadLengthByOwner.set(
             oid,
             (this.roadLengthByOwner.get(oid) ?? 0) + delta,
@@ -1064,6 +1197,12 @@ export class RoadManager {
     // Owners added: gain newShare
     for (const oid of addOwners) {
       if (!credited.has(oid)) {
+        // Add contribution using source owners' average quality
+        const prevQSum = this.roadQualityWeightedSum.get(oid) ?? 0;
+        this.roadQualityWeightedSum.set(
+          oid,
+          prevQSum + newShare * sourceQualityForAdds,
+        );
         this.roadLengthByOwner.set(
           oid,
           (this.roadLengthByOwner.get(oid) ?? 0) + newShare,
@@ -1536,6 +1675,20 @@ export class RoadManager {
   // Expose authoritative, fractional road length credited to a player (includes under-construction tiles)
   public getRoadLengthForPlayer(playerId: PlayerID): number {
     return this.roadLengthByOwner.get(playerId) ?? 0;
+  }
+
+  // Expose computed road network quality [0..100] for a player.
+  // Defaults to 100 when the player has no credited road tiles.
+  public getRoadNetworkQualityForPlayer(playerId: PlayerID): number {
+    const length = this.roadLengthByOwner.get(playerId) ?? 0;
+    if (length <= 0) return 100;
+    const sum = this.roadQualityWeightedSum.get(playerId) ?? 0;
+    const avg = sum / length;
+    if (!Number.isFinite(avg) || avg < 0) return 100;
+    // Clamp to configured bounds (allow values >100 up to max)
+    const minQ = this.game.config().roadQualityMin?.() ?? 0;
+    const maxQ = this.game.config().roadQualityMax?.() ?? 150;
+    return Math.max(minQ, Math.min(maxQ, avg));
   }
 
   // Expose server-computed net road build rate (pixels per second) for client display

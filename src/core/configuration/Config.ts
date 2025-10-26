@@ -143,6 +143,10 @@ export interface Config {
   roadConstructionBaseCost(): number;
   // Roads: per-tile maintenance multiplier applied to base cost
   roadMaintenanceMultiplier(): number;
+  // Road quality dynamics
+  roadQualityMin(): number;
+  roadQualityMax(): number;
+  roadQualityAdjustmentRate(): number;
 
   // International Cargo Trucks
   internationalCargoTrucksEnabled(): boolean;
