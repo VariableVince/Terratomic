@@ -304,6 +304,59 @@ export class RoadManager {
         }
       });
 
+      // Also cancel any planned or in-progress roads that referenced this node as an endpoint
+      // Cancel in-progress constructions first
+      const constructionsToCancel: PlayerID[] = [];
+      for (const [pid, state] of this.currentConstruction) {
+        if (
+          state.planned.start === removedNodeTile ||
+          state.planned.end === removedNodeTile
+        ) {
+          // Remove partially built segments
+          const path = state.planned.path;
+          for (let i = 0; i < state.builtIndex; i++) {
+            const a = path[i];
+            const b = path[i + 1];
+            const seg = this.getCanonicalSegment(a, b);
+            if (this.segmentSet.delete(seg)) {
+              this.pendingRemovedSegments.push(seg);
+            }
+            this.underConstructionSegments.delete(seg);
+          }
+          // Free reservation and planned bias
+          this.reservedEndpointSegments.delete(
+            this.getCanonicalSegment(state.planned.start, state.planned.end),
+          );
+          this.removePlannedPath(state.planned.path);
+          constructionsToCancel.push(pid);
+        }
+      }
+      for (const pid of constructionsToCancel) {
+        this.currentConstruction.delete(pid);
+      }
+
+      // Purge queued plans that reference this node
+      for (const [ownerId, queue] of this.plannedQueues) {
+        const toRemove: PlannedRoad[] = [];
+        for (const pr of queue) {
+          if (pr.start === removedNodeTile || pr.end === removedNodeTile) {
+            toRemove.push(pr);
+          }
+        }
+        if (toRemove.length > 0) {
+          for (const pr of toRemove) {
+            this.reservedEndpointSegments.delete(
+              this.getCanonicalSegment(pr.start, pr.end),
+            );
+            this.removePlannedPath(pr.path);
+          }
+          this.plannedQueues.set(
+            ownerId,
+            queue.filter((pr) => !toRemove.includes(pr)),
+          );
+        }
+      }
+
       // Queue local updates for nearby nodes
       this.updateLocalArea(removedNodeTile, ROAD_UPDATE_RADIUS);
     });
