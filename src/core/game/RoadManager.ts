@@ -41,6 +41,9 @@ let nextRoadId = 0;
  * 4. Provide pathfinding for both road construction and unit movement
  */
 export class RoadManager {
+  // Small penalty for changing direction while laying roads to prefer straighter paths
+  // Tuned low so it never overwhelms terrain costs (land=2, road=1, water/shore=20)
+  private readonly DIRECTION_CHANGE_PENALTY = 0.5;
   private roads = new Map<number, Road>();
   private roadsByOwner = new Map<PlayerID, Set<number>>();
   private structureGraph = new StructureGraph();
@@ -969,7 +972,24 @@ export class RoadManager {
         } else if (!this.game.isLand(neighbor) || this.game.isShore(neighbor)) {
           cost = 20;
         }
-        const newCost = currentCost + cost;
+
+        // Add a small penalty if turning relative to how we entered `current`
+        let turnPenalty = 0;
+        const prevOfCurrent = prev.get(current) ?? null;
+        if (prevOfCurrent !== null) {
+          const dxPrev = this.game.x(current) - this.game.x(prevOfCurrent);
+          const dyPrev = this.game.y(current) - this.game.y(prevOfCurrent);
+          const dxNew = this.game.x(neighbor) - this.game.x(current);
+          const dyNew = this.game.y(neighbor) - this.game.y(current);
+          // Only penalize when the move direction changes
+          if (dxPrev !== 0 || dyPrev !== 0) {
+            if (dxPrev !== dxNew || dyPrev !== dyNew) {
+              turnPenalty = this.DIRECTION_CHANGE_PENALTY;
+            }
+          }
+        }
+
+        const newCost = currentCost + cost + turnPenalty;
 
         // Stop exploring paths that are already too long
         if (newCost > maxRoadLength) {
