@@ -59,6 +59,8 @@ export class RoadManager {
   private spClosed: Uint32Array | null = null; // closed-set marker (versioned)
   private roads = new Map<number, Road>();
   private roadsByOwner = new Map<PlayerID, Set<number>>();
+  // Per-owner segment reference counts to compute network length per player
+  private segmentsByOwner = new Map<PlayerID, Map<string, number>>();
   private structureGraph = new StructureGraph();
   private nodes: Unit[] = [];
   private newNodesQueue: Unit[] = [];
@@ -296,6 +298,8 @@ export class RoadManager {
           const startTile = road.path[0];
           const endTile = road.path[road.path.length - 1];
           // Track per-edge segment removals for UI redraw
+          const ownerSegs = this.segmentsByOwner.get(road.owner);
+          const ownerPlayer = this.game.player(road.owner);
           for (let i = 0; i < road.path.length - 1; i++) {
             const seg = this.getCanonicalSegment(
               road.path[i],
@@ -303,6 +307,18 @@ export class RoadManager {
             );
             if (this.segmentSet.delete(seg))
               this.pendingRemovedSegments.push(seg);
+            if (ownerSegs) {
+              const prev = ownerSegs.get(seg) ?? 0;
+              if (prev > 0) {
+                const next = prev - 1;
+                if (next === 0) {
+                  ownerSegs.delete(seg);
+                  ownerPlayer.addRoadNetworkLength(-1);
+                } else {
+                  ownerSegs.set(seg, next);
+                }
+              }
+            }
           }
           this.roads.delete(roadId);
           this.existingRoadSegments.delete(
@@ -567,13 +583,16 @@ export class RoadManager {
       }
       // Compute build speed (ignore instantBuild for roads):
       // Invested gold per tick = grossGoldPerTick * roadInvestmentRate
-      // Using parameter: 600 gold invested per tick yields 1 px per tick
+      // Cost per pixel now scales with player productivity:
+      //   costPerPixel = 600 * player.productivity()
+      // Therefore: pxPerTick = investedPerTick / costPerPixel
       let edgesToBuild = 0;
       const grossGoldPerTick = this.game.config().grossGoldAdditionRate(player);
       const investRatio = player.roadInvestmentRate?.() ?? 0;
       const investedPerTick = grossGoldPerTick * investRatio; // gold/tick (double)
-      const PX_PER_TICK_PER_GOLD = 1 / 600; // 1 px/tick per 600 gold/tick invested
-      const pxPerTick = investedPerTick * PX_PER_TICK_PER_GOLD;
+      const productivity = player.productivity?.() ?? 1;
+      const costPerPixel = 600 * Math.max(0.0001, productivity); // guard tiny/zero
+      const pxPerTick = investedPerTick / costPerPixel;
       if (pxPerTick <= 0) continue;
 
       state.pxAccum += pxPerTick;
@@ -613,6 +632,18 @@ export class RoadManager {
         if (!this.segmentSet.has(seg)) {
           this.segmentSet.add(seg);
           this.pendingAddedSegments.push(seg);
+        }
+        // Update per-owner length accounting (ref-counted by segment)
+        let ownerSegs = this.segmentsByOwner.get(pid);
+        if (!ownerSegs) {
+          ownerSegs = new Map<string, number>();
+          this.segmentsByOwner.set(pid, ownerSegs);
+        }
+        const prev = ownerSegs.get(seg) ?? 0;
+        ownerSegs.set(seg, prev + 1);
+        if (prev === 0) {
+          // Only increment player's network length on first ownership of this segment
+          player.addRoadNetworkLength(1);
         }
         // Track as under construction until the entire road is finalized
         this.underConstructionSegments.add(seg);
@@ -785,6 +816,8 @@ export class RoadManager {
   // Helper: remove any partially built segments for a construction state
   private removePartialConstructionSegments(state: ConstructionState): void {
     const path = state.planned.path;
+    const ownerSegs = this.segmentsByOwner.get(state.planned.owner);
+    const ownerPlayer = this.game.player(state.planned.owner);
     for (let i = 0; i < state.builtIndex; i++) {
       const a = path[i];
       const b = path[i + 1];
@@ -793,6 +826,18 @@ export class RoadManager {
         this.pendingRemovedSegments.push(seg);
       }
       this.underConstructionSegments.delete(seg);
+      if (ownerSegs) {
+        const prev = ownerSegs.get(seg) ?? 0;
+        if (prev > 0) {
+          const next = prev - 1;
+          if (next === 0) {
+            ownerSegs.delete(seg);
+            ownerPlayer.addRoadNetworkLength(-1);
+          } else {
+            ownerSegs.set(seg, next);
+          }
+        }
+      }
     }
   }
 
@@ -1172,11 +1217,24 @@ export class RoadManager {
 
         this.roads.delete(roadId);
 
-        // Explicitly remove segments from segmentSet for renderer
+        // Explicitly remove segments from segmentSet for renderer and adjust per-owner length
+        const ownerSegs = this.segmentsByOwner.get(player.id());
         for (let i = 0; i < road.path.length - 1; i++) {
           const seg = this.getCanonicalSegment(road.path[i], road.path[i + 1]);
           if (this.segmentSet.delete(seg)) {
             this.pendingRemovedSegments.push(seg); // Ensure these are also queued for renderer
+          }
+          if (ownerSegs) {
+            const prev = ownerSegs.get(seg) ?? 0;
+            if (prev > 0) {
+              const next = prev - 1;
+              if (next === 0) {
+                ownerSegs.delete(seg);
+                player.addRoadNetworkLength(-1);
+              } else {
+                ownerSegs.set(seg, next);
+              }
+            }
           }
         }
       }
@@ -1200,6 +1258,9 @@ export class RoadManager {
 
     // Clear path cache as roads have been destroyed
     this.clearPathCache();
+
+    // Clear any leftover per-owner segment refs for this player
+    this.segmentsByOwner.delete(player.id());
 
     this.maybeReconcileSegments(true);
   }

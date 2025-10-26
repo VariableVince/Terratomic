@@ -78,6 +78,7 @@ export class PlayerImpl implements Player {
   private _productivityGrowthPerMinute = 0;
   private _maxproductivity = 1;
   private _roadInvestmentRate: number = 0; // 0..1, fraction of per-tick income allocated to roads
+  private _roadNetworkLength: number = 0; // total tile-edge length of owned road network
   private _researchInvestmentRate: number = 0; // 0..1, fraction of per-tick income allocated to research
 
   markedTraitorTick = -1;
@@ -952,6 +953,19 @@ export class PlayerImpl implements Player {
     const total = completed + queued + inProgress;
     if (total === 0) return 100;
     return Math.round((completed / total) * 100);
+  }
+
+  // Roads - total network length (tile edges)
+  roadNetworkLength(): number {
+    return this._roadNetworkLength;
+  }
+
+  addRoadNetworkLength(delta: number): void {
+    // Clamp to non-negative and ignore tiny float noise
+    this._roadNetworkLength = Math.max(
+      0,
+      Math.round(this._roadNetworkLength + delta),
+    );
   }
   addHospitalReturns(count: number): void {
     const effectiveHospitals = this.effectiveUnits(UnitType.Hospital);

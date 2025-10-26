@@ -567,6 +567,10 @@ export interface Player {
   roadNetworkQuality(): number;
   // Percentage [0..100] = completed roads / (completed + queued + in-progress), 100 if none exist
   roadNetworkCompletion(): number;
+  // Total length (in tile edges) of this player's road network
+  roadNetworkLength(): number;
+  // Internal mutators used by infrastructure systems
+  addRoadNetworkLength(delta: number): void;
 
   // Units
   units(...types: UnitType[]): Unit[];
