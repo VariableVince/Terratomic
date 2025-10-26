@@ -47,6 +47,7 @@ export class RoadManager {
   // Small penalty for changing direction while laying roads to prefer straighter paths
   // Tuned low so it never overwhelms terrain costs (land=2, road=1, water/shore=20)
   private readonly DIRECTION_CHANGE_PENALTY = 0.5;
+  // Use config-provided constants for construction and maintenance costs
   // 8-way movement deltas and cost scale (diagonals)
   private static readonly DX = new Int8Array([0, 0, -1, 1, -1, 1, -1, 1]);
   private static readonly DY = new Int8Array([-1, 1, 0, 0, -1, -1, 1, 1]);
@@ -68,6 +69,8 @@ export class RoadManager {
   private globalTileRefs = new Map<TileRef, number>();
   // For each tile that has any road coverage, which owners were credited for that tile
   private tileCreditedOwners = new Map<TileRef, Set<PlayerID>>();
+  // Cached per-owner credited road length (fractional). Used for maintenance without scanning tiles.
+  private roadLengthByOwner = new Map<PlayerID, number>();
   // Per-owner segment reference counts to compute network length per player
   private segmentsByOwner = new Map<PlayerID, Map<string, number>>();
   private structureGraph = new StructureGraph();
@@ -93,6 +96,8 @@ export class RoadManager {
   private currentConstruction = new Map<PlayerID, ConstructionState>();
   private reservedEndpointSegments = new Set<string>(); // endpoints reserved for planned/construction
   private underConstructionSegments = new Set<string>(); // tile-to-tile segments added before finalization
+  // Authoritative server-side net road build rate (pixels per second) per player
+  private roadNetPxPerSecond = new Map<PlayerID, number>();
 
   // Performance optimization caches
   private roadTilesCache = new Set<TileRef>();
@@ -682,6 +687,8 @@ export class RoadManager {
   }
 
   private progressConstruction(playersWithRoads: Player[]): void {
+    // Reset per-tick metrics
+    this.roadNetPxPerSecond.clear();
     // Map players to their IDs for quick speed lookup
     const playerById = new Map<PlayerID, Player>();
     for (const p of playersWithRoads) playerById.set(p.id(), p);
@@ -703,16 +710,32 @@ export class RoadManager {
       }
       // Compute build speed (ignore instantBuild for roads):
       // Invested gold per tick = grossGoldPerTick * roadInvestmentRate
-      // Cost per pixel now scales with player productivity:
-      //   costPerPixel = 600 * player.productivity()
-      // Therefore: pxPerTick = investedPerTick / costPerPixel
+      // Maintenance per tick = roadMaintenanceMultiplier * roadConstructionBaseCost * creditedRoadLength
+      // New road investment = max(0, investedPerTick - maintenancePerTick)
+      // Cost per pixel scales with player productivity:
+      //   costPerPixel = roadConstructionBaseCost * player.productivity()
+      // Therefore: pxPerTick = newInvestment / costPerPixel
       let edgesToBuild = 0;
       const grossGoldPerTick = this.game.config().grossGoldAdditionRate(player);
       const investRatio = player.roadInvestmentRate?.() ?? 0;
       const investedPerTick = grossGoldPerTick * investRatio; // gold/tick (double)
+      // Compute maintenance using cached fractional road length credited to this owner
+      const creditedLength = this.roadLengthByOwner.get(pid) ?? 0;
+      const BASE_COST = this.game.config().roadConstructionBaseCost();
+      const MAINT_MULT = this.game.config().roadMaintenanceMultiplier();
       const productivity = player.productivity?.() ?? 1;
-      const costPerPixel = 600 * Math.max(0.0001, productivity); // guard tiny/zero
-      const pxPerTick = investedPerTick / costPerPixel;
+      const prodGuard = Math.max(0.0001, productivity);
+      const maintenancePerTick =
+        MAINT_MULT * BASE_COST * prodGuard * creditedLength;
+      const newInvestment = Math.max(0, investedPerTick - maintenancePerTick);
+      const costPerPixel = BASE_COST * prodGuard; // guard tiny/zero
+      const pxPerTick = newInvestment / costPerPixel;
+      // Record net build speed in pixels per second for UI consumption
+      const pxPerSecond = Math.max(0, pxPerTick * 10);
+      this.roadNetPxPerSecond.set(
+        pid,
+        Number.isFinite(pxPerSecond) ? pxPerSecond : 0,
+      );
       if (pxPerTick <= 0) continue;
 
       state.pxAccum += pxPerTick;
@@ -958,7 +981,11 @@ export class RoadManager {
       const share = owners.length > 0 ? 1 / owners.length : 1;
       for (const oid of owners) {
         credited.add(oid);
-        this.game.player(oid).addRoadNetworkLength(share);
+        // Update authoritative cache only; UI should read via getRoadLengthForPlayer()
+        this.roadLengthByOwner.set(
+          oid,
+          (this.roadLengthByOwner.get(oid) ?? 0) + share,
+        );
       }
       this.tileCreditedOwners.set(tile, credited);
     }
@@ -976,8 +1003,13 @@ export class RoadManager {
       const credited = this.tileCreditedOwners.get(tile);
       if (credited && credited.size > 0) {
         const share = 1 / credited.size;
-        for (const oid of credited)
-          this.game.player(oid).addRoadNetworkLength(-share);
+        for (const oid of credited) {
+          // Update authoritative cache only
+          this.roadLengthByOwner.set(
+            oid,
+            (this.roadLengthByOwner.get(oid) ?? 0) - share,
+          );
+        }
       }
       this.tileCreditedOwners.delete(tile);
     } else {
@@ -1010,20 +1042,33 @@ export class RoadManager {
 
     // Owners removed: lose oldShare
     for (const oid of removeOwners) {
-      if (credited.has(oid))
-        this.game.player(oid).addRoadNetworkLength(-oldShare);
+      if (credited.has(oid)) {
+        this.roadLengthByOwner.set(
+          oid,
+          (this.roadLengthByOwner.get(oid) ?? 0) - oldShare,
+        );
+      }
     }
     // Owners retained: adjust by delta share
     for (const oid of credited) {
       if (newOwners.has(oid)) {
         const delta = newShare - oldShare;
-        if (delta !== 0) this.game.player(oid).addRoadNetworkLength(delta);
+        if (delta !== 0) {
+          this.roadLengthByOwner.set(
+            oid,
+            (this.roadLengthByOwner.get(oid) ?? 0) + delta,
+          );
+        }
       }
     }
     // Owners added: gain newShare
     for (const oid of addOwners) {
-      if (!credited.has(oid))
-        this.game.player(oid).addRoadNetworkLength(newShare);
+      if (!credited.has(oid)) {
+        this.roadLengthByOwner.set(
+          oid,
+          (this.roadLengthByOwner.get(oid) ?? 0) + newShare,
+        );
+      }
     }
 
     this.tileCreditedOwners.set(tile, newOwners);
@@ -1486,6 +1531,16 @@ export class RoadManager {
   // Expose current roads for external consumers (e.g., GameImpl/tests)
   public getRoads(): Road[] {
     return Array.from(this.roads.values());
+  }
+
+  // Expose authoritative, fractional road length credited to a player (includes under-construction tiles)
+  public getRoadLengthForPlayer(playerId: PlayerID): number {
+    return this.roadLengthByOwner.get(playerId) ?? 0;
+  }
+
+  // Expose server-computed net road build rate (pixels per second) for client display
+  public getRoadNetPixelsPerSecond(playerId: PlayerID): number {
+    return this.roadNetPxPerSecond.get(playerId) ?? 0;
   }
 
   // Road KPI helper for per-player counts

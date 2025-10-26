@@ -1464,16 +1464,33 @@ export class ControlPanel2 extends LitElement implements Layer {
                   <div class="relative ${!hasRoads ? "slider-disabled" : ""}">
                     ${(() => {
                       const me = this.game?.myPlayer?.();
+                      const effectiveRoad = hasRoads
+                        ? this._roadInvestmentRate
+                        : 0;
+                      // Use server-provided net pixels per second to avoid duplication
+                      const pxPerSecond = me?.roadNetPixelsPerSecond?.() ?? 0;
+                      // Compute break-even road investment (covers maintenance only)
+                      const base = this.game
+                        .config()
+                        .roadConstructionBaseCost();
+                      const maintMult = this.game
+                        .config()
+                        .roadMaintenanceMultiplier();
+                      const length = me?.roadNetworkLength?.() ?? 0;
+                      const prod = me?.productivity?.() ?? 1;
+                      const maintenancePerSecond =
+                        base * maintMult * Math.max(0.0001, prod) * length * 10; // per second
                       const grossPerSecond = me
                         ? this.game.config().grossGoldAdditionRate(me) * 10
                         : 0;
-                      const effectiveRoad = this.game
-                        ?.myPlayer?.()
-                        ?.hasUpgrade(UpgradeType.Roads)
-                        ? this._roadInvestmentRate
-                        : 0;
-                      const investedPerSecond = grossPerSecond * effectiveRoad;
-                      const pxPerSecond = investedPerSecond / 1000;
+                      let breakEven = 0;
+                      if (grossPerSecond > 0) {
+                        breakEven = maintenancePerSecond / grossPerSecond;
+                      } else {
+                        breakEven = maintenancePerSecond > 0 ? 1 : 0;
+                      }
+                      if (!Number.isFinite(breakEven)) breakEven = 0;
+                      breakEven = Math.max(0, Math.min(1, breakEven));
                       return html`
                         <label
                           class="block military-label mb-1 whitespace-nowrap"
@@ -1534,6 +1551,43 @@ export class ControlPanel2 extends LitElement implements Layer {
                           (hasRoads ? this._roadInvestmentRate : 0) * 100
                         ).toFixed(2)}%; background-color: rgba(64,123,189,0.6);"
                       ></div>
+                      ${(() => {
+                        const me = this.game?.myPlayer?.();
+                        const base = this.game
+                          .config()
+                          .roadConstructionBaseCost();
+                        const maintMult = this.game
+                          .config()
+                          .roadMaintenanceMultiplier();
+                        const length = me?.roadNetworkLength?.() ?? 0;
+                        const prod = me?.productivity?.() ?? 1;
+                        const maintenancePerSecond =
+                          base *
+                          maintMult *
+                          Math.max(0.0001, prod) *
+                          length *
+                          10;
+                        const grossPerSecond = me
+                          ? this.game.config().grossGoldAdditionRate(me) * 10
+                          : 0;
+                        let breakEven = 0;
+                        if (grossPerSecond > 0) {
+                          breakEven = maintenancePerSecond / grossPerSecond;
+                        } else {
+                          breakEven = maintenancePerSecond > 0 ? 1 : 0;
+                        }
+                        if (!Number.isFinite(breakEven)) breakEven = 0;
+                        breakEven = Math.max(0, Math.min(1, breakEven));
+                        const leftPct = (breakEven * 100).toFixed(2) + "%";
+                        const percentLabel = (breakEven * 100).toFixed(0) + "%";
+                        return html`
+                          <div
+                            class="absolute top-1"
+                            style="left:${leftPct}; width:2px; height:10px; background-color: rgba(255,255,255,0.85); transform: translateX(-1px); border-radius: 1px;"
+                            title=${`Break-even: ${percentLabel} (covers maintenance)`}
+                          ></div>
+                        `;
+                      })()}
                       <input
                         type="range"
                         min="0"

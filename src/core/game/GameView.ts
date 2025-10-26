@@ -298,6 +298,12 @@ export class PlayerView {
   roadNetworkCompletion(): number {
     return this.data.roadNetworkCompletion ?? 100;
   }
+  roadNetworkLength(): number {
+    return this.data.roadNetworkLength ?? 0;
+  }
+  roadNetPixelsPerSecond(): number {
+    return this.data.roadNetPixelsPerSecond ?? 0;
+  }
   isAlliedWith(other: PlayerView): boolean {
     return this.data.allies.some((n) => other.smallID() === n);
   }

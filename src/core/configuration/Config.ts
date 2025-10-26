@@ -139,6 +139,10 @@ export interface Config {
   cargoTruckGold(distance: number): Gold;
   roadUpdatesPerTick(): number;
   maxRoadLength(): number;
+  // Roads: base gold cost per pixel (before productivity scaling)
+  roadConstructionBaseCost(): number;
+  // Roads: per-tile maintenance multiplier applied to base cost
+  roadMaintenanceMultiplier(): number;
 
   // International Cargo Trucks
   internationalCargoTrucksEnabled(): boolean;

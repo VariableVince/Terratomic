@@ -388,12 +388,12 @@ export class GameImpl implements Game {
       });
     }
 
-    // Debug: every ~10 seconds (100 ticks at ~100ms/tick), log human players' road network length
+    // Debug: every ~10 ticks (~1s at 100ms/tick), log human players' road network length
     if (this._ticks % 10 === 0) {
       for (const p of this._players.values()) {
         if (p.type() === PlayerType.Human) {
           try {
-            const len = p.roadNetworkLength();
+            const len = this.roadManager.getRoadLengthForPlayer(p.id());
             // Print concise identifier for the player
 
             console.log(
@@ -481,6 +481,16 @@ export class GameImpl implements Game {
     this.nextPlayerID++;
     this._players.set(playerInfo.id, player);
     return player;
+  }
+
+  // Expose authoritative road length for PlayerImpl/UI without duplicating state on Player
+  public getRoadLengthForPlayer(playerId: PlayerID): number {
+    return this.roadManager.getRoadLengthForPlayer(playerId);
+  }
+
+  // Expose server-computed net road build rate (pixels per second)
+  public getRoadNetPixelsPerSecond(playerId: PlayerID): number {
+    return this.roadManager.getRoadNetPixelsPerSecond(playerId);
   }
 
   private maybeAssignTeam(player: PlayerInfo): Team | null {

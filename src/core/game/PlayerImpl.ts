@@ -78,7 +78,6 @@ export class PlayerImpl implements Player {
   private _productivityGrowthPerMinute = 0;
   private _maxproductivity = 1;
   private _roadInvestmentRate: number = 0; // 0..1, fraction of per-tick income allocated to roads
-  private _roadNetworkLength: number = 0; // total tile-edge length of owned road network
   private _researchInvestmentRate: number = 0; // 0..1, fraction of per-tick income allocated to research
 
   markedTraitorTick = -1;
@@ -168,6 +167,8 @@ export class PlayerImpl implements Player {
       // Road KPIs exposed to client
       roadNetworkQuality: this.roadNetworkQuality(),
       roadNetworkCompletion: this.roadNetworkCompletion(),
+      roadNetworkLength: this.mg.getRoadLengthForPlayer(this.id()),
+      roadNetPixelsPerSecond: this.mg.getRoadNetPixelsPerSecond(this.id()),
       troops: this.troops(),
       attackingTroops: this.attackingTroops(),
       targetTroopRatio: this.targetTroopRatio(),
@@ -957,15 +958,14 @@ export class PlayerImpl implements Player {
 
   // Roads - total network length (tile edges)
   roadNetworkLength(): number {
-    return this._roadNetworkLength;
+    // Delegate to authoritative RoadManager cache to avoid duplicate state
+    return this.mg.getRoadLengthForPlayer(this.id());
   }
 
   addRoadNetworkLength(delta: number): void {
-    // Clamp to non-negative and ignore tiny float noise
-    this._roadNetworkLength = Math.max(
-      0,
-      Math.round(this._roadNetworkLength + delta),
-    );
+    // Deprecated: RoadManager is the single source of truth now.
+    // Intentionally a no-op to avoid duplicate state.
+    void delta;
   }
   addHospitalReturns(count: number): void {
     const effectiveHospitals = this.effectiveUnits(UnitType.Hospital);

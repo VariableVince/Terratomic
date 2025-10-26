@@ -161,6 +161,10 @@ export interface PlayerUpdate {
   // Road KPIs (percent values 0..100)
   roadNetworkQuality?: number;
   roadNetworkCompletion?: number;
+  // Road: credited network length for this player (fractional tiles)
+  roadNetworkLength?: number;
+  // Road: server-computed net build speed in pixels per second
+  roadNetPixelsPerSecond?: number;
   troops: number;
   attackingTroops: number;
   targetTroopRatio: number;

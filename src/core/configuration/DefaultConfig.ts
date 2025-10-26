@@ -353,6 +353,14 @@ export class DefaultConfig implements Config {
     // and the A* maximum allowed path cost threshold.
     return 288;
   }
+  // Roads: base gold cost per pixel (before productivity scaling)
+  roadConstructionBaseCost(): number {
+    return 600;
+  }
+  // Roads: per-tile maintenance multiplier applied to base cost (gold per tile per tick)
+  roadMaintenanceMultiplier(): number {
+    return 0.0001;
+  }
 
   // Cargoplanes (Turned off for now)
   cargoPlanesEnabled(): boolean {
