@@ -852,21 +852,7 @@ export class DefaultConfig implements Config {
       attackerLoss *= atkMods.attackerLossMul * defMods.attackerLossMul;
       defenderLoss *= atkMods.defenderLossMul * defMods.defenderLossMul;
 
-      // TEMP DEBUG: Log only the combined multipliers for human defenders
-      if (defenderType === PlayerType.Human) {
-        try {
-          console.log("[CombatDebug] multipliers", {
-            attackerLossMul: Number(
-              (atkMods.attackerLossMul * defMods.attackerLossMul).toFixed(3),
-            ),
-            defenderLossMul: Number(
-              (atkMods.defenderLossMul * defMods.defenderLossMul).toFixed(3),
-            ),
-          });
-        } catch {
-          // Do nothing; logging must not affect gameplay
-        }
-      }
+      // [CombatDebug] multipliers log disabled per user request
 
       return {
         attackerTroopLoss: attackerLoss,

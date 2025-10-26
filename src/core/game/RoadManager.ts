@@ -14,6 +14,8 @@ export interface Road {
   id: number;
   path: TileRef[];
   owner: PlayerID;
+  // Attribution owners for tile-based length (single owner or shared between allies)
+  owners: PlayerID[];
 }
 
 interface PlannedRoad {
@@ -22,6 +24,7 @@ interface PlannedRoad {
   end: TileRef;
   path: TileRef[];
   length: number;
+  owners: PlayerID[]; // attribution owners for tile-based length
 }
 
 interface ConstructionState {
@@ -59,6 +62,12 @@ export class RoadManager {
   private spClosed: Uint32Array | null = null; // closed-set marker (versioned)
   private roads = new Map<number, Road>();
   private roadsByOwner = new Map<PlayerID, Set<number>>();
+  // Per-owner unique tile ref counts for road coverage
+  private ownerTileRefs = new Map<PlayerID, Map<TileRef, number>>();
+  // Global tile coverage ref counts across all roads (built and under construction)
+  private globalTileRefs = new Map<TileRef, number>();
+  // For each tile that has any road coverage, which owners were credited for that tile
+  private tileCreditedOwners = new Map<TileRef, Set<PlayerID>>();
   // Per-owner segment reference counts to compute network length per player
   private segmentsByOwner = new Map<PlayerID, Map<string, number>>();
   private structureGraph = new StructureGraph();
@@ -302,8 +311,7 @@ export class RoadManager {
           const startTile = road.path[0];
           const endTile = road.path[road.path.length - 1];
           // Track per-edge segment removals for UI redraw
-          const ownerSegs = this.segmentsByOwner.get(road.owner);
-          const ownerPlayer = this.game.player(road.owner);
+          const ownersForTiles = road.owners ?? [road.owner];
           for (let i = 0; i < road.path.length - 1; i++) {
             const seg = this.getCanonicalSegment(
               road.path[i],
@@ -311,18 +319,9 @@ export class RoadManager {
             );
             if (this.segmentSet.delete(seg))
               this.pendingRemovedSegments.push(seg);
-            if (ownerSegs) {
-              const prev = ownerSegs.get(seg) ?? 0;
-              if (prev > 0) {
-                const next = prev - 1;
-                if (next === 0) {
-                  ownerSegs.delete(seg);
-                  ownerPlayer.addRoadNetworkLength(-1);
-                } else {
-                  ownerSegs.set(seg, next);
-                }
-              }
-            }
+            // Tile-based accounting: decrement both endpoints for all owners
+            this.decTileForOwners(ownersForTiles, road.path[i]);
+            this.decTileForOwners(ownersForTiles, road.path[i + 1]);
           }
           this.roads.delete(roadId);
           const endpointKey = this.getCanonicalSegment(startTile, endTile);
@@ -409,6 +408,86 @@ export class RoadManager {
           }
         }
       }
+    });
+
+    // Handle owner-changed nodes: keep built roads, cancel queued/in-progress, and re-queue connections
+    ownerChangedNodes.forEach((node) => {
+      const changedTile = node.tile();
+
+      // Adjust attribution on any existing built roads incident to this node
+      for (const road of this.roads.values()) {
+        const startTile = road.path[0];
+        const endTile = road.path[road.path.length - 1];
+        if (startTile !== changedTile && endTile !== changedTile) continue;
+
+        const prevOwners = new Set<PlayerID>(road.owners ?? [road.owner]);
+        // After conquest, only current endpoint owners should count the road within their network
+        const newOwnersArr = this.computeOwnersFromEndpoints(
+          startTile,
+          endTile,
+        );
+        const newOwners = new Set<PlayerID>(newOwnersArr);
+
+        // Compute deltas
+        const toRemove: PlayerID[] = [];
+        const toAdd: PlayerID[] = [];
+        for (const o of prevOwners) if (!newOwners.has(o)) toRemove.push(o);
+        for (const o of newOwners) if (!prevOwners.has(o)) toAdd.push(o);
+
+        if (toRemove.length > 0 || toAdd.length > 0) {
+          // Reassign credit on all tiles along this road without changing global coverage
+          for (let i = 0; i < road.path.length - 1; i++) {
+            const a = road.path[i];
+            const b = road.path[i + 1];
+            if (toRemove.length > 0 || toAdd.length > 0) {
+              this.reassignTileCredit(a, toRemove, toAdd);
+              this.reassignTileCredit(b, toRemove, toAdd);
+            }
+          }
+          road.owners = newOwnersArr;
+        }
+      }
+
+      // Cancel any planned or in-progress builds that referenced this node as an endpoint
+      const constructionsToCancel: PlayerID[] = [];
+      for (const [pid, state] of this.currentConstruction) {
+        if (
+          state.planned.start === changedTile ||
+          state.planned.end === changedTile
+        ) {
+          this.removePartialConstructionSegments(state);
+          this.cleanupPlannedReservationAndBias(
+            state.planned.start,
+            state.planned.end,
+            state.planned.path,
+          );
+          constructionsToCancel.push(pid);
+        }
+      }
+      for (const pid of constructionsToCancel)
+        this.currentConstruction.delete(pid);
+
+      // Purge queued plans that referenced this node
+      for (const [ownerId, queue] of this.plannedQueues) {
+        const toRemove: PlannedRoad[] = [];
+        for (const pr of queue) {
+          if (pr.start === changedTile || pr.end === changedTile)
+            toRemove.push(pr);
+        }
+        if (toRemove.length > 0) {
+          for (const pr of toRemove)
+            this.cleanupPlannedReservationAndBias(pr.start, pr.end, pr.path);
+          this.plannedQueues.set(
+            ownerId,
+            queue.filter((pr) => !toRemove.includes(pr)),
+          );
+        }
+      }
+
+      // Note: queuing of new connections is handled by pushing ownerChangedNodes
+      // into newNodesQueue earlier; the nearby-connection planner below will consider
+      // this node as a fresh connection candidate. We only ensure queued/in-progress
+      // plans that referenced the pre-conquest state are cleared below.
     });
 
     // Increase neighbor search radius by 20% to match the max road distance change (100 -> 120)
@@ -570,12 +649,14 @@ export class RoadManager {
     // Reserve endpoints to avoid duplicate planning
     this.reservedEndpointSegments.add(segmentKey);
 
+    const owners = this.computeOwnersAttribution(owner, start, end);
     const planned: PlannedRoad = {
       owner,
       start,
       end,
       path,
       length: Math.max(0, (path.length - 1) * 1), // pixels at 1px per tile edge (canvas grid is 1px per tile)
+      owners,
     };
 
     const queue = this.plannedQueues.get(owner) ?? [];
@@ -664,6 +745,7 @@ export class RoadManager {
       }
 
       const path = state.planned.path;
+      const ownersForTiles = state.planned.owners ?? [pid];
       while (edgesToBuild > 0 && state.builtIndex < path.length - 1) {
         const a = path[state.builtIndex];
         const b = path[state.builtIndex + 1];
@@ -672,18 +754,9 @@ export class RoadManager {
           this.segmentSet.add(seg);
           this.pendingAddedSegments.push(seg);
         }
-        // Update per-owner length accounting (ref-counted by segment)
-        let ownerSegs = this.segmentsByOwner.get(pid);
-        if (!ownerSegs) {
-          ownerSegs = new Map<string, number>();
-          this.segmentsByOwner.set(pid, ownerSegs);
-        }
-        const prev = ownerSegs.get(seg) ?? 0;
-        ownerSegs.set(seg, prev + 1);
-        if (prev === 0) {
-          // Only increment player's network length on first ownership of this segment
-          player.addRoadNetworkLength(1);
-        }
+        // Tile-based length accounting: increment unique tile refs for all owners
+        this.incTileForOwners(ownersForTiles, a);
+        this.incTileForOwners(ownersForTiles, b);
         // Track as under construction until the entire road is finalized
         this.underConstructionSegments.add(seg);
         // Update road tiles cache incrementally to influence future pathfinding
@@ -700,6 +773,7 @@ export class RoadManager {
           id: nextRoadId++,
           path: path,
           owner: pid,
+          owners: ownersForTiles,
         };
         this.roads.set(newRoad.id, newRoad);
         if (!this.roadsByOwner.has(newRoad.owner)) {
@@ -841,6 +915,120 @@ export class RoadManager {
     for (const t of path) this.plannedTilesCache.delete(t);
   }
 
+  // Attribution helpers for tile-based length
+  private computeOwnersAttribution(
+    primaryOwner: PlayerID,
+    start: TileRef,
+    end: TileRef,
+  ): PlayerID[] {
+    const owners = new Set<PlayerID>([primaryOwner]);
+    const o1 = this.game.owner(start);
+    const o2 = this.game.owner(end);
+    if (o1.isPlayer() && o2.isPlayer()) {
+      const p1 = o1 as Player;
+      const p2 = o2 as Player;
+      if (p1.id() === p2.id() || p1.isFriendly(p2)) {
+        owners.add(p1.id());
+        owners.add(p2.id());
+      }
+    }
+    return [...owners];
+  }
+
+  // After conquest, attribution should be based solely on current endpoint owners
+  // regardless of the original builder. Non-player owners are ignored.
+  private computeOwnersFromEndpoints(start: TileRef, end: TileRef): PlayerID[] {
+    const owners = new Set<PlayerID>();
+    const o1 = this.game.owner(start);
+    const o2 = this.game.owner(end);
+    if (o1.isPlayer()) owners.add((o1 as Player).id());
+    if (o2.isPlayer()) owners.add((o2 as Player).id());
+    return [...owners];
+  }
+
+  // Add road coverage for the given owners on this tile. Credit owners only if this tile
+  // was not previously part of any existing road.
+  private incTileForOwners(owners: PlayerID[], tile: TileRef): void {
+    const prevGlobal = this.globalTileRefs.get(tile) ?? 0;
+    const nextGlobal = prevGlobal + 1;
+    this.globalTileRefs.set(tile, nextGlobal);
+    if (prevGlobal === 0) {
+      // First time any road covers this tile: split credit evenly among owners
+      const credited = new Set<PlayerID>();
+      const share = owners.length > 0 ? 1 / owners.length : 1;
+      for (const oid of owners) {
+        credited.add(oid);
+        this.game.player(oid).addRoadNetworkLength(share);
+      }
+      this.tileCreditedOwners.set(tile, credited);
+    }
+  }
+
+  // Remove road coverage for the given owners on this tile. Only adjust credit when
+  // this was the last coverage for the tile globally.
+  private decTileForOwners(_owners: PlayerID[], tile: TileRef): void {
+    const prevGlobal = this.globalTileRefs.get(tile) ?? 0;
+    if (prevGlobal <= 0) return;
+    const nextGlobal = prevGlobal - 1;
+    if (nextGlobal === 0) {
+      this.globalTileRefs.delete(tile);
+      // Last road removed from this tile: decrement all owners that were credited for it
+      const credited = this.tileCreditedOwners.get(tile);
+      if (credited && credited.size > 0) {
+        const share = 1 / credited.size;
+        for (const oid of credited)
+          this.game.player(oid).addRoadNetworkLength(-share);
+      }
+      this.tileCreditedOwners.delete(tile);
+    } else {
+      this.globalTileRefs.set(tile, nextGlobal);
+    }
+  }
+
+  // Reassign credit on an already-covered tile without changing coverage counts.
+  // Used when ownership attribution changes (e.g., conquered node)
+  private reassignTileCredit(
+    tile: TileRef,
+    removeOwners: PlayerID[],
+    addOwners: PlayerID[],
+  ): void {
+    let credited = this.tileCreditedOwners.get(tile);
+    if (!credited) {
+      credited = new Set<PlayerID>();
+      this.tileCreditedOwners.set(tile, credited);
+    }
+    // Build new credited set and compute fractional deltas
+    const oldOwners = new Set<PlayerID>(credited);
+    for (const oid of removeOwners) oldOwners.delete(oid);
+    const newOwners = new Set<PlayerID>(oldOwners);
+    for (const oid of addOwners) newOwners.add(oid);
+
+    const oldSize = credited.size || 1;
+    const newSize = newOwners.size || 1;
+    const oldShare = 1 / oldSize;
+    const newShare = 1 / newSize;
+
+    // Owners removed: lose oldShare
+    for (const oid of removeOwners) {
+      if (credited.has(oid))
+        this.game.player(oid).addRoadNetworkLength(-oldShare);
+    }
+    // Owners retained: adjust by delta share
+    for (const oid of credited) {
+      if (newOwners.has(oid)) {
+        const delta = newShare - oldShare;
+        if (delta !== 0) this.game.player(oid).addRoadNetworkLength(delta);
+      }
+    }
+    // Owners added: gain newShare
+    for (const oid of addOwners) {
+      if (!credited.has(oid))
+        this.game.player(oid).addRoadNetworkLength(newShare);
+    }
+
+    this.tileCreditedOwners.set(tile, newOwners);
+  }
+
   // Helper: remove reservation for an endpoint pair and clear planned-path bias
   private cleanupPlannedReservationAndBias(
     start: TileRef,
@@ -855,8 +1043,7 @@ export class RoadManager {
   // Helper: remove any partially built segments for a construction state
   private removePartialConstructionSegments(state: ConstructionState): void {
     const path = state.planned.path;
-    const ownerSegs = this.segmentsByOwner.get(state.planned.owner);
-    const ownerPlayer = this.game.player(state.planned.owner);
+    const ownersForTiles = state.planned.owners ?? [state.planned.owner];
     for (let i = 0; i < state.builtIndex; i++) {
       const a = path[i];
       const b = path[i + 1];
@@ -865,18 +1052,9 @@ export class RoadManager {
         this.pendingRemovedSegments.push(seg);
       }
       this.underConstructionSegments.delete(seg);
-      if (ownerSegs) {
-        const prev = ownerSegs.get(seg) ?? 0;
-        if (prev > 0) {
-          const next = prev - 1;
-          if (next === 0) {
-            ownerSegs.delete(seg);
-            ownerPlayer.addRoadNetworkLength(-1);
-          } else {
-            ownerSegs.set(seg, next);
-          }
-        }
-      }
+      // Tile-based: decrement both endpoints for all owners
+      this.decTileForOwners(ownersForTiles, a);
+      this.decTileForOwners(ownersForTiles, b);
     }
   }
 
@@ -1256,25 +1434,16 @@ export class RoadManager {
 
         this.roads.delete(roadId);
 
-        // Explicitly remove segments from segmentSet for renderer and adjust per-owner length
-        const ownerSegs = this.segmentsByOwner.get(player.id());
+        // Explicitly remove segments from segmentSet for renderer and adjust tile-based length
+        const ownersForTiles = road.owners ?? [road.owner];
         for (let i = 0; i < road.path.length - 1; i++) {
           const seg = this.getCanonicalSegment(road.path[i], road.path[i + 1]);
           if (this.segmentSet.delete(seg)) {
             this.pendingRemovedSegments.push(seg); // Ensure these are also queued for renderer
           }
-          if (ownerSegs) {
-            const prev = ownerSegs.get(seg) ?? 0;
-            if (prev > 0) {
-              const next = prev - 1;
-              if (next === 0) {
-                ownerSegs.delete(seg);
-                player.addRoadNetworkLength(-1);
-              } else {
-                ownerSegs.set(seg, next);
-              }
-            }
-          }
+          // Tile-based: decrement both endpoints for all owners
+          this.decTileForOwners(ownersForTiles, road.path[i]);
+          this.decTileForOwners(ownersForTiles, road.path[i + 1]);
         }
       }
     }
@@ -1298,8 +1467,8 @@ export class RoadManager {
     // Clear path cache as roads have been destroyed
     this.clearPathCache();
 
-    // Clear any leftover per-owner segment refs for this player
-    this.segmentsByOwner.delete(player.id());
+    // Clear any leftover per-owner tile refs for this player
+    this.ownerTileRefs.delete(player.id());
 
     this.maybeReconcileSegments(true);
   }
