@@ -506,7 +506,25 @@ export class RoadManager {
     for (const [pid, state] of this.currentConstruction) {
       const player = playerById.get(pid);
       if (!player) {
-        // Player no longer has roads or is gone; abandon construction
+        // Player no longer has roads or is gone; abandon construction and clean up partials
+        // Free endpoint reservation and planned bias
+        this.reservedEndpointSegments.delete(
+          this.getCanonicalSegment(state.planned.start, state.planned.end),
+        );
+        this.removePlannedPath(state.planned.path);
+
+        // Remove any partially built segments
+        const path = state.planned.path;
+        for (let i = 0; i < state.builtIndex; i++) {
+          const a = path[i];
+          const b = path[i + 1];
+          const seg = this.getCanonicalSegment(a, b);
+          if (this.segmentSet.delete(seg)) {
+            this.pendingRemovedSegments.push(seg);
+          }
+          this.underConstructionSegments.delete(seg);
+        }
+
         this.currentConstruction.delete(pid);
         continue;
       }
@@ -520,13 +538,13 @@ export class RoadManager {
       } else {
         // Compute px per tick from investment based on GROSS gold (pre-investment):
         // Invested gold per tick = grossGoldPerTick * roadInvestmentRate
-        // Using parameter: 1000 gold invested per tick yields 1 px per tick
+        // Using parameter: 800 gold invested per tick yields 1 px per tick
         const grossGoldPerTick = this.game
           .config()
           .grossGoldAdditionRate(player);
         const investRatio = player.roadInvestmentRate?.() ?? 0;
         const investedPerTick = grossGoldPerTick * investRatio; // gold/tick (double)
-        const PX_PER_TICK_PER_GOLD = 1 / 1000; // 1 px/tick per 1000 gold/tick invested
+        const PX_PER_TICK_PER_GOLD = 1 / 800; // 1 px/tick per 800 gold/tick invested
         const pxPerTick = investedPerTick * PX_PER_TICK_PER_GOLD;
         if (pxPerTick <= 0) continue;
 
@@ -683,6 +701,28 @@ export class RoadManager {
     for (const road of this.roads.values()) {
       for (let i = 0; i < road.path.length - 1; i++) {
         current.add(this.getCanonicalSegment(road.path[i], road.path[i + 1]));
+      }
+    }
+
+    // Purge orphan "under construction" segments left from abandoned builds
+    if (this.underConstructionSegments.size > 0) {
+      const activeUC = new Set<string>();
+      for (const { planned, builtIndex } of this.currentConstruction.values()) {
+        for (let i = 0; i < builtIndex; i++) {
+          activeUC.add(
+            this.getCanonicalSegment(planned.path[i], planned.path[i + 1]),
+          );
+        }
+      }
+      for (const seg of [...this.underConstructionSegments]) {
+        if (!activeUC.has(seg)) {
+          // No longer part of any active construction; clear the flag
+          this.underConstructionSegments.delete(seg);
+          // If not an authoritative road edge either, remove the stray segment now
+          if (!current.has(seg) && this.segmentSet.delete(seg)) {
+            this.pendingRemovedSegments.push(seg);
+          }
+        }
       }
     }
 
@@ -846,7 +886,13 @@ export class RoadManager {
     }
 
     const ok = (r: TileRef) => {
-      if (!this.game.isLand(r)) return false;
+      // Allow water/shore tiles to be traversed for roads (bridges/ferries),
+      // but keep ownership rules for land tiles.
+      if (!this.game.isLand(r)) {
+        // Water (ocean/lake) has no ownership; permitted at high cost.
+        return true;
+      }
+      // Land tiles must be owned by the start owner or friendly
       const owner = this.game.owner(r);
       if (!owner.isPlayer()) return false;
       if (owner.id() === startOwner.id()) return true;
@@ -875,9 +921,16 @@ export class RoadManager {
         if (!ok(neighbor)) continue;
 
         // Prefer built and planned roads equally over fresh land
+        // Base land cost = 2, Water/Shore cost = 20, Built/Planned = 1
         let cost = 2;
-        if (this.roadTilesCache.has(neighbor)) cost = 1;
-        else if (this.plannedTilesCache.has(neighbor)) cost = 1;
+        if (
+          this.roadTilesCache.has(neighbor) ||
+          this.plannedTilesCache.has(neighbor)
+        ) {
+          cost = 1;
+        } else if (!this.game.isLand(neighbor) || this.game.isShore(neighbor)) {
+          cost = 20;
+        }
         const newCost = currentCost + cost;
 
         // Stop exploring paths that are already too long
