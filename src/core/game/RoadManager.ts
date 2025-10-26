@@ -1218,4 +1218,17 @@ export class RoadManager {
   public getRoads(): Road[] {
     return Array.from(this.roads.values());
   }
+
+  // Road KPI helper for per-player counts
+  public getCountsForPlayer(player: Player): {
+    completed: number;
+    queued: number;
+    inProgress: number;
+  } {
+    const pid = player.id();
+    const completed = this.roadsByOwner.get(pid)?.size ?? 0;
+    const queued = this.plannedQueues.get(pid)?.length ?? 0;
+    const inProgress = this.currentConstruction.has(pid) ? 1 : 0;
+    return { completed, queued, inProgress };
+  }
 }

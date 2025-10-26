@@ -870,6 +870,9 @@ export class ControlPanel2 extends LitElement implements Layer {
 
     return html`
       <style>
+        .nowrap {
+          white-space: nowrap;
+        }
         .build-button {
           position: relative;
           width: 100%; /* Full width of the column */
@@ -1073,11 +1076,19 @@ export class ControlPanel2 extends LitElement implements Layer {
           margin-left: 6px;
           color: #a0aec0;
           font-size: 11px;
+          /* Ensure the badge aligns with surrounding text like "0%" */
+          vertical-align: middle;
+          line-height: 1em;
         }
         .lock-icon {
           width: 12px;
           height: 12px;
           fill: #a0aec0;
+          /* Keep icon from affecting baseline height and align nicely */
+          display: inline-block;
+          vertical-align: middle;
+          position: relative;
+          top: -1px; /* nudge up to visually center with text */
         }
       </style>
       <div
@@ -1143,7 +1154,7 @@ export class ControlPanel2 extends LitElement implements Layer {
             : ""}
         </div>
 
-        <div class="tab-content flex-grow overflow-y-auto max-w-full">
+        <div class="tab-content flex-grow overflow-y-auto max-w-full pr-4 pt-2">
           ${this.activeTab === "Bombers"
             ? html`
                 <div class="flex w-full">
@@ -1335,9 +1346,13 @@ export class ControlPanel2 extends LitElement implements Layer {
             : ""}
           ${this.activeTab === "Economy"
             ? html`
-                <div>
+                <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                  <!-- Top-Left: Production -->
                   <div class="relative">
-                    <label class="block military-label mb-1" translate="no">
+                    <label
+                      class="block military-label mb-1 whitespace-nowrap"
+                      translate="no"
+                    >
                       Production Investment Rate:
                       ${(this.investmentRate * 100).toFixed(0)}%
                       ${this._lockProd
@@ -1444,9 +1459,9 @@ export class ControlPanel2 extends LitElement implements Layer {
                       />
                     </div>
                   </div>
-                  <div
-                    class="relative mt-6 ${!hasRoads ? "slider-disabled" : ""}"
-                  >
+
+                  <!-- Top-Right: Roads -->
+                  <div class="relative ${!hasRoads ? "slider-disabled" : ""}">
                     ${(() => {
                       const me = this.game?.myPlayer?.();
                       const grossPerSecond = me
@@ -1460,11 +1475,11 @@ export class ControlPanel2 extends LitElement implements Layer {
                       const investedPerSecond = grossPerSecond * effectiveRoad;
                       const pxPerSecond = investedPerSecond / 1000;
                       return html`
-                        <label class="block military-label mb-1" translate="no">
+                        <label
+                          class="block military-label mb-1 whitespace-nowrap"
+                          translate="no"
+                        >
                           Road investment: ${(effectiveRoad * 100).toFixed(0)}%
-                          <span class="opacity-70"
-                            >(${pxPerSecond.toFixed(2)} px/s)</span
-                          >
                           ${this._lockRoad && hasRoads
                             ? html`<span
                                 class="lock-badge"
@@ -1500,6 +1515,12 @@ export class ControlPanel2 extends LitElement implements Layer {
                               </span>`
                             : ""}
                         </label>
+                        <div
+                          class="text-right text-xs opacity-60 mt-1 military-label normal-case"
+                          translate="no"
+                        >
+                          Road: ${pxPerSecond.toFixed(2)} px/s
+                        </div>
                       `;
                     })()}
                     <div class="relative h-8">
@@ -1588,9 +1609,23 @@ export class ControlPanel2 extends LitElement implements Layer {
                     <div
                       class="text-right text-xs opacity-60 mt-1 military-label normal-case"
                       translate="no"
-                    ></div>
+                    >
+                      ${(() => {
+                        const p = this.game?.myPlayer?.();
+                        const quality = p ? p.roadNetworkQuality() : 100;
+                        const completion = p ? p.roadNetworkCompletion() : 100;
+                        return html`Road network:
+                          <span class="nowrap"
+                            >Quality ${Math.round(quality)}%</span
+                          >
+                          ·
+                          <span class="nowrap"
+                            >Completion: ${Math.round(completion)}%</span
+                          >`;
+                      })()}
+                    </div>
                   </div>
-                  <div class="relative mt-6">
+                  <div class="relative">
                     ${(() => {
                       // Removed gold cost display next to the research slider per request
                       return html`
@@ -1695,6 +1730,47 @@ export class ControlPanel2 extends LitElement implements Layer {
                           : ""}"
                         @dblclick=${() =>
                           (this._lockResearch = !this._lockResearch)}
+                      />
+                    </div>
+                  </div>
+                  <!-- Bottom-Right: Military Expenditure (locked) -->
+                  <div class="relative slider-disabled">
+                    <label class="block military-label mb-1" translate="no">
+                      Military Expenditure: 0%
+                      <span
+                        class="lock-badge"
+                        title="This slider is locked and not yet available."
+                      >
+                        <svg
+                          class="lock-icon"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M8 10V7a4 4 0 118 0v3h1a2 2 0 012 2v8a2 2 0 01-2 2H7a2 2 0 01-2-2v-8a2 2 0 012-2h1zm2 0h4V7a2 2 0 10-4 0v3z"
+                          />
+                        </svg>
+                        Locked
+                      </span>
+                    </label>
+                    <div class="relative h-8">
+                      <div
+                        class="absolute left-0 right-0 top-3 h-2 rounded"
+                        style="background-color:rgba(24,39,66,0.85)"
+                      ></div>
+                      <div
+                        class="absolute left-0 top-3 h-2 rounded transition-all duration-300"
+                        style="width:0%; background-color: rgba(64,123,189,0.6);"
+                      ></div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        .value=${"0"}
+                        disabled
+                        title="Locked"
+                        class="absolute left-0 right-0 top-2 m-0 h-4 military-slider slider-locked cursor-not-allowed"
                       />
                     </div>
                   </div>

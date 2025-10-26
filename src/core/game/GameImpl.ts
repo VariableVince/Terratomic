@@ -938,6 +938,10 @@ export class GameImpl implements Game {
     return this.roadManager.hasRoadOnTile(tile);
   }
 
+  public getRoadCountsForPlayer(player: Player) {
+    return this.roadManager.getCountsForPlayer(player);
+  }
+
   public roads(): Road[] {
     return this.roadManager.getRoads();
   }

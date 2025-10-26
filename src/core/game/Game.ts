@@ -562,6 +562,12 @@ export interface Player {
   addHospitalReturns(amount: number): void;
   resetHospitalReturns(): void;
 
+  // Roads - Network KPIs
+  // Percentage [0..100]; currently constant until we add quality metrics
+  roadNetworkQuality(): number;
+  // Percentage [0..100] = completed roads / (completed + queued + in-progress), 100 if none exist
+  roadNetworkCompletion(): number;
+
   // Units
   units(...types: UnitType[]): Unit[];
   unitCount(type: UnitType): number;
@@ -698,6 +704,12 @@ export interface Game extends GameMap {
   hasRoadOnTile(tile: TileRef): boolean;
   destroyPlayerRoads(player: Player): void;
   markPlayerNodesForReconnection(player: Player): void;
+  // Helper for player road KPI calculations
+  getRoadCountsForPlayer(player: Player): {
+    completed: number;
+    queued: number;
+    inProgress: number;
+  };
 
   // Game State
   ticks(): Tick;

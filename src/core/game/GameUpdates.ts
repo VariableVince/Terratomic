@@ -158,6 +158,9 @@ export interface PlayerUpdate {
   productivity: number;
   productivityGrowthPerMinute: number;
   investmentRate: number;
+  // Road KPIs (percent values 0..100)
+  roadNetworkQuality?: number;
+  roadNetworkCompletion?: number;
   troops: number;
   attackingTroops: number;
   targetTroopRatio: number;

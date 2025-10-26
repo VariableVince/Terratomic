@@ -291,6 +291,13 @@ export class PlayerView {
   investmentRate(): number {
     return this.data.investmentRate;
   }
+  // Road KPIs (optional on wire; default to 100% quality and 100% completion if absent)
+  roadNetworkQuality(): number {
+    return this.data.roadNetworkQuality ?? 100;
+  }
+  roadNetworkCompletion(): number {
+    return this.data.roadNetworkCompletion ?? 100;
+  }
   isAlliedWith(other: PlayerView): boolean {
     return this.data.allies.some((n) => other.smallID() === n);
   }

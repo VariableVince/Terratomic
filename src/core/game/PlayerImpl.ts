@@ -164,6 +164,9 @@ export class PlayerImpl implements Player {
       totalPopulation: this.totalPopulation(),
       hospitalReturns: this.hospitalReturns(),
       workers: this.workers(),
+      // Road KPIs exposed to client
+      roadNetworkQuality: this.roadNetworkQuality(),
+      roadNetworkCompletion: this.roadNetworkCompletion(),
       troops: this.troops(),
       attackingTroops: this.attackingTroops(),
       targetTroopRatio: this.targetTroopRatio(),
@@ -936,6 +939,19 @@ export class PlayerImpl implements Player {
   }
   hospitalReturns(): number {
     return this._hospitalReturns;
+  }
+  // Roads - KPIs
+  roadNetworkQuality(): number {
+    // Placeholder for future degradation/improvement metrics
+    return 100;
+  }
+
+  roadNetworkCompletion(): number {
+    const { completed, queued, inProgress } =
+      this.mg.getRoadCountsForPlayer(this);
+    const total = completed + queued + inProgress;
+    if (total === 0) return 100;
+    return Math.round((completed / total) * 100);
   }
   addHospitalReturns(count: number): void {
     const effectiveHospitals = this.effectiveUnits(UnitType.Hospital);
