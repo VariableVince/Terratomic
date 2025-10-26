@@ -675,16 +675,9 @@ export class RoadManager {
     // Bias future pathfinding to prefer this planned corridor
     this.addPlannedPath(path);
 
-    // If no construction currently running for owner, start this one
+    // If no construction currently running for owner, attempt to start next valid plan (may be this one)
     if (!this.currentConstruction.has(owner)) {
-      this.currentConstruction.set(owner, {
-        planned,
-        builtIndex: 0,
-        pxAccum: 0,
-      });
-      // Remove from queue head (we kept it sorted)
-      const idx = queue.indexOf(planned);
-      if (idx >= 0) queue.splice(idx, 1);
+      this.startNextFor(owner);
     }
   }
 
@@ -922,9 +915,88 @@ export class RoadManager {
   private startNextFor(pid: PlayerID): void {
     const q = this.plannedQueues.get(pid);
     if (!q || q.length === 0) return;
-    // Next item is always the first (already sorted shortest-first)
-    const planned = q.shift()!;
-    this.currentConstruction.set(pid, { planned, builtIndex: 0, pxAccum: 0 });
+
+    // Pull from the head until we find a valid plan we can actually start
+    while (q.length > 0) {
+      const planned = q.shift()!;
+
+      // If a road between these endpoints already exists, skip this plan
+      const endpointKey = this.getCanonicalSegment(planned.start, planned.end);
+      if (this.existingRoadSegments.has(endpointKey)) {
+        // Remove planned bias/reservation just in case
+        this.cleanupPlannedReservationAndBias(
+          planned.start,
+          planned.end,
+          planned.path,
+        );
+        continue;
+      }
+
+      // Endpoints must still be valid and friendly
+      const endpointsOk = this.isPlannedRoadValid({
+        owner: planned.owner,
+        start: planned.start,
+        end: planned.end,
+        path: planned.path,
+        length: planned.length,
+        owners: planned.owners,
+      });
+
+      if (!endpointsOk) {
+        // Free reservation and bias; try next item
+        this.cleanupPlannedReservationAndBias(
+          planned.start,
+          planned.end,
+          planned.path,
+        );
+        continue;
+      }
+
+      // Recompute a fresh path in case territory or costs changed
+      const freshPath = this.shortestPathOverFriendlyLand(
+        planned.start,
+        planned.end,
+      );
+
+      if (!freshPath || freshPath.length < 2) {
+        // No legal path anymore; drop this plan and continue
+        this.cleanupPlannedReservationAndBias(
+          planned.start,
+          planned.end,
+          planned.path,
+        );
+        continue;
+      }
+
+      // If the path changed, update planned bias and metrics
+      const changed =
+        freshPath.length !== planned.path.length ||
+        freshPath.some((t, i) => planned.path[i] !== t);
+      if (changed) {
+        // Remove bias for old planned corridor and add bias for the new one
+        this.removePlannedPath(planned.path);
+        this.addPlannedPath(freshPath);
+        planned.path = freshPath;
+        planned.length = Math.max(0, (freshPath.length - 1) * 1);
+        // Recompute attribution owners from current endpoints to reflect any alliance/ownership changes
+        planned.owners = this.computeOwnersAttribution(
+          planned.owner,
+          planned.start,
+          planned.end,
+        );
+        // Update path cache with the fresh path for future queries
+        const key = this.getCanonicalSegment(planned.start, planned.end);
+        this.pathCache.set(key, freshPath);
+      }
+
+      // Start construction on the validated (and possibly updated) plan
+      this.currentConstruction.set(pid, {
+        planned,
+        builtIndex: 0,
+        pxAccum: 0,
+      });
+      return;
+    }
   }
 
   private isPlannedRoadValid(pr: PlannedRoad): boolean {

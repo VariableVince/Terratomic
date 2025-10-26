@@ -117,4 +117,72 @@ describe("RoadManager", () => {
 
     expect((roadManager as any).roads.size).toBeGreaterThan(0);
   });
+
+  it("revalidates and recalculates a queued road path when it reaches the top of the queue", () => {
+    playerA.addUpgrade(UpgradeType.Roads);
+
+    // Conquer a 3x9 corridor to allow alternate routing around a future blocked tile
+    for (let x = 0; x <= 2; x++) {
+      for (let y = 10; y <= 18; y++) {
+        const t = game.ref(x, y);
+        if (game.isLand(t)) {
+          game.conquer(playerA as PlayerImpl, t);
+        }
+      }
+    }
+
+    const start = game.ref(0, 10);
+    const end = game.ref(0, 18);
+
+    // Seed path cache/path planner
+    const initialPath: number[] = (roadManager as any).getCachedPath(
+      start,
+      end,
+    );
+    expect(initialPath).toBeTruthy();
+    expect((initialPath as number[]).length).toBeGreaterThan(1);
+
+    // Enqueue a short dummy plan first to ensure our target plan sits in the queue initially
+    const dStart = game.ref(2, 10);
+    const dEnd = game.ref(2, 11);
+    const dPath: number[] = (roadManager as any).getCachedPath(dStart, dEnd);
+    (roadManager as any).enqueuePlannedRoad(
+      playerA.id(),
+      dStart,
+      dEnd,
+      dPath,
+      false,
+    );
+
+    // Now enqueue the target plan which will initially be queued behind the dummy
+    (roadManager as any).enqueuePlannedRoad(
+      playerA.id(),
+      start,
+      end,
+      initialPath,
+      false,
+    );
+
+    // Invalidate the original path by making a middle land tile neutral
+    const blocked = game.ref(0, 14);
+    // Ensure the tile is land and currently owned before relinquishing
+    expect(game.isLand(blocked)).toBe(true);
+    game.relinquish(blocked);
+
+    // Simulate the first construction finishing
+    (roadManager as any).currentConstruction.delete(playerA.id());
+
+    // Start next; this should revalidate and recalculate the path
+    (roadManager as any).startNextFor(playerA.id());
+
+    const state = (roadManager as any).currentConstruction.get(playerA.id());
+    expect(state).toBeTruthy();
+    const nextPath: number[] = state.planned.path;
+    // The next path should avoid the blocked tile and likely differ from the initial vertical path
+    expect(nextPath.includes(blocked)).toBe(false);
+    const same =
+      nextPath.length === (initialPath as number[]).length &&
+      nextPath.every((t, i) => t === (initialPath as number[])[i]);
+    expect(same).toBe(false);
+  });
 });
