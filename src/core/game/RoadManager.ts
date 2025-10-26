@@ -44,6 +44,13 @@ export class RoadManager {
   // Small penalty for changing direction while laying roads to prefer straighter paths
   // Tuned low so it never overwhelms terrain costs (land=2, road=1, water/shore=20)
   private readonly DIRECTION_CHANGE_PENALTY = 0.5;
+  // Scratch buffers for shortestPathOverFriendlyLand (versioned to avoid full clears)
+  private spCosts: Float32Array | null = null;
+  private spPrev: Int32Array | null = null;
+  private spPrevDir: Int8Array | null = null; // last move dir index [0..7], 127 for start, -128 unset
+  private spMark: Uint32Array | null = null;
+  private spMarkVersion = 1;
+  private spClosed: Uint32Array | null = null; // closed-set marker (versioned)
   private roads = new Map<number, Road>();
   private roadsByOwner = new Map<PlayerID, Set<number>>();
   private structureGraph = new StructureGraph();
@@ -911,6 +918,26 @@ export class RoadManager {
     start: TileRef,
     goal: TileRef,
   ): TileRef[] | null {
+    const ensureSPBuffers = () => {
+      const w = this.game.width();
+      const h = this.game.height();
+      const n = w * h;
+      if (!this.spCosts || this.spCosts.length !== n) {
+        this.spCosts = new Float32Array(n);
+      }
+      if (!this.spPrev || this.spPrev.length !== n) {
+        this.spPrev = new Int32Array(n);
+      }
+      if (!this.spPrevDir || this.spPrevDir.length !== n) {
+        this.spPrevDir = new Int8Array(n);
+      }
+      if (!this.spMark || this.spMark.length !== n) {
+        this.spMark = new Uint32Array(n);
+      }
+      if (!this.spClosed || this.spClosed.length !== n) {
+        this.spClosed = new Uint32Array(n);
+      }
+    };
     if (start === goal) return [start];
 
     const startOwner = this.game.owner(start);
@@ -926,62 +953,111 @@ export class RoadManager {
       return null;
     }
 
+    // Build fast owner allow-list once per query
+    const allowedOwners = new Set<number>();
+    const startPlayer = startOwner as Player;
+    allowedOwners.add(startPlayer.smallID());
+    for (const p of this.game.players()) {
+      if (p.smallID() !== startPlayer.smallID() && startPlayer.isFriendly(p)) {
+        allowedOwners.add(p.smallID());
+      }
+    }
+
     const ok = (r: TileRef) => {
       // Allow water/shore tiles to be traversed for roads (bridges/ferries),
       // but keep ownership rules for land tiles.
-      if (!this.game.isLand(r)) {
-        // Water (ocean/lake) has no ownership; permitted at high cost.
-        return true;
-      }
+      if (!this.game.isLand(r)) return true;
       // Land tiles must be owned by the start owner or friendly
-      const owner = this.game.owner(r);
-      if (!owner.isPlayer()) return false;
-      if (owner.id() === startOwner.id()) return true;
-      return startOwner.isFriendly(owner as Player);
+      const oid = this.game.ownerID(r);
+      if (oid === 0) return false; // terra nullius
+      return allowedOwners.has(oid);
     };
 
     if (!ok(start) || !ok(goal)) return null;
 
     // Fallback to regular A* search if no road path found
-    const costs = new Map<TileRef, number>();
-    const prev = new Map<TileRef, TileRef | null>();
+    ensureSPBuffers();
+    // Version bump; reset when wrap-around
+    if (this.spMarkVersion === 0xffffffff) {
+      this.spMark!.fill(0);
+      this.spClosed!.fill(0);
+      this.spMarkVersion = 1;
+    }
+    const version = ++this.spMarkVersion;
+    const costs = this.spCosts!;
+    const prev = this.spPrev!;
+    const prevDirArr = this.spPrevDir!;
+    const mark = this.spMark!;
+    const closed = this.spClosed!;
+
+    const INF = Number.POSITIVE_INFINITY;
+    const getCost = (t: TileRef) => (mark[t] === version ? costs[t] : INF);
+    const setCost = (t: TileRef, c: number) => {
+      mark[t] = version;
+      costs[t] = c;
+    };
+    const setPrev = (t: TileRef, p: number, dir: number) => {
+      prev[t] = p;
+      prevDirArr[t] = dir;
+    };
+
     const pq = new PriorityQueue<TileRef>();
+    setCost(start, 0);
+    setPrev(start, -1, 127); // 127 sentinel for start (no direction)
+    // Precompute goal position for heuristic
+    const gx = this.game.x(goal);
+    const gy = this.game.y(goal);
+    const SQRT2 = 1.41421356237;
+    const octile = (x: number, y: number) => {
+      const dx = Math.abs(x - gx);
+      const dy = Math.abs(y - gy);
+      const m = Math.min(dx, dy);
+      // Lower bound using min step cost = 1
+      return dx + dy - m + m * SQRT2;
+    };
+    pq.enqueue(octile(this.game.x(start), this.game.y(start)), start);
 
-    costs.set(start, 0);
-    pq.enqueue(0, start);
-
+    let expanded = 0;
+    const MAX_EXPANSIONS = 80000; // hard safety cap to avoid frame stalls on worst cases
     while (pq.size > 0) {
       const current = pq.dequeue();
-      if (!current) break;
+      if (current === undefined) break;
+      if (closed[current] === version) continue;
+      closed[current] = version;
+      if (++expanded > MAX_EXPANSIONS) {
+        // Give up this attempt to avoid freezing the game; let planner try later
+        return null;
+      }
 
       if (current === goal) break;
 
-      const currentCost = costs.get(current) ?? Infinity;
+      const currentCost = getCost(current);
 
       // Enumerate 8-directional neighbors without allocations
       const cx = this.game.x(current);
       const cy = this.game.y(current);
+      // If even the best-case remaining distance would exceed the max cost, prune this node
+      if (currentCost + octile(cx, cy) > maxRoadLength) {
+        continue;
+      }
+      const w = this.game.width();
+      const h = this.game.height();
       // dx,dy pairs: 4-orthogonal + 4-diagonals
       // Order chosen to prefer straight expansions first for small PQ ties
-      const OFFS = [
-        [0, -1],
-        [0, 1],
-        [-1, 0],
-        [1, 0],
-        [-1, -1],
-        [1, -1],
-        [-1, 1],
-        [1, 1],
-      ] as const;
-      for (let i = 0; i < 8; i++) {
-        const dx = OFFS[i][0];
-        const dy = OFFS[i][1];
-        const nx = cx + dx;
-        const ny = cy + dy;
-        if (!this.game.isValidCoord(nx, ny)) continue;
-        const neighbor = this.game.ref(nx, ny);
-        if (!ok(neighbor)) continue;
-
+      const DX = [0, 0, -1, 1, -1, 1, -1, 1];
+      const DY = [-1, 1, 0, 0, -1, -1, 1, 1];
+      const SCALE = [
+        1, 1, 1, 1, 1.41421356237, 1.41421356237, 1.41421356237, 1.41421356237,
+      ];
+      const prevDir = prevDirArr[current];
+      for (let dir = 0; dir < 8; dir++) {
+        const dx = DX[dir];
+        const dy = DY[dir];
+        // Fast bounds checks without creating coords/TileRef via ref()
+        if ((dx === -1 && cx === 0) || (dx === 1 && cx === w - 1)) continue;
+        if ((dy === -1 && cy === 0) || (dy === 1 && cy === h - 1)) continue;
+        const neighbor = (current + dx + dy * w) as TileRef;
+        if (closed[neighbor] === version) continue;
         // Prefer built and planned roads equally over fresh land
         // Base land cost = 2, Water/Shore cost = 20, Built/Planned = 1
         let stepCost = 2;
@@ -993,24 +1069,12 @@ export class RoadManager {
         } else if (!this.game.isLand(neighbor) || this.game.isShore(neighbor)) {
           stepCost = 20;
         }
-        // Scale diagonal steps by sqrt(2) to better reflect distance
-        const isDiagonal = dx !== 0 && dy !== 0;
-        const moveScale = isDiagonal ? 1.41421356237 : 1;
+        const moveScale = SCALE[dir];
 
         // Add a small penalty if turning relative to how we entered `current`
         let turnPenalty = 0;
-        const prevOfCurrent = prev.get(current) ?? null;
-        if (prevOfCurrent !== null) {
-          const dxPrev = cx - this.game.x(prevOfCurrent);
-          const dyPrev = cy - this.game.y(prevOfCurrent);
-          const dxNew = dx;
-          const dyNew = dy;
-          // Only penalize when the move direction changes
-          if (dxPrev !== 0 || dyPrev !== 0) {
-            if (dxPrev !== dxNew || dyPrev !== dyNew) {
-              turnPenalty = this.DIRECTION_CHANGE_PENALTY;
-            }
-          }
+        if (prevDir !== 127 /* has a direction */) {
+          if (prevDir !== dir) turnPenalty = this.DIRECTION_CHANGE_PENALTY;
         }
 
         const newCost = currentCost + stepCost * moveScale + turnPenalty;
@@ -1018,24 +1082,23 @@ export class RoadManager {
         // Stop exploring paths that are already too long (cost threshold)
         if (newCost > maxRoadLength) continue;
 
-        if (newCost < (costs.get(neighbor) ?? Infinity)) {
-          costs.set(neighbor, newCost);
-          prev.set(neighbor, current);
-          pq.enqueue(newCost, neighbor);
+        if (newCost < getCost(neighbor)) {
+          setCost(neighbor, newCost);
+          setPrev(neighbor, current, dir);
+          // A* priority: f = g + h (with admissible octile heuristic using min step cost 1)
+          pq.enqueue(
+            newCost + octile(this.game.x(neighbor), this.game.y(neighbor)),
+            neighbor,
+          );
         }
       }
     }
 
-    if (!costs.has(goal)) return null;
+    if (getCost(goal) === INF) return null;
 
     const path: TileRef[] = [];
-    for (
-      let at: TileRef | null = goal;
-      at !== null;
-      at = prev.get(at) ?? null
-    ) {
-      path.push(at);
-    }
+    for (let at: number = goal; at !== -1; at = prev[at])
+      path.push(at as TileRef);
     path.reverse();
 
     return path.length > 0 ? path : null;
