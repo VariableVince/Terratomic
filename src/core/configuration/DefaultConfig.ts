@@ -349,7 +349,9 @@ export class DefaultConfig implements Config {
   // This acts as a "max cost" for the A* pathfinder, not a strict tile length.
   // A path over empty land has a cost of 2 per tile.
   maxRoadLength(): number {
-    return 240;
+    // Increased by 20% to expand both maximum Euclidean connection distance
+    // and the A* maximum allowed path cost threshold.
+    return 288;
   }
 
   // Cargoplanes (Turned off for now)

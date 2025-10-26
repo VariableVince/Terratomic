@@ -308,7 +308,8 @@ export class RoadManager {
       this.updateLocalArea(removedNodeTile, ROAD_UPDATE_RADIUS);
     });
 
-    const maxRoadDistSquared = 100 * 100;
+    // Increase neighbor search radius by 20% to match the max road distance change (100 -> 120)
+    const maxRoadDistSquared = 120 * 120;
     const updatesPerTick = this.game.config().roadUpdatesPerTick();
 
     for (let i = 0; i < updatesPerTick && this.newNodesQueue.length > 0; i++) {
