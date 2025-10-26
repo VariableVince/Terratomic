@@ -14,7 +14,10 @@ export class FxLayer implements Layer {
   private context: CanvasRenderingContext2D;
 
   private lastRefresh: number = 0;
+  // Target ~60 FPS for FX layer to reduce CPU (was 10ms ~= 100 FPS)
   private refreshRate: number = 10;
+  // Adapt refresh rate under load to reduce CPU spikes
+  private adaptiveRefresh: boolean = true;
   private theme: Theme;
   private animatedSpriteLoader: AnimatedSpriteLoader =
     new AnimatedSpriteLoader();
@@ -182,20 +185,40 @@ export class FxLayer implements Layer {
         this.renderAllFx(context, delta);
         this.lastRefresh = now;
       }
-      context.drawImage(
-        this.canvas,
-        -this.game.width() / 2,
-        -this.game.height() / 2,
-        this.game.width(),
-        this.game.height(),
-      );
+      // If the offscreen canvas size matches the game size, use 3-arg drawImage (no scaling) for minor perf gain.
+      // Otherwise, fall back to 5-arg drawImage to scale correctly.
+      if (
+        this.canvas.width === this.game.width() &&
+        this.canvas.height === this.game.height()
+      ) {
+        context.drawImage(
+          this.canvas,
+          -this.game.width() / 2,
+          -this.game.height() / 2,
+        );
+      } else {
+        context.drawImage(
+          this.canvas,
+          -this.game.width() / 2,
+          -this.game.height() / 2,
+          this.game.width(),
+          this.game.height(),
+        );
+      }
     }
   }
 
   renderAllFx(context: CanvasRenderingContext2D, delta: number) {
     if (this.allFx.length > 0) {
+      const t0 = performance.now();
       this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
       this.renderContextFx(delta);
+      if (this.adaptiveRefresh) {
+        const elapsed = performance.now() - t0;
+        // If FX rendering takes longer than ~12ms, drop FX FPS a bit
+        this.refreshRate =
+          elapsed > 12 ? Math.min(33, Math.ceil(elapsed * 2)) : 16;
+      }
     }
   }
 

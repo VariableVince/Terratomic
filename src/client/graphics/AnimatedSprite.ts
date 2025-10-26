@@ -53,8 +53,9 @@ export class AnimatedSprite {
   }
 
   draw(ctx: CanvasRenderingContext2D, x: number, y: number) {
-    const drawX = x - this.originX * this.scale;
-    const drawY = y - this.originY * this.scale;
+    // Snap to integer pixels to avoid subpixel blending cost and blurriness
+    const drawX = Math.round(x - this.originX * this.scale);
+    const drawY = Math.round(y - this.originY * this.scale);
 
     ctx.drawImage(
       this.image,

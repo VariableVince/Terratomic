@@ -108,7 +108,8 @@ const ANIMATED_SPRITE_CONFIG: Partial<Record<FxType, AnimatedSpriteConfig>> = {
 };
 
 export class AnimatedSpriteLoader {
-  private animatedSpriteImageMap: Map<FxType, HTMLCanvasElement> = new Map();
+  // Store base sprite sheets as ImageBitmap for faster drawImage
+  private animatedSpriteImageMap: Map<FxType, CanvasImageSource> = new Map();
   // Do not color the same sprite twice
   private coloredAnimatedSpriteCache: Map<string, HTMLCanvasElement> =
     new Map();
@@ -131,12 +132,9 @@ export class AnimatedSpriteLoader {
             img.onerror = (e) => reject(e);
           });
 
-          const canvas = document.createElement("canvas");
-          canvas.width = img.width;
-          canvas.height = img.height;
-          canvas.getContext("2d")!.drawImage(img, 0, 0);
-
-          this.animatedSpriteImageMap.set(typedFxType, canvas);
+          // Prefer ImageBitmap for better blit performance
+          const bitmap = await createImageBitmap(img);
+          this.animatedSpriteImageMap.set(typedFxType, bitmap);
         } catch (err) {
           console.error(`Failed to load sprite for ${typedFxType}:`, err);
         }
@@ -181,7 +179,7 @@ export class AnimatedSpriteLoader {
       coloredCanvas = this.coloredAnimatedSpriteCache.get(key)!;
     } else {
       coloredCanvas = colorizeCanvas(
-        baseImage,
+        baseImage as CanvasImageSource & { width: number; height: number },
         territoryColor,
         borderColor,
         spawnHighlightColor,
