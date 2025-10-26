@@ -44,6 +44,12 @@ export class RoadManager {
   // Small penalty for changing direction while laying roads to prefer straighter paths
   // Tuned low so it never overwhelms terrain costs (land=2, road=1, water/shore=20)
   private readonly DIRECTION_CHANGE_PENALTY = 0.5;
+  // 8-way movement deltas and cost scale (diagonals)
+  private static readonly DX = new Int8Array([0, 0, -1, 1, -1, 1, -1, 1]);
+  private static readonly DY = new Int8Array([-1, 1, 0, 0, -1, -1, 1, 1]);
+  private static readonly SCALE = new Float32Array([
+    1, 1, 1, 1, 1.41421356237, 1.41421356237, 1.41421356237, 1.41421356237,
+  ]);
   // Scratch buffers for shortestPathOverFriendlyLand (versioned to avoid full clears)
   private spCosts: Float32Array | null = null;
   private spPrev: Int32Array | null = null;
@@ -559,36 +565,26 @@ export class RoadManager {
         this.currentConstruction.delete(pid);
         continue;
       }
-      // Compute build speed
-      const instant = this.game.config().instantBuild();
+      // Compute build speed (ignore instantBuild for roads):
+      // Invested gold per tick = grossGoldPerTick * roadInvestmentRate
+      // Using parameter: 600 gold invested per tick yields 1 px per tick
       let edgesToBuild = 0;
-      if (instant) {
-        // Build the entire planned path this tick
-        const remaining = state.planned.path.length - 1 - state.builtIndex;
-        edgesToBuild = Math.max(0, remaining);
-      } else {
-        // Compute px per tick from investment based on GROSS gold (pre-investment):
-        // Invested gold per tick = grossGoldPerTick * roadInvestmentRate
-        // Using parameter: 600 gold invested per tick yields 1 px per tick
-        const grossGoldPerTick = this.game
-          .config()
-          .grossGoldAdditionRate(player);
-        const investRatio = player.roadInvestmentRate?.() ?? 0;
-        const investedPerTick = grossGoldPerTick * investRatio; // gold/tick (double)
-        const PX_PER_TICK_PER_GOLD = 1 / 600; // 1 px/tick per 800 gold/tick invested
-        const pxPerTick = investedPerTick * PX_PER_TICK_PER_GOLD;
-        if (pxPerTick <= 0) continue;
+      const grossGoldPerTick = this.game.config().grossGoldAdditionRate(player);
+      const investRatio = player.roadInvestmentRate?.() ?? 0;
+      const investedPerTick = grossGoldPerTick * investRatio; // gold/tick (double)
+      const PX_PER_TICK_PER_GOLD = 1 / 600; // 1 px/tick per 600 gold/tick invested
+      const pxPerTick = investedPerTick * PX_PER_TICK_PER_GOLD;
+      if (pxPerTick <= 0) continue;
 
-        state.pxAccum += pxPerTick;
+      state.pxAccum += pxPerTick;
 
-        // Canvas grid uses 1px per tile step (see RoadLayer using game.x/y() directly)
-        const TILE_EDGE_PX = 1;
-        edgesToBuild = Math.floor(state.pxAccum / TILE_EDGE_PX);
-        if (edgesToBuild <= 0) continue;
+      // Canvas grid uses 1px per tile step (see RoadLayer using game.x/y() directly)
+      const TILE_EDGE_PX = 1;
+      edgesToBuild = Math.floor(state.pxAccum / TILE_EDGE_PX);
+      if (edgesToBuild <= 0) continue;
 
-        // Consume px and build edges
-        state.pxAccum -= edgesToBuild * TILE_EDGE_PX;
-      }
+      // Consume px and build edges
+      state.pxAccum -= edgesToBuild * TILE_EDGE_PX;
 
       // Validate endpoints periodically; if invalid, abandon and move on
       if (!this.isPlannedRoadValid(state.planned)) {
@@ -1042,13 +1038,10 @@ export class RoadManager {
       }
       const w = this.game.width();
       const h = this.game.height();
-      // dx,dy pairs: 4-orthogonal + 4-diagonals
-      // Order chosen to prefer straight expansions first for small PQ ties
-      const DX = [0, 0, -1, 1, -1, 1, -1, 1];
-      const DY = [-1, 1, 0, 0, -1, -1, 1, 1];
-      const SCALE = [
-        1, 1, 1, 1, 1.41421356237, 1.41421356237, 1.41421356237, 1.41421356237,
-      ];
+      // dx,dy pairs: 4-orthogonal + 4-diagonals (class-level typed arrays to avoid allocations)
+      const DX = RoadManager.DX;
+      const DY = RoadManager.DY;
+      const SCALE = RoadManager.SCALE;
       const prevDir = prevDirArr[current];
       for (let dir = 0; dir < 8; dir++) {
         const dx = DX[dir];
