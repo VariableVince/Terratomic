@@ -277,11 +277,15 @@ export class RoadManager {
 
       // Get roads that need to be removed
       const affectedRoads = new Set<number>();
+      // Track direct neighbors previously connected to the removed node
+      const neighborTiles = new Set<TileRef>();
       for (const road of this.roads.values()) {
         const startTile = road.path[0];
         const endTile = road.path[road.path.length - 1];
         if (startTile === removedNodeTile || endTile === removedNodeTile) {
           affectedRoads.add(road.id);
+          const neighbor = startTile === removedNodeTile ? endTile : startTile;
+          neighborTiles.add(neighbor);
         }
       }
 
@@ -321,9 +325,10 @@ export class RoadManager {
             }
           }
           this.roads.delete(roadId);
-          this.existingRoadSegments.delete(
-            this.getCanonicalSegment(startTile, endTile),
-          );
+          const endpointKey = this.getCanonicalSegment(startTile, endTile);
+          this.existingRoadSegments.delete(endpointKey);
+          // Also free any reservation on this endpoint pair so it can be replanned
+          this.reservedEndpointSegments.delete(endpointKey);
         }
       });
 
@@ -368,8 +373,42 @@ export class RoadManager {
         }
       }
 
-      // Queue local updates for nearby nodes
-      this.updateLocalArea(removedNodeTile, ROAD_UPDATE_RADIUS);
+      // Reconnect former neighbors: attempt to plan roads among nodes that were directly connected
+      if (neighborTiles.size > 0) {
+        const neighbors: Unit[] = [];
+        for (const t of neighborTiles) {
+          const u = this.findNodeByTile(t);
+          if (u) neighbors.push(u);
+        }
+        // For each unique pair of neighbors, attempt to replan a road if allowed
+        for (let i = 0; i < neighbors.length; i++) {
+          for (let j = i + 1; j < neighbors.length; j++) {
+            const u1 = neighbors[i];
+            const u2 = neighbors[j];
+            const owner1 = this.game.owner(u1.tile());
+            const owner2 = this.game.owner(u2.tile());
+            if (!owner1.isPlayer() || !owner2.isPlayer()) continue;
+            const p1 = owner1 as Player;
+            const p2 = owner2 as Player;
+            const allowed = p1.id() === p2.id() || p1.isFriendly(p2);
+            if (!allowed) continue;
+            const segKey = this.getCanonicalSegment(u1.tile(), u2.tile());
+            if (this.reservedEndpointSegments.has(segKey)) continue;
+            if (this.existingRoadSegments.has(segKey)) continue;
+            const path = this.getCachedPath(u1.tile(), u2.tile());
+            if (path) {
+              // Prefer the first owner's perspective for queuing
+              this.enqueuePlannedRoad(
+                p1.id(),
+                u1.tile(),
+                u2.tile(),
+                path,
+                true,
+              );
+            }
+          }
+        }
+      }
     });
 
     // Increase neighbor search radius by 20% to match the max road distance change (100 -> 120)
