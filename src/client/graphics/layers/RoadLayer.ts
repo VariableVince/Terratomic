@@ -1,4 +1,3 @@
-import { Theme } from "../../../core/configuration/Config";
 import { TileRef } from "../../../core/game/GameMap";
 import { GameUpdateType, RoadsUpdate } from "../../../core/game/GameUpdates";
 import { GameView } from "../../../core/game/GameView";
@@ -11,7 +10,8 @@ export class RoadLayer implements Layer {
   private static readonly ROAD_GROW_ZOOM_THRESHOLD = 2;
   private static readonly BASE_ROAD_WIDTH = 1.8; // base inner stroke width in screen px at/under threshold
   private static readonly OUTLINE_EXTRA = 1.6; // extra px for outline relative to inner stroke
-  private theme: Theme;
+  // Neutral outline color to avoid player color dependence; matches StructureLayer under-construction border
+  private static readonly ROAD_OUTLINE_COLOR = "rgb(128, 127, 127)";
   // Cache geometry as a Path2D to avoid re-tracing every frame
   private path: Path2D | null = null;
   private dirty = true;
@@ -22,8 +22,7 @@ export class RoadLayer implements Layer {
     private game: GameView,
     private transform: TransformHandler,
   ) {
-    // initialize theme from game config to match StructureLayer
-    this.theme = this.game.config().theme();
+    // No theme needed for fixed neutral road outline color
   }
 
   shouldTransform(): boolean {
@@ -100,13 +99,8 @@ export class RoadLayer implements Layer {
     context.lineJoin = "round";
     context.lineCap = "round";
 
-    // Outline color identical to StructureLayer icon border color:
-    // theme.borderColor(player).darken(0.17)
-    const player = this.game.focusedPlayer() ?? this.game.myPlayer();
-    const outlineRgb = player
-      ? this.theme.borderColor(player).darken(0.17).toRgbString()
-      : "rgb(128, 127, 127)"; // fallback similar to UNDER_CONSTRUCTION_BORDER
-    context.strokeStyle = outlineRgb;
+    // Use a neutral grey outline independent of player color
+    context.strokeStyle = RoadLayer.ROAD_OUTLINE_COLOR;
     context.lineWidth = outlineWorldWidth;
     context.stroke(this.path);
 

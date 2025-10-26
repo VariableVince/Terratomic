@@ -548,9 +548,33 @@ export class RoadManager {
         );
         // Remove planned bias for this abandoned plan
         this.removePlannedPath(state.planned.path);
-        // Do not remove already built segments; keep partials
+        // Remove any partially built segments so no ghost road segments remain
+        const path = state.planned.path;
+        for (let i = 0; i < state.builtIndex; i++) {
+          const a = path[i];
+          const b = path[i + 1];
+          const seg = this.getCanonicalSegment(a, b);
+          if (this.segmentSet.delete(seg)) {
+            this.pendingRemovedSegments.push(seg);
+          }
+          this.underConstructionSegments.delete(seg);
+        }
+
+        // Cancel this construction entirely and reset all planned/queued roads for this player
         this.currentConstruction.delete(pid);
-        this.startNextFor(pid);
+
+        const queued = this.plannedQueues.get(pid);
+        if (queued) {
+          for (const pr of queued) {
+            this.reservedEndpointSegments.delete(
+              this.getCanonicalSegment(pr.start, pr.end),
+            );
+            this.removePlannedPath(pr.path);
+          }
+          this.plannedQueues.delete(pid);
+        }
+
+        // Do not immediately start the next plan; we cleared the queue so planning can restart cleanly
         continue;
       }
 
