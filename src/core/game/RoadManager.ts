@@ -1,7 +1,6 @@
 import { Game, Player, PlayerID, Unit, UnitType } from "./Game";
 import { TileRef } from "./GameMap";
 import { PriorityQueue } from "./PriorityQueue";
-import { RoadCache } from "./RoadCache";
 import { SpatialGrid } from "./SpatialGrid";
 import { StructureGraph } from "./StructureGraph";
 
@@ -61,7 +60,6 @@ export class RoadManager {
   private pendingRemovedSegments: string[] = [];
   private nodeOwnerIds = new Map<number, PlayerID>();
   private nodesByOwner = new Map<PlayerID, Unit[]>();
-  private roadCache: RoadCache;
 
   // New: per-player planned road queues and construction state
   private plannedQueues = new Map<PlayerID, PlannedRoad[]>();
@@ -75,7 +73,6 @@ export class RoadManager {
   private plannedTilesCache = new Set<TileRef>();
   private pathCache = new Map<string, TileRef[]>();
   private tileToNode = new Map<TileRef, Unit>();
-  private findingCargoPath = false;
 
   // Periodic consistency reconciliation for incremental segment tracking
   private lastSegmentReconcileTick = 0;
@@ -93,15 +90,6 @@ export class RoadManager {
     if (currentNodes.length !== this.nodes.length) return true;
     const currentNodeIds = new Set(currentNodes.map((n) => n.id()));
     return this.nodes.some((n) => !currentNodeIds.has(n.id()));
-  }
-
-  private updateRoadTilesCache(added: Road[], removed: Road[]) {
-    removed.forEach((road) =>
-      road.path.forEach((tile) => this.roadTilesCache.delete(tile)),
-    );
-    added.forEach((road) =>
-      road.path.forEach((tile) => this.roadTilesCache.add(tile)),
-    );
   }
 
   private updateTileToNodeIndex(currentNodes: Unit[]) {
@@ -142,18 +130,18 @@ export class RoadManager {
    * 4. Initial road tiles cache state
    */
   constructor(private game: Game) {
-    // Increase grid chunk size to reduce number of chunks in dense areas
-    const adaptiveChunkSize = Math.max(
-      100,
-      Math.floor(Math.sqrt(game.map().width() * game.map().height()) / 20),
-    );
+    // Initialize spatial grid with adaptive chunk size
+    const adaptiveChunkSize = this.computeAdaptiveChunkSize();
     this.spatialGrid = new SpatialGrid(game.map(), adaptiveChunkSize);
-
-    // Initialize road rendering cache with proper map coordinates
-    this.roadCache = new RoadCache(32, game.map().width());
 
     // Initialize road tiles cache for quick lookups
     this.initializeRoadTilesCache();
+  }
+
+  private computeAdaptiveChunkSize(): number {
+    const w = this.game.map().width();
+    const h = this.game.map().height();
+    return Math.max(100, Math.floor(Math.sqrt(w * h) / 20));
   }
 
   private initializeRoadTilesCache(): void {
@@ -233,7 +221,10 @@ export class RoadManager {
 
     // Only rebuild caches if nodes have changed significantly
     if (this.hasNodesChanged(currentNodes)) {
-      this.spatialGrid = new SpatialGrid(this.game.map(), 100);
+      this.spatialGrid = new SpatialGrid(
+        this.game.map(),
+        this.computeAdaptiveChunkSize(),
+      );
       for (const node of currentNodes) {
         this.spatialGrid.add(node);
       }
@@ -312,22 +303,13 @@ export class RoadManager {
           state.planned.start === removedNodeTile ||
           state.planned.end === removedNodeTile
         ) {
-          // Remove partially built segments
-          const path = state.planned.path;
-          for (let i = 0; i < state.builtIndex; i++) {
-            const a = path[i];
-            const b = path[i + 1];
-            const seg = this.getCanonicalSegment(a, b);
-            if (this.segmentSet.delete(seg)) {
-              this.pendingRemovedSegments.push(seg);
-            }
-            this.underConstructionSegments.delete(seg);
-          }
-          // Free reservation and planned bias
-          this.reservedEndpointSegments.delete(
-            this.getCanonicalSegment(state.planned.start, state.planned.end),
+          // Remove partially built segments and free reservation/planned bias
+          this.removePartialConstructionSegments(state);
+          this.cleanupPlannedReservationAndBias(
+            state.planned.start,
+            state.planned.end,
+            state.planned.path,
           );
-          this.removePlannedPath(state.planned.path);
           constructionsToCancel.push(pid);
         }
       }
@@ -345,10 +327,7 @@ export class RoadManager {
         }
         if (toRemove.length > 0) {
           for (const pr of toRemove) {
-            this.reservedEndpointSegments.delete(
-              this.getCanonicalSegment(pr.start, pr.end),
-            );
-            this.removePlannedPath(pr.path);
+            this.cleanupPlannedReservationAndBias(pr.start, pr.end, pr.path);
           }
           this.plannedQueues.set(
             ownerId,
@@ -458,9 +437,8 @@ export class RoadManager {
     ) {
       const { from, to, radius, isPriority } = this.pathfindingQueue[0];
 
-      // Skip if outside local update radius, but only for road updates
-      // Don't skip for cargo path finding or priority connections
-      if (radius !== undefined && !this.findingCargoPath && !isPriority) {
+      // Skip if outside local update radius for non-priority connections
+      if (radius !== undefined && !isPriority) {
         const dist = Math.sqrt(this.game.euclideanDistSquared(from, to));
         if (dist > radius) {
           this.pathfindingQueue.shift();
@@ -560,23 +538,13 @@ export class RoadManager {
       const player = playerById.get(pid);
       if (!player) {
         // Player no longer has roads or is gone; abandon construction and clean up partials
-        // Free endpoint reservation and planned bias
-        this.reservedEndpointSegments.delete(
-          this.getCanonicalSegment(state.planned.start, state.planned.end),
+        this.cleanupPlannedReservationAndBias(
+          state.planned.start,
+          state.planned.end,
+          state.planned.path,
         );
-        this.removePlannedPath(state.planned.path);
-
         // Remove any partially built segments
-        const path = state.planned.path;
-        for (let i = 0; i < state.builtIndex; i++) {
-          const a = path[i];
-          const b = path[i + 1];
-          const seg = this.getCanonicalSegment(a, b);
-          if (this.segmentSet.delete(seg)) {
-            this.pendingRemovedSegments.push(seg);
-          }
-          this.underConstructionSegments.delete(seg);
-        }
+        this.removePartialConstructionSegments(state);
 
         this.currentConstruction.delete(pid);
         continue;
@@ -614,37 +582,18 @@ export class RoadManager {
 
       // Validate endpoints periodically; if invalid, abandon and move on
       if (!this.isPlannedRoadValid(state.planned)) {
-        // Free reservation so it can be replanned later
-        this.reservedEndpointSegments.delete(
-          this.getCanonicalSegment(state.planned.start, state.planned.end),
+        // Free reservation and remove any partially built segments
+        this.cleanupPlannedReservationAndBias(
+          state.planned.start,
+          state.planned.end,
+          state.planned.path,
         );
-        // Remove planned bias for this abandoned plan
-        this.removePlannedPath(state.planned.path);
-        // Remove any partially built segments so no ghost road segments remain
-        const path = state.planned.path;
-        for (let i = 0; i < state.builtIndex; i++) {
-          const a = path[i];
-          const b = path[i + 1];
-          const seg = this.getCanonicalSegment(a, b);
-          if (this.segmentSet.delete(seg)) {
-            this.pendingRemovedSegments.push(seg);
-          }
-          this.underConstructionSegments.delete(seg);
-        }
+        this.removePartialConstructionSegments(state);
 
         // Cancel this construction entirely and reset all planned/queued roads for this player
         this.currentConstruction.delete(pid);
 
-        const queued = this.plannedQueues.get(pid);
-        if (queued) {
-          for (const pr of queued) {
-            this.reservedEndpointSegments.delete(
-              this.getCanonicalSegment(pr.start, pr.end),
-            );
-            this.removePlannedPath(pr.path);
-          }
-          this.plannedQueues.delete(pid);
-        }
+        this.clearQueuedPlansForPlayer(pid);
 
         // Do not immediately start the next plan; we cleared the queue so planning can restart cleanly
         continue;
@@ -814,6 +763,42 @@ export class RoadManager {
 
   private removePlannedPath(path: TileRef[]): void {
     for (const t of path) this.plannedTilesCache.delete(t);
+  }
+
+  // Helper: remove reservation for an endpoint pair and clear planned-path bias
+  private cleanupPlannedReservationAndBias(
+    start: TileRef,
+    end: TileRef,
+    path: TileRef[],
+  ): void {
+    const seg = this.getCanonicalSegment(start, end);
+    this.reservedEndpointSegments.delete(seg);
+    this.removePlannedPath(path);
+  }
+
+  // Helper: remove any partially built segments for a construction state
+  private removePartialConstructionSegments(state: ConstructionState): void {
+    const path = state.planned.path;
+    for (let i = 0; i < state.builtIndex; i++) {
+      const a = path[i];
+      const b = path[i + 1];
+      const seg = this.getCanonicalSegment(a, b);
+      if (this.segmentSet.delete(seg)) {
+        this.pendingRemovedSegments.push(seg);
+      }
+      this.underConstructionSegments.delete(seg);
+    }
+  }
+
+  // Helper: clear all queued plans for a player, releasing reservations and planned bias
+  private clearQueuedPlansForPlayer(pid: PlayerID): void {
+    const queued = this.plannedQueues.get(pid);
+    if (queued) {
+      for (const pr of queued) {
+        this.cleanupPlannedReservationAndBias(pr.start, pr.end, pr.path);
+      }
+      this.plannedQueues.delete(pid);
+    }
   }
 
   // Find a path using the built structure graph plus any planned or in-progress edges
@@ -1050,23 +1035,15 @@ export class RoadManager {
     const roadIdsToDestroy = this.roadsByOwner.get(player.id());
     if (!roadIdsToDestroy) {
       // Still clear any planned or in-progress roads for this player
-      const queued = this.plannedQueues.get(player.id());
-      if (queued) {
-        for (const pr of queued) {
-          this.reservedEndpointSegments.delete(
-            this.getCanonicalSegment(pr.start, pr.end),
-          );
-          this.removePlannedPath(pr.path);
-        }
-      }
-      this.plannedQueues.delete(player.id());
+      this.clearQueuedPlansForPlayer(player.id());
       const inProg = this.currentConstruction.get(player.id());
       if (inProg) {
         // Free endpoint reservation so it can be planned again in the future
-        this.reservedEndpointSegments.delete(
-          this.getCanonicalSegment(inProg.planned.start, inProg.planned.end),
+        this.cleanupPlannedReservationAndBias(
+          inProg.planned.start,
+          inProg.planned.end,
+          inProg.planned.path,
         );
-        this.removePlannedPath(inProg.planned.path);
         this.currentConstruction.delete(player.id());
       }
       return;
@@ -1085,14 +1062,15 @@ export class RoadManager {
         // Clean up all state related to this road
         if (startNode && endNode) {
           this.structureGraph.removeEdge(startNode, endNode);
-          const segment = this.getCanonicalSegment(
-            startNode.tile(),
-            endNode.tile(),
-          );
-          this.existingRoadSegments.delete(segment);
-          // Free reservation so endpoints can be replanned later
-          this.reservedEndpointSegments.delete(segment);
         }
+        // Clear endpoint tracking based on path endpoints (nodes may be missing)
+        const endpointSeg = this.getCanonicalSegment(
+          road.path[0],
+          road.path[road.path.length - 1],
+        );
+        this.existingRoadSegments.delete(endpointSeg);
+        // Free reservation so endpoints can be replanned later
+        this.reservedEndpointSegments.delete(endpointSeg);
 
         this.roads.delete(roadId);
 
@@ -1109,32 +1087,16 @@ export class RoadManager {
     this.roadsByOwner.delete(player.id());
 
     // Also clear planned and in-progress work for this player
-    const queued = this.plannedQueues.get(player.id());
-    if (queued) {
-      for (const pr of queued) {
-        this.reservedEndpointSegments.delete(
-          this.getCanonicalSegment(pr.start, pr.end),
-        );
-        this.removePlannedPath(pr.path);
-      }
-    }
-    this.plannedQueues.delete(player.id());
+    this.clearQueuedPlansForPlayer(player.id());
     const inProg = this.currentConstruction.get(player.id());
     if (inProg) {
       // Remove any partially built segments from the incremental state
-      const path = inProg.planned.path;
-      const builtIdx = inProg.builtIndex;
-      for (let i = 0; i < builtIdx; i++) {
-        const seg = this.getCanonicalSegment(path[i], path[i + 1]);
-        if (this.segmentSet.delete(seg)) {
-          this.pendingRemovedSegments.push(seg);
-        }
-        this.underConstructionSegments.delete(seg);
-      }
-      this.reservedEndpointSegments.delete(
-        this.getCanonicalSegment(inProg.planned.start, inProg.planned.end),
+      this.removePartialConstructionSegments(inProg);
+      this.cleanupPlannedReservationAndBias(
+        inProg.planned.start,
+        inProg.planned.end,
+        inProg.planned.path,
       );
-      this.removePlannedPath(inProg.planned.path);
       this.currentConstruction.delete(player.id());
     }
 
