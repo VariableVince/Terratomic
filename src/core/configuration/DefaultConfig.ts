@@ -355,11 +355,11 @@ export class DefaultConfig implements Config {
   }
   // Roads: base gold cost per pixel (before productivity scaling)
   roadConstructionBaseCost(): number {
-    return 600;
+    return 500;
   }
   // Roads: per-tile maintenance multiplier applied to base cost (gold per tile per tick)
   roadMaintenanceMultiplier(): number {
-    return 0.0001;
+    return 0.0003;
   }
 
   // Roads: quality dynamics
