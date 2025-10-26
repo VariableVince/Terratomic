@@ -250,15 +250,10 @@ export class TerritoryLayer implements Layer {
     this.canvas.width = this.game.width();
     this.canvas.height = this.game.height();
 
-    this.imageData = this.context.getImageData(
-      0,
-      0,
-      this.canvas.width,
-      this.canvas.height,
-    );
-    this.alternativeImageData = this.context.getImageData(
-      0,
-      0,
+    // Allocate blank ImageData buffers rather than reading back from the canvas.
+    // This avoids expensive GPU->CPU readbacks and the Chrome warning about getImageData.
+    this.imageData = new ImageData(this.canvas.width, this.canvas.height);
+    this.alternativeImageData = new ImageData(
       this.canvas.width,
       this.canvas.height,
     );
