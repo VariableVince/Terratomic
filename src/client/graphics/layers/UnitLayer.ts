@@ -55,6 +55,9 @@ export class UnitLayer implements Layer {
   private readonly WARSHIP_SELECTION_RADIUS = 10; // Radius in game cells for warship selection hit zone
   private readonly FIGHTER_JET_SELECTION_RADIUS = 10;
 
+  // Cache sprite sizes per UnitType to avoid repeated lookups when clearing
+  private spriteSizeCache = new Map<UnitType, number>();
+
   constructor(
     private game: GameView,
     private eventBus: EventBus,
@@ -253,25 +256,37 @@ export class UnitLayer implements Layer {
   private updateUnitsSprites(unitIds: number[]) {
     const unitsToUpdate = unitIds
       ?.map((id) => this.game.unit(id))
-      .filter((unit) => unit !== undefined);
+      .filter((unit) => unit !== undefined) as UnitView[] | undefined;
 
-    if (unitsToUpdate) {
+    if (unitsToUpdate && unitsToUpdate.length > 0) {
+      // Precompute angles once per unit to avoid duplicate work across passes
+      const angleByUnit = new Map<UnitView, number | null>();
+      for (const u of unitsToUpdate) {
+        // Only aircraft currently use angles; others will return null quickly
+        angleByUnit.set(u, this.getUnitAngle(u));
+      }
+
       // the clearing and drawing of unit sprites need to be done in 2 passes
       // otherwise the sprite of a unit can be drawn on top of another unit
-      this.clearUnitsCells(unitsToUpdate);
-      this.drawUnitsCells(unitsToUpdate);
+      this.clearUnitsCells(unitsToUpdate, angleByUnit);
+      this.drawUnitsCells(unitsToUpdate, angleByUnit);
     }
   }
 
-  private clearUnitsCells(unitViews: UnitView[]) {
+  private clearUnitsCells(
+    unitViews: UnitView[],
+    angleByUnit: Map<UnitView, number | null>,
+  ) {
     unitViews
       .filter((unitView) => isSpriteReady(unitView.type()))
       .forEach((unitView) => {
-        const sprite = getColoredSprite(unitView, this.theme);
-        const clearsize = sprite.width * 2;
+        // Use cached sprite size to limit clear area to near sprite bounds
+        const spriteSize = this.getSpriteSize(unitView);
+        const padding = 2; // small safety margin
+        const clearsize = spriteSize + padding;
         const lastX = this.game.x(unitView.lastTile());
         const lastY = this.game.y(unitView.lastTile());
-        const angle = this.getUnitAngle(unitView);
+        const angle = angleByUnit.get(unitView) ?? null;
         if (angle !== null) {
           this.context.save();
           this.context.translate(lastX, lastY);
@@ -290,8 +305,12 @@ export class UnitLayer implements Layer {
       });
   }
 
-  private drawUnitsCells(unitViews: UnitView[]) {
-    unitViews.forEach((unitView) => this.onUnitEvent(unitView));
+  private drawUnitsCells(
+    unitViews: UnitView[],
+    angleByUnit: Map<UnitView, number | null>,
+  ) {
+    // Pass-through for now; angleByUnit helps avoid recomputation in drawSprite via an overload
+    unitViews.forEach((unitView) => this.onUnitEvent(unitView, angleByUnit));
   }
 
   private relationship(unit: UnitView): Relationship {
@@ -308,7 +327,7 @@ export class UnitLayer implements Layer {
     return Relationship.Enemy;
   }
 
-  onUnitEvent(unit: UnitView) {
+  onUnitEvent(unit: UnitView, angleByUnit?: Map<UnitView, number | null>) {
     // Check if unit was deactivated
     if (!unit.isActive()) {
       this.handleUnitDeactivation(unit);
@@ -319,7 +338,7 @@ export class UnitLayer implements Layer {
         this.handleBoatEvent(unit);
         break;
       case UnitType.Warship:
-        this.handleWarShipEvent(unit);
+        this.handleWarShipEvent(unit, angleByUnit);
         break;
       case UnitType.Shell:
         this.handleShellEvent(unit);
@@ -328,19 +347,19 @@ export class UnitLayer implements Layer {
         this.handleMissileEvent(unit);
         break;
       case UnitType.TradeShip:
-        this.handleTradeShipEvent(unit);
+        this.handleTradeShipEvent(unit, angleByUnit);
         break;
       case UnitType.CargoPlane:
-        this.handleCargoPlaneEvent(unit);
+        this.handleCargoPlaneEvent(unit, angleByUnit);
         break;
       case UnitType.MIRVWarhead:
         this.handleMIRVWarhead(unit);
         break;
       case UnitType.Bomber:
-        this.handleBomberEvent(unit);
+        this.handleBomberEvent(unit, angleByUnit);
         break;
       case UnitType.FighterJet:
-        this.handleFighterJetEvent(unit);
+        this.handleFighterJetEvent(unit, angleByUnit);
         break;
       case UnitType.AtomBomb:
       case UnitType.HydrogenBomb:
@@ -350,11 +369,14 @@ export class UnitLayer implements Layer {
     }
   }
 
-  private handleWarShipEvent(unit: UnitView) {
+  private handleWarShipEvent(
+    unit: UnitView,
+    angleByUnit?: Map<UnitView, number | null>,
+  ) {
     if (unit.targetUnitId()) {
-      this.drawSprite(unit, colord({ r: 200, b: 0, g: 0 }));
+      this.drawSprite(unit, colord({ r: 200, b: 0, g: 0 }), angleByUnit);
     } else {
-      this.drawSprite(unit);
+      this.drawSprite(unit, undefined, angleByUnit);
     }
   }
 
@@ -391,8 +413,11 @@ export class UnitLayer implements Layer {
   }
 
   // interception missle from SAM
-  private handleMissileEvent(unit: UnitView) {
-    this.drawSprite(unit);
+  private handleMissileEvent(
+    unit: UnitView,
+    angleByUnit?: Map<UnitView, number | null>,
+  ) {
+    this.drawSprite(unit, undefined, angleByUnit);
   }
 
   private drawTrail(trail: number[], color: Colord, rel: Relationship) {
@@ -435,7 +460,10 @@ export class UnitLayer implements Layer {
     }
   }
 
-  private handleNuke(unit: UnitView) {
+  private handleNuke(
+    unit: UnitView,
+    angleByUnit?: Map<UnitView, number | null>,
+  ) {
     const rel = this.relationship(unit);
 
     if (!this.unitToTrail.has(unit)) {
@@ -470,13 +498,16 @@ export class UnitLayer implements Layer {
       this.theme.territoryColor(unit.owner()),
       rel,
     );
-    this.drawSprite(unit);
+    this.drawSprite(unit, undefined, angleByUnit);
     if (!unit.isActive()) {
       this.clearTrail(unit);
     }
   }
 
-  private handleMIRVWarhead(unit: UnitView) {
+  private handleMIRVWarhead(
+    unit: UnitView,
+    angleByUnit?: Map<UnitView, number | null>,
+  ) {
     const rel = this.relationship(unit);
 
     this.clearCell(this.game.x(unit.lastTile()), this.game.y(unit.lastTile()));
@@ -493,23 +524,35 @@ export class UnitLayer implements Layer {
     }
   }
 
-  private handleTradeShipEvent(unit: UnitView) {
-    this.drawSprite(unit);
+  private handleTradeShipEvent(
+    unit: UnitView,
+    angleByUnit?: Map<UnitView, number | null>,
+  ) {
+    this.drawSprite(unit, undefined, angleByUnit);
   }
 
-  private handleCargoPlaneEvent(unit: UnitView) {
-    this.drawSprite(unit);
+  private handleCargoPlaneEvent(
+    unit: UnitView,
+    angleByUnit?: Map<UnitView, number | null>,
+  ) {
+    this.drawSprite(unit, undefined, angleByUnit);
   }
 
-  private handleBomberEvent(unit: UnitView) {
-    this.drawSprite(unit);
+  private handleBomberEvent(
+    unit: UnitView,
+    angleByUnit?: Map<UnitView, number | null>,
+  ) {
+    this.drawSprite(unit, undefined, angleByUnit);
   }
 
-  private handleFighterJetEvent(unit: UnitView) {
+  private handleFighterJetEvent(
+    unit: UnitView,
+    angleByUnit?: Map<UnitView, number | null>,
+  ) {
     if (unit.targetUnitId()) {
-      this.drawSprite(unit, colord({ r: 200, b: 0, g: 0 }));
+      this.drawSprite(unit, colord({ r: 200, b: 0, g: 0 }), angleByUnit);
     } else {
-      this.drawSprite(unit);
+      this.drawSprite(unit, undefined, angleByUnit);
     }
   }
 
@@ -570,7 +613,11 @@ export class UnitLayer implements Layer {
     context.clearRect(x, y, 1, 1);
   }
 
-  drawSprite(unit: UnitView, customTerritoryColor?: Colord) {
+  drawSprite(
+    unit: UnitView,
+    customTerritoryColor?: Colord,
+    angleByUnit?: Map<UnitView, number | null>,
+  ) {
     const x = this.game.x(unit.tile());
     const y = this.game.y(unit.tile());
 
@@ -621,7 +668,7 @@ export class UnitLayer implements Layer {
         this.context.globalAlpha = 0.4;
       }
 
-      const angle = this.getUnitAngle(unit);
+      const angle = angleByUnit?.get(unit) ?? this.getUnitAngle(unit);
       if (angle !== null) {
         this.context.save();
         this.context.translate(x, y);
@@ -699,5 +746,17 @@ export class UnitLayer implements Layer {
       return angle;
     }
     return null;
+  }
+
+  // Get square sprite size for a unit type, cached
+  private getSpriteSize(unit: UnitView): number {
+    const t = unit.type();
+    const existing = this.spriteSizeCache.get(t);
+    if (existing !== undefined) return existing;
+    // Use a single colored sprite to get width; colorization does not affect size
+    const canvas = getColoredSprite(unit, this.theme);
+    const size = canvas.width;
+    this.spriteSizeCache.set(t, size);
+    return size;
   }
 }
