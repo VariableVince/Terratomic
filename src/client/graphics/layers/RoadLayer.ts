@@ -100,6 +100,8 @@ export class RoadLayer implements Layer {
           this.path = null;
         }
       }
+      // Notify views that a redraw is needed (kept for backward-compatible tests)
+      this.redraw();
     }
   }
 

@@ -35,6 +35,9 @@ describe("CargoManager", () => {
     game.addPlayer(pInfo);
     player = game.player(pInfo.id);
     player.addGold(10_000_000n);
+    // Ensure roads will actually be constructed during the warmup ticks
+    player.setRoadInvestmentRate(1);
+    (player as any).addWorkers(10000000);
 
     // Build two nearby cities and conquer the path between them
     player.buildUnit(UnitType.City, game.ref(0, 10), {});

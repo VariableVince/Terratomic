@@ -14,6 +14,9 @@ describe("Scorched Earth Full Cycle Integration Test", () => {
     game.addPlayer(pInfo);
     const player = game.player(pInfo.id);
     player.addGold(10_000_000n);
+    // Allocate income to road building so construction progresses in tests
+    player.setRoadInvestmentRate(1);
+    (player as any).addWorkers(10000000);
     const city1 = player.buildUnit(UnitType.City, game.ref(0, 10), {});
     const city2 = player.buildUnit(UnitType.City, game.ref(0, 12), {});
 
@@ -42,7 +45,7 @@ describe("Scorched Earth Full Cycle Integration Test", () => {
 
     // Step 3: Re-buy Roads and verify network reformation
     game.addExecution(new PurchaseUpgradeExecution(player, UpgradeType.Roads));
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 200; i++) {
       game.executeNextTick();
     }
     expect(game.roads().length).toBeGreaterThan(0);
