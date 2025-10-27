@@ -92,6 +92,10 @@ export class PlayerImpl implements Player {
   private _upgrades: Set<UpgradeType> = new Set();
   // Per-match research tree selections (IDs are client-defined strings)
   private _researchTreeTechs: Set<string> = new Set();
+  // Per-match research progress (beakers) per tech
+  private _researchBeakers: Map<string, number> = new Map();
+  // Currently selected research priority tech id
+  private _researchPriority: string | null = null;
 
   private _flag: string | undefined;
   private _name: string;
@@ -217,6 +221,11 @@ export class PlayerImpl implements Player {
       ),
       upgrades: Array.from(this._upgrades),
       researchTreeTechs: Array.from(this._researchTreeTechs),
+      researchTreeBeakers:
+        this._researchBeakers.size > 0
+          ? Object.fromEntries(this._researchBeakers)
+          : undefined,
+      researchPriorityTech: this._researchPriority,
     };
   }
 
@@ -325,6 +334,33 @@ export class PlayerImpl implements Player {
   }
   hasResearchedTech(techId: string): boolean {
     return this._researchTreeTechs.has(techId);
+  }
+  researchBeakers(techId: string): number {
+    return this._researchBeakers.get(techId) ?? 0;
+  }
+  addResearchBeakers(
+    techId: string,
+    beakers: number,
+    cost: number,
+  ): {
+    completed: boolean;
+    newBeakers: number;
+  } {
+    const prev = this._researchBeakers.get(techId) ?? 0;
+    const total = Math.min(cost, prev + beakers);
+    this._researchBeakers.set(techId, total);
+    const completed = total >= cost;
+    if (completed) {
+      this._researchTreeTechs.add(techId);
+      // Do not carry over excess; keep capped at cost
+    }
+    return { completed, newBeakers: total };
+  }
+  setResearchPriority(techId: string | null): void {
+    this._researchPriority = techId;
+  }
+  researchPriority(): string | null {
+    return this._researchPriority;
   }
 
   invalidateEffectiveUnitsCache(type: UnitType): void {

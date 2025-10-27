@@ -1157,4 +1157,24 @@ export class DefaultConfig implements Config {
   internationalCargoTruckGoldSplitRatio(): number {
     return 0.5; // 50/50 split
   }
+
+  // --- Research system defaults ---
+  // f(x) = A * investment^B, where investment is gold allocated to research this tick
+  researchAlpha(): number {
+    return 1.0; // Tunable: scalar applied to investment^B
+  }
+  researchBeta(): number {
+    return 1.0; // Tunable: exponent applied to investment
+  }
+  // Success probability p = 1 - exp(-k * x)
+  researchK(): number {
+    return 0.001; // Tunable: scales how quickly probability rises with x
+  }
+  // Beaker award range when a success occurs (inclusive bounds)
+  researchBeakerMin(): number {
+    return 500;
+  }
+  researchBeakerMax(): number {
+    return 1500;
+  }
 }

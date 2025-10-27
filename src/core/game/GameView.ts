@@ -248,6 +248,13 @@ export class PlayerView {
     return this.data.researchTreeTechs?.includes(techId) ?? false;
   }
 
+  researchBeakers(techId: string): number {
+    return this.data.researchTreeBeakers?.[techId] ?? 0;
+  }
+  researchPriorityTech(): string | null {
+    return this.data.researchPriorityTech ?? null;
+  }
+
   unitsOwned(type: UnitType): number {
     return this.data.unitsOwned[type];
   }

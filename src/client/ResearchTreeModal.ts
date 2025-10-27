@@ -1,22 +1,17 @@
 import { LitElement, html } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, query } from "lit/decorators.js";
 import { EventBus } from "../core/EventBus";
 import { GameView } from "../core/game/GameView";
-import { TECH_METADATA } from "../core/tech/TechEffects";
+import {
+  getTechNodes,
+  isTechAvailable as serverIsTechAvailable,
+  type Category,
+  type TechNode,
+} from "../core/tech/ResearchTree";
 import "./components/baseComponents/Modal";
 import { SendResearchTreeSelectIntentEvent } from "./Transport";
 
-type Category = "Land" | "Sea" | "Air" | "Nuclear" | "Economy";
-
-interface TechNode {
-  id: string;
-  name: string;
-  category: Category;
-  level: number; // 1..5 top to bottom
-  requiresAllOf?: string[]; // all these must be researched
-  requiresOneOf?: string[]; // at least one of these researched
-  description?: string; // Optional hover description
-}
+// Category and TechNode are imported from core so client stays in sync
 
 @customElement("research-tree-modal")
 export class ResearchTreeModal extends LitElement {
@@ -32,11 +27,11 @@ export class ResearchTreeModal extends LitElement {
 
   // Local polling while modal is open to keep UI in sync with game state
   private refreshTimer: number | null = null;
-  // Optimistic local state so clicks feel instant, independent of gold affordability
-  @state() private optimisticResearched = new Set<string>();
 
-  private techs: TechNode[] = this.generatePlaceholderTechs();
-  private categories: Category[] = ["Land", "Sea", "Air", "Nuclear", "Economy"];
+  private techs: TechNode[] = [...getTechNodes()];
+  private categories: Category[] = Array.from(
+    new Set(this.techs.map((t) => t.category)),
+  ) as Category[];
   // Fixed column widths per category (px). Adjust as needed.
   private readonly categoryColumnWidths: Record<Category, number> = {
     Land: 360,
@@ -74,81 +69,10 @@ export class ResearchTreeModal extends LitElement {
     this.close();
   }
 
-  private generatePlaceholderTechs(): TechNode[] {
-    const t: TechNode[] = [];
-    const mkId = (cat: Category, lvl: number) => `${cat}-${lvl}`;
-    for (let lvl = 1; lvl <= 5; lvl++) {
-      for (const cat of ["Land", "Sea", "Air", "Nuclear", "Economy"] as const) {
-        const id = mkId(cat, lvl);
-        const meta = TECH_METADATA[id];
-        const node: TechNode = {
-          id,
-          name: meta?.name ?? `${cat} Tech ${lvl}`,
-          category: cat,
-          level: lvl,
-          description: meta?.description,
-        };
-        if (lvl > 1) node.requiresAllOf = [mkId(cat, lvl - 1)];
-        t.push(node);
-      }
-    }
-    // Remove cross-category links; keep same-category defaults only
-    // Land-3 previously had cross-category one-of requirements; omit them
-    // Air-4 previously added Land-3 as an extra requirement; keep only Air-3 (default)
-    t.find((x) => x.id === "Nuclear-5")!.requiresAllOf = ["Nuclear-4"];
-    // Nuclear-5 previously had cross-category one-of requirements; omit them
-
-    // Add three extra techs to diversify the example tree
-    // 1) Land level 2: a parallel tech at the same slot
-    t.push({
-      id: "Land-2B",
-      name: "Land Tech 2B",
-      category: "Land",
-      level: 2,
-      requiresAllOf: ["Land-1"],
-    });
-    // 2) Sea level 4: a parallel tech that can also satisfy Nuclear-5 one-of
-    t.push({
-      id: "Sea-4B",
-      name: "Sea Tech 4B",
-      category: "Sea",
-      level: 4,
-      requiresAllOf: ["Sea-3"],
-    });
-    // Include Sea-4B as an alternative prerequisite for Nuclear-5
-    // Do not add Sea-4B as a cross-category prerequisite to Nuclear-5
-    // 3) Economy level 3: a parallel tech mid-tree
-    t.push({
-      id: "Economy-3B",
-      name: "Economy Tech 3B",
-      category: "Economy",
-      level: 3,
-      requiresAllOf: ["Economy-2"],
-    });
-
-    // Within-category one-of example: Sea-5 accepts either Sea-4 or Sea-4B
-    const sea5 = t.find((x) => x.id === "Sea-5");
-    if (sea5) {
-      sea5.requiresAllOf = undefined;
-      sea5.requiresOneOf = ["Sea-4", "Sea-4B"];
-    }
-    return t;
-  }
+  // Placeholder tree removed: client uses server-authoritative tree
 
   private isAvailable(id: string, researched: Set<string>): boolean {
-    const n = this.techs.find((x) => x.id === id)!;
-    if (n.level === 1) return true;
-    // Ignore cross-category requirements
-    const sameCat = (p: string) =>
-      this.techs.find((x) => x.id === p)?.category === n.category;
-    n.requiresAllOf ??= [];
-    n.requiresOneOf ??= [];
-
-    const reqAll = n.requiresAllOf.filter(sameCat);
-    const reqOne = n.requiresOneOf.filter(sameCat);
-    if (reqAll.length && !reqAll.every((p) => researched.has(p))) return false;
-    if (reqOne.length && !reqOne.some((p) => researched.has(p))) return false;
-    return true;
+    return serverIsTechAvailable(id, researched);
   }
 
   // No mapping to existing UpgradeType; research tree is separate
@@ -168,19 +92,12 @@ export class ResearchTreeModal extends LitElement {
     const me = this.game.myPlayer();
     if (!me) return;
 
-    // Merge real researched with optimistic selections for availability check
-    const researched = new Set<string>([
-      ...this.researchedIDsFromGame(),
-      ...this.optimisticResearched,
-    ]);
-    if (!this.isAvailable(id, researched)) return; // unmet prereqs in tree
-    if (me.hasResearchedTech?.(id) || me.data?.researchTreeTechs?.includes(id))
-      return; // already owned
+    const researched = this.researchedIDsFromGame();
+    // Allow prioritizing even if unavailable; still ignore already researched
+    if (me.hasResearchedTech?.(id)) return; // already researched
 
+    // Clicking sets this as the current research priority (server handles distribution)
     this.eventBus.emit(new SendResearchTreeSelectIntentEvent(id));
-    // Optimistically mark as researched for immediate feedback
-    this.optimisticResearched = new Set(this.optimisticResearched);
-    this.optimisticResearched.add(id);
     this.requestUpdate();
   }
 
@@ -312,6 +229,56 @@ export class ResearchTreeModal extends LitElement {
     const scrollLeft = treeEl.scrollLeft;
     const scrollTop = treeEl.scrollTop;
 
+    // Compute highlight path based on priority and current researched
+    const me = this.game?.myPlayer?.();
+    const researched = this.researchedIDsFromGame();
+    const priority = me?.researchPriorityTech?.() ?? null;
+
+    const byId = new Map(this.techs.map((n) => [n.id, n] as const));
+    const sameCat = (a: string, b: string) =>
+      (byId.get(a)?.category ?? "") === (byId.get(b)?.category ?? "");
+    const buildMissingPrereqPath = (targetId: string): Set<string> => {
+      const path = new Set<string>();
+      const seen = new Set<string>();
+      const dfs = (tid: string) => {
+        if (seen.has(tid)) return;
+        seen.add(tid);
+        const node = byId.get(tid);
+        if (!node) return;
+        const reqAll = (node.requiresAllOf ?? []).filter((p) =>
+          sameCat(p, tid),
+        );
+        const reqOne = (node.requiresOneOf ?? []).filter((p) =>
+          sameCat(p, tid),
+        );
+        for (const r of reqAll) {
+          if (!researched.has(r)) {
+            path.add(r);
+            dfs(r);
+          }
+        }
+        if (reqOne.length > 0 && !reqOne.some((p) => researched.has(p))) {
+          const sorted = [...reqOne].sort(
+            (a, b) => (byId.get(a)?.level ?? 0) - (byId.get(b)?.level ?? 0),
+          );
+          const choice = sorted[0];
+          if (choice && !researched.has(choice)) {
+            path.add(choice);
+            dfs(choice);
+          }
+        }
+      };
+      if (targetId) dfs(targetId);
+      return path;
+    };
+
+    const highlightNodes = new Set<string>();
+    if (priority) {
+      highlightNodes.add(priority);
+      const missing = buildMissingPrereqPath(priority);
+      for (const id of missing) highlightNodes.add(id);
+    }
+
     const addLine = (fromId: string, toId: string, cls: string) => {
       const a = pos[fromId];
       const b = pos[toId];
@@ -328,7 +295,12 @@ export class ResearchTreeModal extends LitElement {
       const d = `M ${x1},${y1} C ${mx},${y1 + 20} ${mx},${y2 - 20} ${x2},${y2}`;
       path.setAttribute("d", d);
       path.setAttribute("fill", "none");
-      path.setAttribute("class", `edge ${cls}`);
+      const isHighlighted =
+        highlightNodes.has(fromId) && highlightNodes.has(toId);
+      path.setAttribute(
+        "class",
+        `edge ${cls} ${isHighlighted ? "highlight" : ""}`,
+      );
       svg.appendChild(path);
     };
 
@@ -380,12 +352,10 @@ export class ResearchTreeModal extends LitElement {
   }
 
   render() {
-    const levels = [1, 2, 3, 4, 5];
-    // Combine actual and optimistic researched states
-    const researched = new Set<string>([
-      ...this.researchedIDsFromGame(),
-      ...this.optimisticResearched,
-    ]);
+    const levels = Array.from(new Set(this.techs.map((t) => t.level))).sort(
+      (a, b) => a - b,
+    );
+    const researched = this.researchedIDsFromGame();
     const categoryColors: Record<Category, string> = {
       Land: "rgba(59,130,246,0.08)",
       Sea: "rgba(14,165,233,0.08)",
@@ -393,6 +363,8 @@ export class ResearchTreeModal extends LitElement {
       Nuclear: "rgba(239,68,68,0.08)",
       Economy: "rgba(34,197,94,0.08)",
     };
+    const me = this.game?.myPlayer?.();
+    const priority = me?.researchPriorityTech?.() ?? null;
 
     return html`
       <!-- Prevent outer content from scrolling; use inner tree scroll only -->
@@ -524,8 +496,8 @@ export class ResearchTreeModal extends LitElement {
             box-shadow: 0 0 0 2px rgba(39, 71, 110, 0.8) inset; /* bluish rim */
           }
           .tech.locked {
-            opacity: 0.45;
-            cursor: not-allowed;
+            opacity: 1; /* allow full visibility so users can prioritize paths */
+            cursor: pointer;
           }
           .tech.researched {
             background: #162544; /* slightly lighter */
@@ -539,6 +511,13 @@ export class ResearchTreeModal extends LitElement {
             font-weight: bold;
             color: #86efac; /* keep success green */
             text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+          }
+          /* Highlight prioritized tech with a subtle halo */
+          .tech.priority {
+            border-color: rgba(59, 130, 246, 0.9);
+            box-shadow:
+              0 0 0 2px rgba(59, 130, 246, 0.35) inset,
+              0 0 10px 2px rgba(59, 130, 246, 0.25);
           }
           /* Themed tooltip for tech descriptions (right-side) */
           .tech .tooltip {
@@ -580,6 +559,24 @@ export class ResearchTreeModal extends LitElement {
             opacity: 1;
             visibility: visible;
           }
+          /* Research progress bar */
+          .progress-track {
+            width: 100%;
+            height: 6px;
+            background: rgba(39, 71, 110, 0.25);
+            border: 1px solid rgba(39, 71, 110, 0.35);
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 6px 0 4px;
+          }
+          .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.08);
+          }
+          .progress-fill.priority {
+            background: linear-gradient(90deg, #60a5fa, #3b82f6);
+          }
           .pill {
             font-size: 10px;
             border-radius: 999px;
@@ -618,6 +615,10 @@ export class ResearchTreeModal extends LitElement {
             stroke: rgba(245, 158, 11, 0.85);
             stroke-dasharray: 6 4;
           }
+          .edge.highlight {
+            stroke-width: 3;
+            filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.45));
+          }
         </style>
         ${this.renderLegend()}
         <div class="tree-container">
@@ -649,11 +650,72 @@ export class ResearchTreeModal extends LitElement {
                               researched,
                             );
                             const isResearched = researched.has(tech.id);
-                            const clickable = available && !isResearched;
+                            const clickable = !isResearched; // allow prioritizing locked techs
+                            // Compute highlight membership for this node
+                            const byId = new Map(
+                              this.techs.map((n) => [n.id, n] as const),
+                            );
+                            const sameCat = (a: string, b: string) =>
+                              (byId.get(a)?.category ?? "") ===
+                              (byId.get(b)?.category ?? "");
+                            const buildMissingPrereqPath = (
+                              targetId: string,
+                            ): Set<string> => {
+                              const path = new Set<string>();
+                              const seen = new Set<string>();
+                              const dfs = (tid: string) => {
+                                if (seen.has(tid)) return;
+                                seen.add(tid);
+                                const node = byId.get(tid);
+                                if (!node) return;
+                                const reqAll = (
+                                  node.requiresAllOf ?? []
+                                ).filter((p) => sameCat(p, tid));
+                                const reqOne = (
+                                  node.requiresOneOf ?? []
+                                ).filter((p) => sameCat(p, tid));
+                                for (const r of reqAll) {
+                                  if (!researched.has(r)) {
+                                    path.add(r);
+                                    dfs(r);
+                                  }
+                                }
+                                if (
+                                  reqOne.length > 0 &&
+                                  !reqOne.some((p) => researched.has(p))
+                                ) {
+                                  const sorted = [...reqOne].sort(
+                                    (a, b) =>
+                                      (byId.get(a)?.level ?? 0) -
+                                      (byId.get(b)?.level ?? 0),
+                                  );
+                                  const choice = sorted[0];
+                                  if (choice && !researched.has(choice)) {
+                                    path.add(choice);
+                                    dfs(choice);
+                                  }
+                                }
+                              };
+                              if (priority) dfs(priority);
+                              return path;
+                            };
+                            const highlightSet = (() => {
+                              const s = new Set<string>();
+                              if (priority) {
+                                s.add(priority);
+                                const missing =
+                                  buildMissingPrereqPath(priority);
+                                for (const id of missing) s.add(id);
+                              }
+                              return s;
+                            })();
+                            const inHighlight = highlightSet.has(tech.id);
+
                             const classes = [
                               "tech",
                               available ? "" : "locked",
                               isResearched ? "researched" : "",
+                              inHighlight ? "priority" : "",
                             ]
                               .filter(Boolean)
                               .join(" ");
@@ -665,16 +727,71 @@ export class ResearchTreeModal extends LitElement {
                                 title=${""}
                                 ?disabled=${!clickable}
                               >
-                                ${tech.description
-                                  ? html`<div class="tooltip">
-                                      ${tech.description}
-                                    </div>`
-                                  : ""}
+                                <div class="tooltip">
+                                  <div
+                                    style="font-weight:600;margin-bottom:4px;"
+                                  >
+                                    ${tech.name}
+                                  </div>
+                                  ${tech.description
+                                    ? html`<div
+                                        style="opacity:.9;margin-bottom:6px;"
+                                      >
+                                        ${tech.description}
+                                      </div>`
+                                    : ""}
+                                  ${(() => {
+                                    const meLocal = this.game?.myPlayer?.();
+                                    const b =
+                                      meLocal?.researchBeakers?.(tech.id) ?? 0;
+                                    const pct = Math.min(
+                                      100,
+                                      Math.floor((b / (tech.cost || 1)) * 100),
+                                    );
+                                    return html`<div
+                                      style="font-size:11px;opacity:.9;"
+                                    >
+                                      <div>
+                                        Cost: ${tech.cost.toLocaleString()}
+                                      </div>
+                                      ${isResearched
+                                        ? html`<div>Status: Completed</div>`
+                                        : html`<div>
+                                            Progress: ${b.toLocaleString()} /
+                                            ${tech.cost.toLocaleString()}
+                                            (${pct}%)
+                                          </div>`}
+                                    </div>`;
+                                  })()}
+                                </div>
                                 <div
                                   style="font-weight:600; margin-bottom:6px;"
                                 >
                                   ${tech.name}
                                 </div>
+                                ${!isResearched && me
+                                  ? (() => {
+                                      const b =
+                                        me.researchBeakers?.(tech.id) ?? 0;
+                                      const pct = Math.min(
+                                        100,
+                                        Math.floor(
+                                          (b / (tech.cost || 1)) * 100,
+                                        ),
+                                      );
+                                      return b > 0
+                                        ? html`<div class="progress-track">
+                                            <div
+                                              class="progress-fill ${priority ===
+                                              tech.id
+                                                ? "priority"
+                                                : ""}"
+                                              style="width:${pct}%"
+                                            ></div>
+                                          </div>`
+                                        : "";
+                                    })()
+                                  : ""}
                                 <div>
                                   ${tech.requiresAllOf?.length
                                     ? html`<span class="pill pill-req"
@@ -686,6 +803,13 @@ export class ResearchTreeModal extends LitElement {
                                     ? html`<span class="pill pill-oneof"
                                         >One of:
                                         ${tech.requiresOneOf.length}</span
+                                      >`
+                                    : ""}
+                                  ${priority === tech.id && !isResearched
+                                    ? html`<span
+                                        class="pill"
+                                        style="background:rgba(59,130,246,0.18);color:#cfe3ff;border:1px solid rgba(59,130,246,0.45);"
+                                        >Priority</span
                                       >`
                                     : ""}
                                 </div>

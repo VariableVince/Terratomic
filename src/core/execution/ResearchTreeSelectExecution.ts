@@ -1,9 +1,6 @@
-import { Execution, Game, Player, UpgradeType } from "../game/Game";
-import { RESEARCH_TECH_IDS } from "../tech/TechEffects";
+import { Execution, Game, Player } from "../game/Game";
 
-// Simple execution that marks a research-tree tech as selected for a player.
-// This is intentionally side-effect free except updating the player's per-match
-// research tech set, which is included in PlayerUpdate via PlayerImpl.
+// Execution to set the player's research priority tech in the tree.
 export class ResearchTreeSelectExecution implements Execution {
   private _active = true;
   private mg: Game | null = null;
@@ -24,20 +21,10 @@ export class ResearchTreeSelectExecution implements Execution {
     this.mg = _mg;
   }
   tick(_ticks: number): void {
-    // Add tech to player's research set; duplicate adds are ignored.
-    if ((this.player as any).addResearchedTech) {
-      (this.player as any).addResearchedTech(this.techId);
-    }
-
-    // If the first Economy tech is researched, unlock Roads automatically.
-    if (this.techId === RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION) {
-      // Grant Roads upgrade if not already owned
-      if (!this.player.hasUpgrade(UpgradeType.Roads)) {
-        this.player.addUpgrade(UpgradeType.Roads);
-        // Ensure road network recalculates connectivity
-        this.mg?.markPlayerNodesForReconnection(this.player);
-      }
-    }
+    // Toggle priority: clicking an already prioritized tech unsets it.
+    const current = (this.player as any).researchPriority?.() ?? null;
+    const next = current === this.techId ? null : this.techId;
+    (this.player as any).setResearchPriority?.(next);
     this._active = false;
   }
 }

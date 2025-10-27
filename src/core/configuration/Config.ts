@@ -202,6 +202,13 @@ export interface Config {
   isReplay(): boolean;
   allianceExtensionPromptOffset(): number;
   maxProductivity(): number;
+
+  // Research system parameters
+  researchAlpha(): number; // A in A * investment^B
+  researchBeta(): number; // B in A * investment^B
+  researchK(): number; // k in 1 - exp(-k * x)
+  researchBeakerMin(): number; // inclusive
+  researchBeakerMax(): number; // inclusive
 }
 
 export interface Theme {
