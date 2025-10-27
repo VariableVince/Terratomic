@@ -92,24 +92,7 @@
 
 /* ===== WWII / Cold War Panel Theme (styling only) ===== */
 
-/* Main panel shell */
-.military-panel {
-  background: linear-gradient(
-    to bottom,
-    rgba(47, 50, 35, 0.9),
-    rgba(59, 62, 44, 0.9)
-  );
-  border: 2px solid #1f2018;
-  border-radius: 10px;
-  box-shadow:
-    inset 0 0 10px rgba(0, 0, 0, 0.5),
-    0 2px 6px rgba(0, 0, 0, 0.4);
-  padding: 2px;
-  color: #d8d1b1; /* default text color */
-  font-family: "Azeret Mono", monospace;
-}
-
-/* Submarine/Bunker dark blue variant for in-game UI */
+/* Main panel shell: submarine/bunker dark blue theme (single source of truth) */
 .submarine-panel {
   background: linear-gradient(
     to bottom,
@@ -117,7 +100,15 @@
     /* #0b1220 */ rgba(16, 27, 51, 0.92) /* #101b33 */
   );
   border: 2px solid #0e1a33; /* deep navy border */
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 10px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+  padding: 2px;
   color: #dbe7ff; /* soft desaturated light-blue text */
+  font-family: "Azeret Mono", monospace;
+  /* Default downscale for panels without affecting transforms used elsewhere */
+  zoom: var(--ui-panel-zoom, 0.9);
 }
 /* Typography inside submarine panels */
 .submarine-panel .military-heading {

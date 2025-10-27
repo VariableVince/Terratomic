@@ -385,7 +385,7 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
         @contextmenu=${(e) => e.preventDefault()}
       >
         <div
-          class="absolute top-0 lg:top-2.5 left-1/2 transform -translate-x-1/2 submarine-panel military-panel transition-all duration-300 text-lg md:text-base ${containerClasses}"
+          class="absolute top-0 lg:top-2.5 left-1/2 transform -translate-x-1/2 submarine-panel transition-all duration-300 text-lg md:text-base ${containerClasses}"
           style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);"
         >
           ${this.player !== null ? this.renderPlayerInfo(this.player) : ""}

@@ -176,7 +176,7 @@ export class Leaderboard extends LitElement implements Layer {
         @contextmenu=${(e: Event) => e.preventDefault()}
       >
         <div
-          class="grid submarine-panel military-panel w-full text-xs md:text-xs lg:text-sm"
+          class="grid submarine-panel w-full text-xs md:text-xs lg:text-sm"
           style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5); grid-template-columns: 30px 100px 70px 55px 75px;"
         >
           <div

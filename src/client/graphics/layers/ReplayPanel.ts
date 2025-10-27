@@ -64,7 +64,7 @@ export class ReplayPanel extends LitElement implements Layer {
 
     return html`
       <div
-        class="submarine-panel military-panel p-1 lg:p-2"
+        class="submarine-panel p-1 lg:p-2"
         style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);"
         @contextmenu=${(e) => e.preventDefault()}
       >

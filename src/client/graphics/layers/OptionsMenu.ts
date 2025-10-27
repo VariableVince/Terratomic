@@ -183,7 +183,7 @@ export class OptionsMenu extends LitElement implements Layer {
         @contextmenu=${(e: MouseEvent) => e.preventDefault()}
       >
         <div
-          class="submarine-panel military-panel p-1 lg:p-2"
+          class="submarine-panel p-1 lg:p-2"
           style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);"
         >
           <div class="flex items-stretch gap-1 lg:gap-2">
@@ -229,7 +229,7 @@ export class OptionsMenu extends LitElement implements Layer {
       </div>
 
         <div
-          class="submarine-panel military-panel options-menu flex flex-col justify-around gap-y-3 mt-2 p-1 lg:p-2 ${
+          class="submarine-panel options-menu flex flex-col justify-around gap-y-3 mt-2 p-1 lg:p-2 ${
             !this.showSettings ? "hidden" : ""
           }"
           style="box-shadow: inset 0 0 18px rgba(2, 8, 20, 0.8), 0 2px 6px rgba(0, 0, 0, 0.5);"
