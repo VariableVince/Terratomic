@@ -26,6 +26,9 @@ export class SerialAStar<NodeType> implements AStar<NodeType> {
   private bwdCameFrom = new Map<NodeType, NodeType>();
   private fwdGScore = new Map<NodeType, number>();
   private bwdGScore = new Map<NodeType, number>();
+  // Direction used to reach a node (encoded as an int 0..8)
+  private fwdDirTo = new Map<NodeType, number>();
+  private bwdDirTo = new Map<NodeType, number>();
 
   private meetingPoint: NodeType | null = null;
   public completed = false;
@@ -95,6 +98,7 @@ export class SerialAStar<NodeType> implements AStar<NodeType> {
         return PathFindResultType.Completed;
       }
       this.expandNode(fwdCurrent, true);
+      if (this.completed) return PathFindResultType.Completed;
 
       // Process backward search
       const bwdCurrent = this.bwdOpenSet.poll()!.tile;
@@ -106,6 +110,7 @@ export class SerialAStar<NodeType> implements AStar<NodeType> {
         return PathFindResultType.Completed;
       }
       this.expandNode(bwdCurrent, false);
+      if (this.completed) return PathFindResultType.Completed;
     }
 
     return this.completed
@@ -114,39 +119,63 @@ export class SerialAStar<NodeType> implements AStar<NodeType> {
   }
 
   private expandNode(current: NodeType, isForward: boolean) {
+    // Hoist side-specific structures and immutable targets out of the loop
+    const gScore = isForward ? this.fwdGScore : this.bwdGScore;
+    const openSet = isForward ? this.fwdOpenSet : this.bwdOpenSet;
+    const cameFrom = isForward ? this.fwdCameFrom : this.bwdCameFrom;
+    const dirTo = isForward ? this.fwdDirTo : this.bwdDirTo;
+    const otherG = isForward ? this.bwdGScore : this.fwdGScore;
+    const target = isForward ? this.dst : this.closestSource;
+
+    // Cache current and target positions once
+    const currentPos = this.graph.position(current);
+    const targetPos = this.graph.position(target);
+    const prevDirCode =
+      this.directionChangePenalty > 0 ? dirTo.get(current) : undefined;
+    const currentG = gScore.get(current)!;
+
     for (const neighbor of this.graph.neighbors(current)) {
-      if (
-        neighbor !== (isForward ? this.dst : this.closestSource) &&
-        !this.graph.isTraversable(current, neighbor)
-      )
+      // Skip non-traversable neighbors except when the neighbor is the target
+      if (neighbor !== target && !this.graph.isTraversable(current, neighbor))
         continue;
 
-      const gScore = isForward ? this.fwdGScore : this.bwdGScore;
-      const openSet = isForward ? this.fwdOpenSet : this.bwdOpenSet;
-      const cameFrom = isForward ? this.fwdCameFrom : this.bwdCameFrom;
+      const tentativeGScore = currentG + this.graph.cost(neighbor);
+      // Cache neighbor position once (used by penalty and heuristic)
+      const nPos = this.graph.position(neighbor);
 
-      const tentativeGScore = gScore.get(current)! + this.graph.cost(neighbor);
+      // Optional direction change penalty without string allocations
       let penalty = 0;
-      // With a direction change penalty, the path will get as straight as possible
+      let newDirCode: number | undefined = undefined;
       if (this.directionChangePenalty > 0) {
-        const prev = cameFrom.get(current);
-        if (prev) {
-          const prevDir = this.getDirection(prev, current);
-          const newDir = this.getDirection(current, neighbor);
-          if (prevDir !== newDir) {
-            penalty = this.directionChangePenalty;
-          }
+        const dx = Math.sign(nPos.x - currentPos.x) + 1; // 0..2
+        const dy = Math.sign(nPos.y - currentPos.y) + 1; // 0..2
+        newDirCode = dx * 3 + dy; // 0..8
+        if (prevDirCode !== undefined && prevDirCode !== newDirCode) {
+          penalty = this.directionChangePenalty;
         }
       }
 
       const totalG = tentativeGScore + penalty;
-      if (!gScore.has(neighbor) || totalG < gScore.get(neighbor)!) {
+      const neighborG = gScore.get(neighbor);
+      if (neighborG === undefined || totalG < neighborG) {
         cameFrom.set(neighbor, current);
         gScore.set(neighbor, totalG);
+        if (this.directionChangePenalty > 0 && newDirCode !== undefined) {
+          dirTo.set(neighbor, newDirCode);
+        }
+
+        // Inline heuristic using cached target position (2 * Manhattan)
         const fScore =
           totalG +
-          this.heuristic(neighbor, isForward ? this.dst : this.closestSource);
-        openSet.add({ tile: neighbor, fScore: fScore });
+          2 * (Math.abs(nPos.x - targetPos.x) + Math.abs(nPos.y - targetPos.y));
+        openSet.add({ tile: neighbor, fScore });
+
+        // Early meeting detection to reduce expansions
+        if (otherG.has(neighbor)) {
+          this.meetingPoint = neighbor;
+          this.completed = true;
+          return;
+        }
       }
     }
   }
