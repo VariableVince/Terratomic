@@ -144,19 +144,15 @@ export class UnitCreationHelper {
     if (cached !== undefined) return cached;
 
     // Get owned tiles (cached)
-    if (this.ownedTilesCache === null) {
-      this.ownedTilesCache = Array.from(this.player.tiles());
-    }
+    this.ownedTilesCache ??= Array.from(this.player.tiles());
 
     // Restrict to shoreline for ports (cached)
     let candidateTiles: TileRef[];
     if (type === UnitType.Port) {
-      if (this.shoreOwnedTilesCache === null) {
-        // Filter once per tick; mg.isOceanShore is relatively cheap but can add up.
-        this.shoreOwnedTilesCache = this.ownedTilesCache.filter((t) =>
-          this.mg.isOceanShore(t),
-        );
-      }
+      // Filter once per tick; mg.isOceanShore is relatively cheap but can add up.
+      this.shoreOwnedTilesCache ??= this.ownedTilesCache.filter((t) =>
+        this.mg.isOceanShore(t),
+      );
       candidateTiles = this.shoreOwnedTilesCache;
     } else {
       candidateTiles = this.ownedTilesCache;
@@ -174,8 +170,8 @@ export class UnitCreationHelper {
       type !== UnitType.MissileSilo;
 
     // Build spatial buckets of existing buildings once per tick for fast neighborhood checks.
-    if (mustRespectSpacing && this.buildingBuckets === null) {
-      this.buildingBuckets = this.buildBuildingBuckets();
+    if (mustRespectSpacing) {
+      this.buildingBuckets ??= this.buildBuildingBuckets();
     }
 
     const isValid = (tile: TileRef): boolean => {

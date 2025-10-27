@@ -1397,7 +1397,7 @@ export class RoadManager {
           if (!visited.has(nid)) {
             // Neighbor might not be directly connected in built graph yet; locate among known nodes
             const nb =
-              builtNeighbors.find((u) => u.id() === nid) ||
+              builtNeighbors.find((u) => u.id() === nid) ??
               this.nodes.find((u) => u.id() === nid);
             if (nb) {
               visited.add(nid);

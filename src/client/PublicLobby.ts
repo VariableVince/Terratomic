@@ -131,11 +131,7 @@ export class PublicLobby extends LitElement {
             <div class="text-md font-medium text-[var(--secondaryColor)]">
               <span
                 class="text-sm
-                ${
-                  this.isLobbyHighlighted
-                    ? "text-[var(--alertColor)]"
-                    : "text-[var(--primaryColor)]"
-                }
+                text-[var(--primaryColor)]
                 bg-white rounded-sm px-1"
               >
                 ${

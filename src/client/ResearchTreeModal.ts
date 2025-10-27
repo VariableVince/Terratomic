@@ -56,9 +56,7 @@ export class ResearchTreeModal extends LitElement {
     // Perform a full layout pass on the next frame after opening
     requestAnimationFrame(() => this.updateLayout());
     // Start a light refresh loop to reflect game state (gold/upgrades) while open
-    if (this.refreshTimer === null) {
-      this.refreshTimer = window.setInterval(() => this.requestUpdate(), 500);
-    }
+    this.refreshTimer ??= window.setInterval(() => this.requestUpdate(), 500);
   }
   close() {
     this.modalEl?.close();
