@@ -326,7 +326,7 @@ export class BuildMenu extends LitElement {
       text-align: left;
       line-height: 1.2;
       color: #e3edff; /* brighten primary label */
-      font-family: "Azeret Mono", monospace;
+      font-family: monospace;
     }
     .build-description {
       font-size: 0.6rem;

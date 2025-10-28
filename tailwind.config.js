@@ -6,7 +6,7 @@ export default {
     extend: {
       fontFamily: {
         military: ["Oswald"],
-        ocr: ['"Azeret Mono"', "monospace"],
+        ocr: ["monospace"],
       },
       colors: {
         // UI theme colors (keep in sync with variables.css)

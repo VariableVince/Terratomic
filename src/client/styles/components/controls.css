@@ -106,7 +106,7 @@
     0 2px 6px rgba(0, 0, 0, 0.4);
   padding: 2px;
   color: #dbe7ff; /* soft desaturated light-blue text */
-  font-family: "Azeret Mono", monospace;
+  font-family: monospace;
   /* Default downscale for panels without affecting transforms used elsewhere */
   zoom: var(--ui-panel-zoom, 0.9);
 }
@@ -172,7 +172,7 @@
   padding: 4px 8px;
   text-transform: uppercase;
   font-size: 12px;
-  font-family: "Azeret Mono", monospace;
+  font-family: monospace;
   transition: background-color 0.15s ease-in-out;
 }
 .military-button:hover {

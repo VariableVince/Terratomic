@@ -1,6 +1,50 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* Local Overpass font faces */
+@font-face {
+  font-family: "Overpass";
+  src: url("/resources/fonts/overpass.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Overpass";
+  src: url("/resources/fonts/overpass-bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+/* Local Oswald font faces (woff2) */
+@font-face {
+  font-family: "Oswald";
+  src: url("/resources/fonts/oswald-v57-latin-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Oswald";
+  src: url("/resources/fonts/oswald-v57-latin-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Oswald";
+  src: url("/resources/fonts/oswald-v57-latin-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Oswald";
+  src: url("/resources/fonts/oswald-v57-latin-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 @import url("./styles/core/variables.css");
 @import url("./styles/core/typography.css");
 @import url("./styles/layout/header.css");

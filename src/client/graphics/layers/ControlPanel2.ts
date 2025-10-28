@@ -937,7 +937,7 @@ export class ControlPanel2 extends LitElement implements Layer {
           padding: 4px 10px;
           text-transform: uppercase;
           font-size: 12px;
-          font-family: "Azeret Mono", monospace;
+          font-family: monospace;
           transition:
             background-color 0.15s ease-in-out,
             box-shadow 0.15s ease-in-out,
