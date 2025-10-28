@@ -94,6 +94,12 @@
       .drop-shadow-glow {
         filter: drop-shadow(0 0 5px #00ff00) drop-shadow(0 0 15px #00ff00);
       }
+
+      /* Scale container based on screen height */
+      .scale-container {
+        transform-origin: top;
+        transition: transform 0.3s ease-in-out;
+      }
     </style>
 
     <!-- Immediate execution to prevent FOUC -->
@@ -120,22 +126,23 @@
     <div class="bg-image"></div>
 
     <!-- Main container with responsive padding -->
-    <main class="flex justify-center flex-grow pt-8">
-      <div
-        class="container p-[25px] flex flex-col flex-grow submarine-panel"
-        style="
-          box-shadow:
-            inset 0 0 10px rgba(0, 0, 0, 0.5),
-            0 2px 6px rgba(0, 0, 0, 0.4);
-        "
-      >
-        <img
-          src="../../proprietary/images/TerratomicLogoMagic2.png"
-          alt="Terratomic Logo"
-          class="mx-auto h-auto filter drop-shadow-glow"
-          style="max-width: 20rem"
-        />
-        <!--
+    <main class="flex justify-center pt-8">
+      <div class="scale-container w-full flex justify-center">
+        <div
+          class="container p-[25px] flex flex-col submarine-panel"
+          style="
+            box-shadow:
+              inset 0 0 10px rgba(0, 0, 0, 0.5),
+              0 2px 6px rgba(0, 0, 0, 0.4);
+          "
+        >
+          <img
+            src="../../proprietary/images/TerratomicLogoMagic2.png"
+            alt="Terratomic Logo"
+            class="mx-auto h-auto filter drop-shadow-glow"
+            style="max-width: 20rem"
+          />
+          <!--
         <o-button
           id="login-discord"
           title="Initializing..."
@@ -144,7 +151,7 @@
         ></o-button>
         -->
 
-        <!--
+          <!--
         <o-button
           id="logout-discord"
           title="Log out"
@@ -154,63 +161,64 @@
         ></o-button>
         -->
 
-        <o-button
-          id="join-discord-button"
-          translationKey="main.join_discord"
-          block
-          iconSrc="/images/DiscordIcon.svg"
-        ></o-button>
+          <o-button
+            id="join-discord-button"
+            translationKey="main.join_discord"
+            block
+            iconSrc="/images/DiscordIcon.svg"
+          ></o-button>
 
-        <div class="container__row">
-          <flag-input class="w-[20%] md:w-[15%]"></flag-input>
-          <username-input class="relative w-full"></username-input>
-          <news-button
-            class="w-[20%] md:w-[15%] component-hideable"
-          ></news-button>
-        </div>
-        <div></div>
-        <div>
-          <public-lobby class="block"></public-lobby>
-        </div>
-        <div class="container__row container__row--equal">
-          <o-button
-            id="host-lobby-button"
-            title="Create Lobby"
-            translationKey="main.create_lobby"
-            block
-            secondary
-          ></o-button>
-          <o-button
-            id="join-private-lobby-button"
-            title="Join Lobby"
-            translationKey="main.join_lobby"
-            block
-            secondary
-          ></o-button>
-          <!-- <o-button
+          <div class="container__row">
+            <flag-input class="w-[20%] md:w-[15%]"></flag-input>
+            <username-input class="relative w-full"></username-input>
+            <news-button
+              class="w-[20%] md:w-[15%] component-hideable"
+            ></news-button>
+          </div>
+          <div></div>
+          <div>
+            <public-lobby class="block"></public-lobby>
+          </div>
+          <div class="container__row container__row--equal">
+            <o-button
+              id="host-lobby-button"
+              title="Create Lobby"
+              translationKey="main.create_lobby"
+              block
+              secondary
+            ></o-button>
+            <o-button
+              id="join-private-lobby-button"
+              title="Join Lobby"
+              translationKey="main.join_lobby"
+              block
+              secondary
+            ></o-button>
+            <!-- <o-button
             id="chat-button"
             title="Chat Test"
             block
             secondary
           ></o-button> -->
-        </div>
+          </div>
 
-        <o-button
-          id="single-player"
-          title="Single Player"
-          translationKey="main.single_player"
-          block
-        ></o-button>
+          <o-button
+            id="single-player"
+            title="Single Player"
+            translationKey="main.single_player"
+            block
+          ></o-button>
 
-        <o-button
-          id="help-button"
-          title="Instructions"
-          translationKey="main.instructions"
-          block
-          secondary
-        ></o-button>
-        <div class="container__row">
-          <lang-selector class="w-full"></lang-selector>
+          <o-button
+            id="help-button"
+            title="Instructions"
+            translationKey="main.instructions"
+            block
+            secondary
+          ></o-button>
+          <div class="container__row">
+            <lang-selector class="w-full"></lang-selector>
+          </div>
         </div>
       </div>
     </main>
@@ -239,8 +247,21 @@
       class="flex gap-2 fixed right-[10px] top-[10px] z-50 flex-col items-end"
     >
       <div class="flex flex-col gap-2 w-max">
-        <options-menu style="width: 100%"></options-menu>
-        <replay-panel style="width: 100%"></replay-panel>
+        <options-menu
+          style="
+            width: 100%;
+            transform: scale(0.9);
+            transform-origin: top right;
+          "
+        ></options-menu>
+        <replay-panel
+          style="
+            width: 100%;
+            transform: scale(0.9);
+            transform-origin: top right;
+            margin-top: -10px;
+          "
+        ></replay-panel>
       </div>
       <player-info-overlay style="width: max-content"></player-info-overlay>
     </div>
@@ -257,16 +278,29 @@
       <div class="flex items-end">
         <control-panel
           class="w-1/4 max-w-[270px] min-w-[270px]"
-          style="pointer-events: auto"
+          style="
+            pointer-events: auto;
+            transform: scale(0.9);
+            transform-origin: bottom left;
+          "
         ></control-panel>
         <control-panel2
           class="max-w-[620px] min-w-[620px]"
-          style="pointer-events: auto"
+          style="
+            pointer-events: auto;
+            transform: scale(0.9);
+            transform-origin: bottom left;
+            margin-left: -27px;
+          "
         ></control-panel2>
       </div>
       <div
         class="max-w-[260px] min-w-[260px] flex flex-col"
-        style="pointer-events: auto"
+        style="
+          pointer-events: auto;
+          transform: scale(0.9);
+          transform-origin: bottom right;
+        "
       >
         <chat-display></chat-display>
         <events-display></events-display>
@@ -323,6 +357,9 @@
     <game-starting-modal></game-starting-modal>
     <top-bar></top-bar>
 
+    <!-- Research tree modal at root to avoid transform clipping -->
+    <research-tree-modal></research-tree-modal>
+
     <player-panel></player-panel>
     <help-modal></help-modal>
     <dark-mode-button></dark-mode-button>
@@ -358,6 +395,43 @@
           document.documentElement.classList.remove("preload");
         });
       });
+    </script>
+    <!-- Adaptive JS scaling for .scale-container -->
+    <script>
+      (function () {
+        function computeScale() {
+          var height = Math.max(
+            document.documentElement.clientHeight,
+            window.innerHeight || 0,
+          );
+          var baseHeight = 892;
+          if (height >= baseHeight) return 1;
+          return Math.min(1, height / baseHeight);
+        }
+
+        function applyScale() {
+          var container = document.querySelector(".scale-container");
+          if (!container) return;
+          var scale = computeScale();
+          container.style.transform = "scale(" + scale + ")";
+          // Compensate layout gap created by transform (which doesn't affect flow height)
+          // Compensate using base height as an approximation for natural content height
+          var baseHeight = 892;
+          var compensation = Math.max(0, Math.round(baseHeight * (1 - scale)));
+          container.style.marginBottom = compensation
+            ? "-" + compensation + "px"
+            : "0px";
+        }
+
+        function onResize() {
+          requestAnimationFrame(applyScale);
+        }
+
+        window.addEventListener("resize", onResize);
+        window.addEventListener("DOMContentLoaded", applyScale);
+        // Initial apply
+        onResize();
+      })();
     </script>
   </body>
 </html>

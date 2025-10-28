@@ -1900,11 +1900,6 @@ export class ControlPanel2 extends LitElement implements Layer {
               })()
             : ""}
         </div>
-        <!-- Attach ResearchTreeModal instance to the DOM once -->
-        <research-tree-modal
-          .game=${this.game}
-          .eventBus=${this.eventBus}
-        ></research-tree-modal>
       </div>
     `;
   }
