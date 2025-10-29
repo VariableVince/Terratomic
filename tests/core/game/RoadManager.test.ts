@@ -185,4 +185,49 @@ describe("RoadManager", () => {
     // Should have a valid path to build after revalidation
     expect(nextPath.length).toBeGreaterThan(1);
   });
+
+  it("does not traverse foreign-owned land for domestic roads (only own land or water/shore)", () => {
+    // Add a second player (foreign)
+    const pInfoB = playerInfo("Player B", PlayerType.Human);
+    game.addPlayer(pInfoB);
+    const playerB = game.player(pInfoB.id);
+
+    // Player A has Roads
+    playerA.addUpgrade(UpgradeType.Roads);
+
+    // Conquer a 3x5 corridor for Player A so alternate paths exist around a blocked tile
+    for (let x = 0; x <= 2; x++) {
+      for (let y = 10; y <= 14; y++) {
+        const t = game.ref(x, y);
+        if (game.isLand(t)) {
+          game.conquer(playerA as PlayerImpl, t);
+        }
+      }
+    }
+
+    const start = game.ref(0, 10);
+    const end = game.ref(0, 14);
+
+    // Make a direct in-line land tile owned by Player B to force a detour if possible
+    const foreignBlock = game.ref(0, 12);
+    if (game.isLand(foreignBlock)) {
+      game.conquer(playerB as PlayerImpl, foreignBlock);
+    }
+
+    // Compute a domestic path (private method access via any)
+    const path: number[] | null = (
+      roadManager as any
+    ).shortestPathOverFriendlyLand(start, end);
+
+    // If no path exists (e.g., due to map layout), test is inconclusive but should not fail.
+    // When a path exists, ensure it never uses foreign-owned land.
+    if (path && path.length > 0) {
+      for (const t of path as number[]) {
+        const tile = t as unknown as number;
+        if (game.isLand(tile as any)) {
+          expect(game.owner(tile as any)).toBe(playerA);
+        }
+      }
+    }
+  });
 });

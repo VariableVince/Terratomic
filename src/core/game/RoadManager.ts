@@ -45,7 +45,7 @@ let nextRoadId = 0;
  */
 export class RoadManager {
   // Small penalty for changing direction while laying roads to prefer straighter paths
-  // Tuned low so it never overwhelms terrain costs (land=2, road=1, water/shore=20)
+  // Tuned low so it never overwhelms terrain costs (land=2, road=1, water/shore=30)
   private readonly DIRECTION_CHANGE_PENALTY = 0.5;
   // Use config-provided constants for construction and maintenance costs
   // 8-way movement deltas and cost scale (diagonals)
@@ -1456,6 +1456,7 @@ export class RoadManager {
 
     const startOwner = this.game.owner(start);
     if (!startOwner.isPlayer()) return null;
+    const goalOwner = this.game.owner(goal);
 
     const maxRoadLength = this.game.config().maxRoadLength();
 
@@ -1467,21 +1468,33 @@ export class RoadManager {
       return null;
     }
 
+    // Determine if this is a domestic road (same owner on both endpoints).
+    const isDomestic =
+      goalOwner.isPlayer() &&
+      (goalOwner as Player).id() === (startOwner as Player).id();
+
     // Build fast owner allow-list once per query
     const allowedOwners = new Set<number>();
     const startPlayer = startOwner as Player;
     allowedOwners.add(startPlayer.smallID());
-    for (const p of this.game.players()) {
-      if (p.smallID() !== startPlayer.smallID() && startPlayer.isFriendly(p)) {
-        allowedOwners.add(p.smallID());
+    // Only include friendly owners for non-domestic connections; for domestic roads,
+    // forbid traversing foreign-owned land entirely (ally or otherwise).
+    if (!isDomestic) {
+      for (const p of this.game.players()) {
+        if (
+          p.smallID() !== startPlayer.smallID() &&
+          startPlayer.isFriendly(p)
+        ) {
+          allowedOwners.add(p.smallID());
+        }
       }
     }
 
     const ok = (r: TileRef) => {
-      // Allow water/shore tiles to be traversed for roads (bridges/ferries),
-      // but keep ownership rules for land tiles.
-      if (!this.game.isLand(r)) return true;
-      // Land tiles must be owned by the start owner or friendly
+      // Allow water tiles and shore tiles to be traversed for roads (bridges/ferries)
+      // regardless of ownership. For other land tiles, enforce ownership rules.
+      if (!this.game.isLand(r) || this.game.isShore(r)) return true;
+      // Land tiles must be owned by the start owner (domestic) or friendly (non-domestic)
       const oid = this.game.ownerID(r);
       if (oid === 0) return false; // terra nullius
       return allowedOwners.has(oid);
@@ -1569,6 +1582,10 @@ export class RoadManager {
         if ((dy === -1 && cy === 0) || (dy === 1 && cy === h - 1)) continue;
         const neighbor = (current + dx + dy * w) as TileRef;
         if (closed[neighbor] === version) continue;
+        // Enforce ownership traversal rules:
+        // - Land tiles must be owned by the allowed owner set (domestic: only own land)
+        // - Water/shore tiles are always allowed
+        if (!ok(neighbor)) continue;
         // Prefer built and planned roads equally over fresh land
         // Base land cost = 2, Water/Shore cost = 20, Built/Planned = 1
         let stepCost = 2;
@@ -1578,7 +1595,7 @@ export class RoadManager {
         ) {
           stepCost = 1;
         } else if (!this.game.isLand(neighbor) || this.game.isShore(neighbor)) {
-          stepCost = 20;
+          stepCost = 30;
         }
         const moveScale = SCALE[dir];
 
