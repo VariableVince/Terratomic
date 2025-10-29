@@ -84,6 +84,8 @@ class Client {
   private userSettings: UserSettings = new UserSettings();
   // Main menu background music (loops on menu, paused during gameplay)
   private menuMusic: HTMLAudioElement | null = null;
+  // Track whether the UI is currently on the main menu (not in-game)
+  private isOnMainMenu = true;
 
   constructor() {}
 
@@ -338,9 +340,12 @@ class Client {
 
         // Try to start on first user interaction to comply with autoplay policies
         const tryPlay = () => {
-          this.menuMusic?.play().catch(() => {
-            // Ignore autoplay rejections; another interaction will retry
-          });
+          // Only play if we're actually on the main menu
+          if (this.isOnMainMenu) {
+            this.menuMusic?.play().catch(() => {
+              // Ignore autoplay rejections; another interaction will retry
+            });
+          }
         };
         // One-time listeners for common interactions on the menu
         window.addEventListener("pointerdown", tryPlay, { once: true });
@@ -348,14 +353,18 @@ class Client {
 
         // Also attempt a delayed play in case policies allow without gesture
         setTimeout(() => {
-          this.menuMusic?.play().catch(() => {});
+          if (this.isOnMainMenu) {
+            this.menuMusic?.play().catch(() => {});
+          }
         }, 500);
       }
 
       // Ensure music plays when we're on the main menu initially
-      this.menuMusic?.play().catch(() => {
-        // Will be retried on user gesture
-      });
+      if (this.isOnMainMenu) {
+        this.menuMusic?.play().catch(() => {
+          // Will be retried on user gesture
+        });
+      }
     } catch (e) {
       console.warn("Failed to set up menu music", e);
     }
@@ -399,6 +408,8 @@ class Client {
       },
       () => {
         console.log("Closing modals");
+        // We're leaving the main menu and entering the game
+        this.isOnMainMenu = false;
         // Pause menu music when the game is loading/starting
         this.menuMusic?.pause();
         document.getElementById("settings-button")?.classList.add("hidden");
@@ -460,8 +471,19 @@ class Client {
     this.gameStop();
     this.gameStop = null;
     this.publicLobby.leaveLobby();
+    // We're back on the main menu; allow music again
+    this.isOnMainMenu = true;
     // Resume menu music when returning to main menu
-    this.menuMusic?.play().catch(() => {});
+    this.menuMusic?.play().catch(() => {
+      // If autoplay blocks this, attach a one-off listener to start on next interaction
+      const resumeOnGesture = () => {
+        if (this.isOnMainMenu) {
+          this.menuMusic?.play().catch(() => {});
+        }
+      };
+      window.addEventListener("pointerdown", resumeOnGesture, { once: true });
+      window.addEventListener("keydown", resumeOnGesture, { once: true });
+    });
   }
 
   private handleKickPlayer(event: CustomEvent) {
