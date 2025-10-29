@@ -1,5 +1,6 @@
 import { LitElement, html } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
+import flaskIcon from "../../proprietary/images/flask.png";
 import { EventBus } from "../core/EventBus";
 import { GameView } from "../core/game/GameView";
 import {
@@ -574,11 +575,37 @@ export class ResearchTreeModal extends LitElement {
           }
           .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #22c55e, #16a34a);
-            box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.08);
+            /* Match flask colors exactly */
+            background: linear-gradient(90deg, #00f8ff 0%, #00a6f6 100%);
+            box-shadow:
+              0 0 10px rgba(37, 150, 186, 0.55),
+              0 0 16px rgba(0, 166, 246, 0.35),
+              inset 0 0 4px rgba(255, 255, 255, 0.1);
           }
           .progress-fill.priority {
-            background: linear-gradient(90deg, #60a5fa, #3b82f6);
+            /* Keep priority identical to flask reference as requested */
+            background: linear-gradient(90deg, #00f8ff 0%, #00a6f6 100%);
+            box-shadow:
+              0 0 12px rgba(37, 150, 186, 0.65),
+              0 0 20px rgba(0, 166, 246, 0.45),
+              inset 0 0 5px rgba(255, 255, 255, 0.12);
+          }
+          .cost-inline {
+            display: inline-flex;
+            /* Align bottoms of number and icon */
+            align-items: flex-end;
+            gap: 6px;
+            font-size: 12px;
+            color: #dbe7ff;
+            opacity: 0.95;
+            margin: 2px 0 4px;
+          }
+          .cost-inline img {
+            width: 14px;
+            height: 14px;
+            /* Slight nudge up to visually align with text bottom across platforms */
+            transform: translateY(-1px);
+            opacity: 0.95;
           }
           .pill {
             font-size: 10px;
@@ -754,8 +781,15 @@ export class ResearchTreeModal extends LitElement {
                                     return html`<div
                                       style="font-size:11px;opacity:.9;"
                                     >
-                                      <div>
-                                        Cost: ${tech.cost.toLocaleString()}
+                                      <div class="cost-inline" translate="no">
+                                        <span
+                                          >Cost:
+                                          ${tech.cost.toLocaleString()}</span
+                                        >
+                                        <img
+                                          src=${flaskIcon}
+                                          alt="research cost"
+                                        />
                                       </div>
                                       ${isResearched
                                         ? html`<div>Status: Completed</div>`
@@ -771,6 +805,10 @@ export class ResearchTreeModal extends LitElement {
                                   style="font-weight:600; margin-bottom:6px;"
                                 >
                                   ${tech.name}
+                                </div>
+                                <div class="cost-inline" translate="no">
+                                  <span>${tech.cost.toLocaleString()}</span>
+                                  <img src=${flaskIcon} alt="research cost" />
                                 </div>
                                 ${!isResearched && me
                                   ? (() => {
