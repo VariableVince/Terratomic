@@ -1587,7 +1587,7 @@ export class RoadManager {
         // - Water/shore tiles are always allowed
         if (!ok(neighbor)) continue;
         // Prefer built and planned roads equally over fresh land
-        // Base land cost = 2, Water/Shore cost = 20, Built/Planned = 1
+        // Base land cost = 2, Water/Shore cost = 30, Built/Planned = 1
         let stepCost = 2;
         if (
           this.roadTilesCache.has(neighbor) ||
