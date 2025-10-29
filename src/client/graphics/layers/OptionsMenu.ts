@@ -5,7 +5,7 @@ import { GameType } from "../../../core/game/Game";
 import { GameUpdateType } from "../../../core/game/GameUpdates";
 import { GameView } from "../../../core/game/GameView";
 import { UserSettings } from "../../../core/game/UserSettings";
-import { AlternateViewEvent, RefreshGraphicsEvent } from "../../InputHandler";
+import { AlternateViewEvent } from "../../InputHandler";
 import { PauseGameEvent } from "../../Transport";
 import { translateText } from "../../Utils";
 import { Layer } from "./Layer";
@@ -114,12 +114,6 @@ export class OptionsMenu extends LitElement implements Layer {
   private onToggleSpecialEffectsButtonClick() {
     this.userSettings.toggleFxLayer();
     this.requestUpdate();
-  }
-
-  private onToggleDarkModeButtonClick() {
-    this.userSettings.toggleDarkMode();
-    this.requestUpdate();
-    this.eventBus.emit(new RefreshGraphicsEvent());
   }
 
   private onToggleRandomNameModeButtonClick() {
@@ -253,11 +247,6 @@ export class OptionsMenu extends LitElement implements Layer {
             onClick: this.onToggleSpecialEffectsButtonClick,
             title: "Toggle Special effects",
             children: "💥: " + (this.userSettings.fxLayer() ? "On" : "Off"),
-          })}
-          ${button({
-            onClick: this.onToggleDarkModeButtonClick,
-            title: "Dark Mode",
-            children: "🌙: " + (this.userSettings.darkMode() ? "On" : "Off"),
           })}
           ${button({
             onClick: this.onToggleRandomNameModeButtonClick,

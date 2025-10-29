@@ -36,7 +36,7 @@ export class SoundButton extends LitElement {
     return html`
       <button
         title="Toggle Sound"
-        class="absolute top-0 right-[42px] md:top-[10px] md:right-[52px] border-none bg-none cursor-pointer text-2xl"
+        class="absolute top-0 right-0 md:top-[10px] md:right-[10px] border-none bg-none cursor-pointer text-2xl"
         @click=${() => this.toggleMuted()}
         aria-label=${this.muted ? "Unmute sound" : "Mute sound"}
       >
