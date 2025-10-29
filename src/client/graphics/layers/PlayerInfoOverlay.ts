@@ -272,7 +272,7 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
         <div class="flex flex-row gap-2 items-stretch">
           <!-- Left Column (Box 2 & 3 Merged) -->
           <div
-            class="flex flex-col justify-between p-1 border border-gray-400 rounded w-40"
+            class="flex flex-col justify-between p-1 border border-gray-400 rounded w-56"
           >
             <!-- Box 2 Content -->
             <div class="flex items-center gap-2 text-sm opacity-80">
@@ -320,6 +320,15 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
                   alt="Productivity"
                 />
                 ${Math.round(player.productivity() * 100)}%
+              </span>
+              <span translate="no">
+                <img
+                  src="/images/flask.png"
+                  class="inline-block w-4 h-4 mr-1"
+                  style="transform: translateY(-1px);"
+                  alt="Research"
+                />
+                ${(1).toFixed(1)}
               </span>
             </div>
           </div>
