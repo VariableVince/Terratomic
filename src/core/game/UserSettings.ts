@@ -38,6 +38,11 @@ export class UserSettings {
     return this.get("settings.darkMode", false);
   }
 
+  // Global sound mute setting (true = muted)
+  soundMuted() {
+    return this.get("settings.soundMuted", false);
+  }
+
   leftClickOpensMenu() {
     return this.get("settings.leftClickOpensMenu", false);
   }
@@ -83,5 +88,16 @@ export class UserSettings {
     } else {
       document.documentElement.classList.remove("dark");
     }
+  }
+
+  toggleSoundMuted() {
+    const next = !this.soundMuted();
+    this.set("settings.soundMuted", next);
+    // Broadcast to any listeners (menu music, UI buttons, etc.)
+    window.dispatchEvent(
+      new CustomEvent("sound-muted-changed", {
+        detail: { muted: next },
+      }),
+    );
   }
 }

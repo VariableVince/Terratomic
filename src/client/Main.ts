@@ -21,6 +21,7 @@ import { NewsModal } from "./NewsModal";
 import "./PublicLobby";
 import { PublicLobby } from "./PublicLobby";
 import { SinglePlayerModal } from "./SinglePlayerModal";
+import "./SoundButton";
 import { SendKickPlayerIntentEvent } from "./Transport";
 import { UserSettingModal } from "./UserSettingModal";
 import "./UsernameInput";
@@ -92,6 +93,19 @@ class Client {
   initialize(): void {
     // Prepare main menu background music
     this.setupMenuMusic();
+    // Sync menu music with persisted mute state and react to changes
+    const syncMute = (muted: boolean) => {
+      if (this.menuMusic) this.menuMusic.muted = muted;
+    };
+    syncMute(this.userSettings.soundMuted());
+    window.addEventListener("sound-muted-changed", (e: Event) => {
+      const event = e as CustomEvent<{ muted: boolean }>;
+      syncMute(event.detail.muted);
+      // If unmuting while on main menu, attempt to play
+      if (!event.detail.muted && this.isOnMainMenu) {
+        this.menuMusic?.play().catch(() => {});
+      }
+    });
     const newsModal = document.querySelector("news-modal") as NewsModal;
     if (!newsModal) {
       console.warn("News modal element not found");
@@ -336,12 +350,14 @@ class Client {
         audio.loop = true;
         audio.preload = "auto";
         audio.volume = 0.35; // pleasant background level
+        // Respect persisted mute state immediately
+        audio.muted = this.userSettings.soundMuted();
         this.menuMusic = audio;
 
         // Try to start on first user interaction to comply with autoplay policies
         const tryPlay = () => {
           // Only play if we're actually on the main menu
-          if (this.isOnMainMenu) {
+          if (this.isOnMainMenu && !this.userSettings.soundMuted()) {
             this.menuMusic?.play().catch(() => {
               // Ignore autoplay rejections; another interaction will retry
             });
@@ -353,14 +369,14 @@ class Client {
 
         // Also attempt a delayed play in case policies allow without gesture
         setTimeout(() => {
-          if (this.isOnMainMenu) {
+          if (this.isOnMainMenu && !this.userSettings.soundMuted()) {
             this.menuMusic?.play().catch(() => {});
           }
         }, 500);
       }
 
       // Ensure music plays when we're on the main menu initially
-      if (this.isOnMainMenu) {
+      if (this.isOnMainMenu && !this.userSettings.soundMuted()) {
         this.menuMusic?.play().catch(() => {
           // Will be retried on user gesture
         });
