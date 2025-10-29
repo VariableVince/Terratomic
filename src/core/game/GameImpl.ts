@@ -396,23 +396,7 @@ export class GameImpl implements Game {
       });
     }
 
-    // Debug: every ~10 ticks (~1s at 100ms/tick), log human players' road network length
-    if (this._ticks % 10 === 0) {
-      for (const p of this._players.values()) {
-        if (p.type() === PlayerType.Human) {
-          try {
-            const len = this.roadManager.getRoadLengthForPlayer(p.id());
-            // Print concise identifier for the player
-
-            console.log(
-              `[Roads] t=${this._ticks} player=${p.displayName()} (#${p.smallID()}) length=${len}`,
-            );
-          } catch (_) {
-            // no-op: method may not exist during hot-reload
-          }
-        }
-      }
-    }
+    // Removed noisy debug logging of road network length
 
     this._ticks++;
     return this.updates;
