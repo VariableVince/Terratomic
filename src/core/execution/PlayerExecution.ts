@@ -12,7 +12,6 @@ import { GameImpl } from "../game/GameImpl";
 import { GameMap, TileRef } from "../game/GameMap";
 import { PseudoRandom } from "../PseudoRandom";
 import { getTechNodes, isTechAvailable } from "../tech/ResearchTree";
-import { RESEARCH_TECH_IDS } from "../tech/TechEffects";
 import { calculateBoundingBox, getMode, inscribed, simpleHash } from "../Util";
 
 export class PlayerExecution implements Execution {
@@ -288,14 +287,9 @@ export class PlayerExecution implements Execution {
           beakers,
           n.cost,
         );
+        // On completion, addResearchBeakers calls addResearchedTech(), which handles all side-effects
         if (result?.completed) {
-          // On completion, record tech and apply any side-effects
-          // Roads unlock via Economy-1 (Post-War Reconstruction)
-          if (n.id === RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION) {
-            if (!(this.player as any).hasUpgrade?.(UpgradeType.Roads)) {
-              (this.player as any).addUpgrade?.(UpgradeType.Roads);
-            }
-          }
+          // No inline side-effects here
         }
       }
     }

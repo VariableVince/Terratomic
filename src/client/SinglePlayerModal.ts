@@ -38,6 +38,7 @@ export class SinglePlayerModal extends LitElement {
   @state() private infiniteGold: boolean = false;
   @state() private infiniteTroops: boolean = false;
   @state() private instantBuild: boolean = false;
+  @state() private instantResearchHumanOnly: boolean = false;
   @state() private useRandomMap: boolean = false;
   @state() private gameMode: GameMode = GameMode.FFA;
   @state() private teamCount: TeamCountConfig = 2;
@@ -252,6 +253,22 @@ export class SinglePlayerModal extends LitElement {
               </label>
 
               <label
+                for="singleplayer-modal-instant-research-human"
+                class="option-card ${this.instantResearchHumanOnly
+                  ? "selected"
+                  : ""}"
+              >
+                <div class="checkbox-icon"></div>
+                <input
+                  type="checkbox"
+                  id="singleplayer-modal-instant-research-human"
+                  @change=${this.handleInstantResearchHumanOnlyChange}
+                  .checked=${this.instantResearchHumanOnly}
+                />
+                <div class="option-card-title">Instant Research</div>
+              </label>
+
+              <label
                 for="singleplayer-modal-infinite-gold"
                 class="option-card ${this.infiniteGold ? "selected" : ""}"
               >
@@ -376,6 +393,12 @@ export class SinglePlayerModal extends LitElement {
     this.instantBuild = Boolean((e.target as HTMLInputElement).checked);
   }
 
+  private handleInstantResearchHumanOnlyChange(e: Event) {
+    this.instantResearchHumanOnly = Boolean(
+      (e.target as HTMLInputElement).checked,
+    );
+  }
+
   private handleInfiniteGoldChange(e: Event) {
     this.infiniteGold = Boolean((e.target as HTMLInputElement).checked);
   }
@@ -466,6 +489,7 @@ export class SinglePlayerModal extends LitElement {
               infiniteGold: this.infiniteGold,
               infiniteTroops: this.infiniteTroops,
               instantBuild: this.instantBuild,
+              instantResearchHumanOnly: this.instantResearchHumanOnly,
               disabledUnits: this.disabledUnits
                 .map((u) => Object.values(UnitType).find((ut) => ut === u))
                 .filter((ut): ut is UnitType => ut !== undefined),

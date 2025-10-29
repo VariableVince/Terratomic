@@ -1,4 +1,4 @@
-import { Player } from "../game/Game";
+import { Game, Player, UpgradeType } from "../game/Game";
 
 // Central tech IDs for research tree items that have gameplay effects.
 // Keep IDs aligned with ResearchTreeModal generation (e.g., "Land-1").
@@ -12,26 +12,121 @@ export interface TechMeta {
   description?: string;
 }
 
-// Central metadata registry for tech names and descriptions.
-// UI should consult this map for display, instead of hardcoding strings.
-export const TECH_METADATA: Readonly<Record<string, TechMeta>> = Object.freeze({
-  [RESEARCH_TECH_IDS.WWII_LESSONS]: {
-    name: "WWII Lessons Learned",
-    description:
-      "Doctrine refined by hard-won experience improves defensive readiness, logistics, and counter-attack planning. Effects: While defending, your troop losses are reduced by 10% and the attacker's troop losses are increased by 10%.",
-  },
-  [RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION]: {
-    name: "Post-War Reconstruction",
-    description:
-      "Revitalize infrastructure and industry by mobilizing civilian labor and resources to rebuild the national economy. Effects: Unlocks Roads investment and enables construction/expansion of your road network.",
-  },
-});
-
 export interface DefenseCasualtyModifiers {
   // Multiplier to apply to the attacker's troop loss when the defender is a player
   attackerLossMul: number;
   // Multiplier to apply to the defender's troop loss when the defender is a player
   defenderLossMul: number;
+}
+
+// Central registry shape for tech effects: on-complete side-effects and battle modifiers
+export type TechEffect = {
+  // Runs once when the tech is completed
+  onComplete?: (player: Player, game: Game) => void;
+  // Applied each time casualty modifiers are computed while defending
+  defense?: (mods: DefenseCasualtyModifiers) => void;
+  // Applied each time casualty modifiers are computed while attacking
+  attack?: (mods: DefenseCasualtyModifiers) => void;
+};
+
+export type TechDefinition = {
+  meta: TechMeta;
+  effects?: TechEffect;
+};
+
+// Unified registry containing both metadata and effects per tech
+export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
+  [RESEARCH_TECH_IDS.WWII_LESSONS]: {
+    meta: {
+      name: "WWII Lessons Learned",
+      description:
+        "Doctrine refined by hard-won experience improves defensive readiness, logistics, and counter-attack planning. Effects: While defending, your troop losses are reduced by 10% and the attacker's troop losses are increased by 10%.",
+    },
+    effects: {
+      defense: (mods) => {
+        mods.attackerLossMul *= 1.1; // enemy (attacker) takes more losses
+        mods.defenderLossMul *= 0.9; // defender takes fewer losses
+      },
+    },
+  },
+  [RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION]: {
+    meta: {
+      name: "Post-War Reconstruction",
+      description:
+        "Revitalize infrastructure and industry by mobilizing civilian labor and resources to rebuild the national economy. Effects: Unlocks Roads investment and enables construction/expansion of your road network.",
+    },
+    effects: {
+      onComplete: (player, game) => {
+        // Unlock Roads upgrade and trigger reconnection
+        if (!player.hasUpgrade?.(UpgradeType.Roads)) {
+          player.addUpgrade?.(UpgradeType.Roads);
+          game.markPlayerNodesForReconnection?.(player);
+        }
+      },
+    },
+  },
+});
+
+// Back-compat export for existing UI code: derive TECH_METADATA from TECHS
+export const TECH_METADATA: Readonly<Record<string, TechMeta>> = Object.freeze(
+  Object.fromEntries(Object.entries(TECHS).map(([id, def]) => [id, def.meta])),
+);
+
+// Helper accessors around TECHS for safe, typed consumption across the codebase
+export type MissingBehavior = "throw" | "warn" | "silent";
+export interface GetTechOptions {
+  strict?: boolean; // when true, on missing -> throw
+  onMissing?: MissingBehavior; // default: "warn" when strict=false
+}
+
+export function getTech(
+  techId: string,
+  opts: GetTechOptions = {},
+): TechDefinition {
+  const def = TECHS[techId];
+  if (def) return def;
+  const strict = opts.strict ?? false;
+  const onMissing: MissingBehavior =
+    opts.onMissing ?? (strict ? "throw" : "warn");
+  const message = `[TechEffects] Unknown tech id: ${techId}`;
+  if (strict || onMissing === "throw") {
+    throw new Error(message);
+  }
+  if (onMissing === "warn") {
+    console.warn(message);
+  }
+  // Return a stub definition to keep callers robust in non-strict mode
+  return { meta: { name: techId } } satisfies TechDefinition;
+}
+
+export function getTechMeta(techId: string, opts?: GetTechOptions): TechMeta {
+  return getTech(techId, opts).meta;
+}
+
+export function getTechEffects(
+  techId: string,
+  opts?: GetTechOptions,
+): TechEffect | undefined {
+  return getTech(techId, opts).effects;
+}
+
+export function listTechs(): Array<{ id: string; meta: TechMeta }> {
+  return Object.entries(TECHS).map(([id, def]) => ({ id, meta: def.meta }));
+}
+
+export function forEachTech(
+  fn: (id: string, def: TechDefinition) => void,
+): void {
+  for (const [id, def] of Object.entries(TECHS)) fn(id, def);
+}
+
+export function applyTechCompletionEffects(
+  player: Player,
+  game: Game,
+  techId: string,
+): void {
+  const entry = TECHS[techId]?.effects;
+  entry?.onComplete?.(player, game);
 }
 
 /**
@@ -42,17 +137,16 @@ export interface DefenseCasualtyModifiers {
 export function defenseCasualtyModifiers(
   defender: Player,
 ): DefenseCasualtyModifiers {
-  let attackerLossMul = 1.0;
-  let defenderLossMul = 1.0;
-
-  // WWII Lessons Learned: When defending, reduce own casualties by 10% and
-  // increase enemy casualties by 10%.
-  if (defender.hasResearchedTech?.(RESEARCH_TECH_IDS.WWII_LESSONS)) {
-    attackerLossMul *= 1.1; // enemy (attacker) takes more losses
-    defenderLossMul *= 0.9; // defender takes fewer losses
+  const mods: DefenseCasualtyModifiers = {
+    attackerLossMul: 1.0,
+    defenderLossMul: 1.0,
+  };
+  for (const [techId, def] of Object.entries(TECHS)) {
+    if (defender.hasResearchedTech?.(techId)) {
+      def.effects?.defense?.(mods);
+    }
   }
-
-  return { attackerLossMul, defenderLossMul };
+  return mods;
 }
 
 /**
@@ -65,14 +159,14 @@ export function defenseCasualtyModifiers(
 export function attackCasualtyModifiers(
   attacker: Player,
 ): DefenseCasualtyModifiers {
-  const attackerLossMul = 1.0;
-  const defenderLossMul = 1.0;
-
-  // Placeholder for future attack-side techs that affect casualties.
-  // Example (future): if (attacker.hasResearchedTech(RESEARCH_TECH_IDS.MODERN_TACTICS)) {
-  //   attackerLossMul *= 0.95;
-  //   defenderLossMul *= 1.05;
-  // }
-
-  return { attackerLossMul, defenderLossMul };
+  const mods: DefenseCasualtyModifiers = {
+    attackerLossMul: 1.0,
+    defenderLossMul: 1.0,
+  };
+  for (const [techId, def] of Object.entries(TECHS)) {
+    if (attacker.hasResearchedTech?.(techId)) {
+      def.effects?.attack?.(mods);
+    }
+  }
+  return mods;
 }

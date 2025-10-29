@@ -1,4 +1,4 @@
-import { TECH_METADATA } from "./TechEffects";
+import { getTechMeta } from "./TechEffects";
 
 export type Category = "Land" | "Sea" | "Air" | "Nuclear" | "Economy";
 
@@ -24,7 +24,7 @@ const baseLevels: TechNode[] = (() => {
   for (let lvl = 1; lvl <= 5; lvl++) {
     for (const cat of ["Land", "Sea", "Air", "Nuclear", "Economy"] as const) {
       const id = mkId(cat, lvl);
-      const meta = TECH_METADATA[id];
+      const meta = getTechMeta(id, { strict: false });
       const node: TechNode = {
         id,
         name: meta?.name ?? `${cat} Tech ${lvl}`,
@@ -44,29 +44,30 @@ const baseLevels: TechNode[] = (() => {
 const extras: TechNode[] = [
   {
     id: "Land-2B",
-    name: TECH_METADATA["Land-2B"]?.name ?? "Land Tech 2B",
+    name: getTechMeta("Land-2B", { strict: false })?.name ?? "Land Tech 2B",
     category: "Land",
     level: 2,
     requiresAllOf: ["Land-1"],
-    description: TECH_METADATA["Land-2B"]?.description,
+    description: getTechMeta("Land-2B", { strict: false })?.description,
     cost: TECH_COST_DEFAULT,
   },
   {
     id: "Sea-4B",
-    name: TECH_METADATA["Sea-4B"]?.name ?? "Sea Tech 4B",
+    name: getTechMeta("Sea-4B", { strict: false })?.name ?? "Sea Tech 4B",
     category: "Sea",
     level: 4,
     requiresAllOf: ["Sea-3"],
-    description: TECH_METADATA["Sea-4B"]?.description,
+    description: getTechMeta("Sea-4B", { strict: false })?.description,
     cost: TECH_COST_DEFAULT,
   },
   {
     id: "Economy-3B",
-    name: TECH_METADATA["Economy-3B"]?.name ?? "Economy Tech 3B",
+    name:
+      getTechMeta("Economy-3B", { strict: false })?.name ?? "Economy Tech 3B",
     category: "Economy",
     level: 3,
     requiresAllOf: ["Economy-2"],
-    description: TECH_METADATA["Economy-3B"]?.description,
+    description: getTechMeta("Economy-3B", { strict: false })?.description,
     cost: TECH_COST_DEFAULT,
   },
 ];

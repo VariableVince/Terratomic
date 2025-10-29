@@ -10,10 +10,7 @@ import {
 } from "../../../core/game/Game";
 import { GameView, PlayerView } from "../../../core/game/GameView";
 import { getTechNodes } from "../../../core/tech/ResearchTree";
-import {
-  RESEARCH_TECH_IDS,
-  TECH_METADATA,
-} from "../../../core/tech/TechEffects";
+import { getTechMeta, RESEARCH_TECH_IDS } from "../../../core/tech/TechEffects";
 import { PlayerListChangedEvent } from "../../events/PlayerListChangedEvent";
 import { AttackRatioEvent } from "../../InputHandler";
 import "../../ResearchTreeModal";
@@ -1481,7 +1478,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                           ${!hasRoads
                             ? html`<span
                                 class="lock-badge"
-                                title=${`Research '${TECH_METADATA[RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION]?.name ?? "Post-War Reconstruction"}' to enable road investment`}
+                                title=${`Research '${getTechMeta(RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION, { strict: false }).name}' to enable road investment`}
                               >
                                 <svg
                                   class="lock-icon"
@@ -1571,7 +1568,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                         .value=${(this._roadInvestmentRate * 100).toString()}
                         ?disabled=${!hasRoads}
                         title=${!hasRoads
-                          ? `Research '${TECH_METADATA[RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION]?.name ?? "Post-War Reconstruction"}' to enable road investment`
+                          ? `Research '${getTechMeta(RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION, { strict: false }).name}' to enable road investment`
                           : ""}
                         @input=${(e: Event) => {
                           if (!hasRoads) return;
@@ -1838,7 +1835,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                   : [];
                 const priorityId = me?.researchPriorityTech?.() ?? null;
                 const priorityName = priorityId
-                  ? (TECH_METADATA[priorityId]?.name ?? priorityId)
+                  ? getTechMeta(priorityId, { strict: false }).name
                   : "None";
                 return html`<div class="flex h-full flex-col">
                   <h3 class="military-heading mb-2">Research</h3>

@@ -1,6 +1,7 @@
 import { renderNumber, renderTroops } from "../../client/Utils";
 import { PseudoRandom } from "../PseudoRandom";
 import { ClientID } from "../Schemas";
+import { applyTechCompletionEffects } from "../tech/TechEffects";
 import {
   assertNever,
   distSortUnit,
@@ -335,7 +336,11 @@ export class PlayerImpl implements Player {
 
   // Research tree (standalone) API
   addResearchedTech(techId: string): void {
+    // Add tech to researched set
     this._researchTreeTechs.add(techId);
+
+    // Apply centralized side-effects upon research completion
+    applyTechCompletionEffects(this, this.mg, techId);
   }
   hasResearchedTech(techId: string): boolean {
     return this._researchTreeTechs.has(techId);
@@ -356,7 +361,8 @@ export class PlayerImpl implements Player {
     this._researchBeakers.set(techId, total);
     const completed = total >= cost;
     if (completed) {
-      this._researchTreeTechs.add(techId);
+      // Route all completions through addResearchedTech to ensure side-effects fire consistently
+      this.addResearchedTech(techId);
       // Do not carry over excess; keep capped at cost
     }
     return { completed, newBeakers: total };
