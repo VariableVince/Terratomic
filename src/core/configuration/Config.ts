@@ -209,6 +209,8 @@ export interface Config {
   researchK(): number; // k in 1 - exp(-k * x)
   researchBeakerMin(): number; // inclusive
   researchBeakerMax(): number; // inclusive
+  // Server-side cadence for research innovation calculation (ticks)
+  researchIntervalTicks(): number;
 }
 
 export interface Theme {

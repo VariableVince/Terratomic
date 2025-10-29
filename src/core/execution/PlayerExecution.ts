@@ -5,6 +5,7 @@ import {
   Game,
   MessageType,
   Player,
+  PlayerType,
   UnitType,
   UpgradeType,
 } from "../game/Game";
@@ -22,6 +23,8 @@ export class PlayerExecution implements Execution {
   private mg: Game;
   private active = true;
   private random: PseudoRandom | null = null;
+  // Accumulate research "intensity" allocation since last innovation calculation
+  private _researchAccum: Map<string, number> = new Map();
 
   constructor(private player: Player) {}
 
@@ -273,25 +276,54 @@ export class PlayerExecution implements Execution {
       for (const n of available) alloc[n.id] = share;
     }
 
-    // For each tech, compute per-tick success probability and award beakers on success
+    // Accumulate allocated intensity for each available tech
     for (const n of available) {
       const x = alloc[n.id] ?? 0;
       if (x <= 0) continue;
-      const p = 1 - Math.exp(-k * x);
-      const roll = this.random.next();
-      if (roll < p) {
-        // Success: award uniform beakers between [bMin, bMax] inclusive
-        const beakers = this.random.nextInt(bMin, bMax + 1);
-        const result = (this.player as any).addResearchBeakers?.(
-          n.id,
-          beakers,
-          n.cost,
-        );
-        // On completion, addResearchBeakers calls addResearchedTech(), which handles all side-effects
-        if (result?.completed) {
-          // No inline side-effects here
+      const prev = this._researchAccum.get(n.id) ?? 0;
+      this._researchAccum.set(n.id, prev + x);
+    }
+
+    // Only calculate innovation probability on the configured cadence
+    const interval = this.config.researchIntervalTicks();
+    if (interval > 0 && this.mg.ticks() % interval === 0) {
+      const isHuman = this.player.type() === PlayerType.Human;
+      const logEntries: Array<{ techId: string; X: number; p: number }> = [];
+      for (const [techId, X] of this._researchAccum.entries()) {
+        if (!Number.isFinite(X) || X <= 0) continue;
+        const p = 1 - Math.exp(-k * X);
+        if (isHuman) logEntries.push({ techId, X, p });
+        const roll = this.random.next();
+        if (roll < p) {
+          // Success: award uniform beakers between [bMin, bMax] inclusive
+          const beakers = this.random.nextInt(bMin, bMax + 1);
+          const cost = byId.get(techId)?.cost ?? 0;
+          const result = (this.player as any).addResearchBeakers?.(
+            techId,
+            beakers,
+            cost,
+          );
+          if (result?.completed) {
+            // completed via addResearchBeakers -> addResearchedTech side-effects
+          }
         }
       }
+      if (isHuman && logEntries.length > 0) {
+        // Compact, readable logging for human player's innovation probabilities
+        try {
+          const tick = this.mg.ticks();
+          const summary = logEntries
+            .map((e) => `${e.techId}: p=${e.p.toFixed(4)} X=${Math.round(e.X)}`)
+            .join(", ");
+          console.log(
+            `[Research] tick=${tick} player=${this.player.displayName()} probs -> ${summary}`,
+          );
+        } catch {
+          // best-effort logging only
+        }
+      }
+      // Reset accumulators after processing the cadence boundary
+      this._researchAccum.clear();
     }
   }
 

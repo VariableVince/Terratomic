@@ -3,6 +3,7 @@ import { SpatialIndex } from "../../client/graphics/SpatialIndex";
 import { Config } from "../configuration/Config";
 import { EventBus } from "../EventBus";
 import { ClientID, GameID } from "../Schemas";
+import { computeResearchLevel } from "../tech/ResearchTree";
 import { createRandomName } from "../Util";
 import { WorkerClient } from "../worker/WorkerClient";
 import {
@@ -143,6 +144,9 @@ export class UnitView {
 
 export class PlayerView {
   public anonymousName: string | null = null;
+  // Cache for aggregate research tech level; recomputed only on configured cadence
+  private _cachedResearchTechLevel: number = 1;
+  private _cachedResearchTechLevelTick: number = -1;
 
   constructor(
     private game: GameView,
@@ -253,6 +257,32 @@ export class PlayerView {
   }
   researchPriorityTech(): string | null {
     return this.data.researchPriorityTech ?? null;
+  }
+
+  // Aggregate research progress across levels in [0, L] (L = max level in tree)
+  researchTechLevel(): number {
+    const tick = this.game.ticks();
+    const interval = this.game.config().researchIntervalTicks();
+    // Only recompute on cadence: when server tick is on a research step boundary
+    if (
+      tick !== this._cachedResearchTechLevelTick &&
+      interval > 0 &&
+      tick % interval === 0
+    ) {
+      this._cachedResearchTechLevel = computeResearchLevel(
+        this.data.researchTreeTechs ?? [],
+      );
+      this._cachedResearchTechLevelTick = tick;
+    }
+    return this._cachedResearchTechLevel;
+  }
+
+  /** Force recompute now (called from GameView on cadence) */
+  _recomputeResearchTechLevelCache(currentTick: number): void {
+    this._cachedResearchTechLevel = computeResearchLevel(
+      this.data.researchTreeTechs ?? [],
+    );
+    this._cachedResearchTechLevelTick = currentTick;
   }
 
   unitsOwned(type: UnitType): number {
@@ -375,6 +405,7 @@ export class PlayerView {
 }
 
 export class GameView implements GameMap {
+  // Recalculate research tech level only after research step cadence (from config)
   private lastUpdate: GameUpdateViewData | null;
   private smallIDToID = new Map<number, PlayerID>();
   private _players = new Map<PlayerID, PlayerView>();
@@ -506,6 +537,15 @@ export class GameView implements GameMap {
 
     if (listsAreDifferent) {
       this.eventBus.emit(new PlayerListChangedEvent());
+    }
+
+    // Recompute cached research tech level on the configured cadence boundary
+    const t = this.ticks();
+    const interval = this._config.researchIntervalTicks();
+    if (interval > 0 && t % interval === 0) {
+      for (const p of this._players.values()) {
+        p._recomputeResearchTechLevelCache(t);
+      }
     }
   }
 

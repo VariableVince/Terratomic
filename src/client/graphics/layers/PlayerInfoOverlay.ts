@@ -328,7 +328,7 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
                   style="transform: translateY(-1px);"
                   alt="Research"
                 />
-                ${(1).toFixed(1)}
+                ${player.researchTechLevel().toFixed(1)}
               </span>
             </div>
           </div>

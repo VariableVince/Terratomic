@@ -1168,7 +1168,7 @@ export class DefaultConfig implements Config {
   }
   // Success probability p = 1 - exp(-k * x)
   researchK(): number {
-    return 0.001; // Tunable: scales how quickly probability rises with x
+    return 0.0001; // Tunable: scales how quickly probability rises with x
   }
   // Beaker award range when a success occurs (inclusive bounds)
   researchBeakerMin(): number {
@@ -1176,5 +1176,9 @@ export class DefaultConfig implements Config {
   }
   researchBeakerMax(): number {
     return 1500;
+  }
+  // Calculate innovation probability every N ticks (align with client 100-tick cadence)
+  researchIntervalTicks(): number {
+    return 100;
   }
 }

@@ -14,6 +14,10 @@ export interface TechNode {
 }
 
 export const TECH_COST_DEFAULT = 10000;
+export function costForLevel(level: number): number {
+  // Level-based cost: L1=10000, L2=20000, ...
+  return Math.max(1, level) * TECH_COST_DEFAULT;
+}
 
 // Central research tech tree definition used by both client and server.
 // Keep aligned with any UI representation.
@@ -32,7 +36,7 @@ const baseLevels: TechNode[] = (() => {
         level: lvl,
         description: meta?.description,
         requiresAllOf: lvl > 1 ? [mkId(cat, lvl - 1)] : undefined,
-        cost: TECH_COST_DEFAULT,
+        cost: costForLevel(lvl),
       };
       nodes.push(node);
     }
@@ -49,7 +53,7 @@ const extras: TechNode[] = [
     level: 2,
     requiresAllOf: ["Land-1"],
     description: getTechMeta("Land-2B", { strict: false })?.description,
-    cost: TECH_COST_DEFAULT,
+    cost: costForLevel(2),
   },
   {
     id: "Sea-4B",
@@ -58,7 +62,7 @@ const extras: TechNode[] = [
     level: 4,
     requiresAllOf: ["Sea-3"],
     description: getTechMeta("Sea-4B", { strict: false })?.description,
-    cost: TECH_COST_DEFAULT,
+    cost: costForLevel(4),
   },
   {
     id: "Economy-3B",
@@ -68,7 +72,7 @@ const extras: TechNode[] = [
     level: 3,
     requiresAllOf: ["Economy-2"],
     description: getTechMeta("Economy-3B", { strict: false })?.description,
-    cost: TECH_COST_DEFAULT,
+    cost: costForLevel(3),
   },
 ];
 
@@ -108,4 +112,54 @@ export function isTechAvailable(
   if (reqAll.length && !reqAll.every((p) => researched.has(p))) return false;
   if (reqOne.length && !reqOne.some((p) => researched.has(p))) return false;
   return true;
+}
+
+/**
+ * Compute the aggregate research tech level using damped level progression.
+ * Returns a value in [0, L], where L is the max level present in the tech tree.
+ * The contribution of each level i is its completion fraction multiplied by the
+ * product of all lower-level completion fractions, so incomplete earlier levels
+ * dampen later levels.
+ *
+ * Example: if L=5 and only level 1 is half complete, result = 0.5. If level 1
+ * is fully complete and level 2 is 50% complete, result = 1.5.
+ */
+export function computeResearchLevel(
+  researchedInput: ReadonlySet<string> | readonly string[],
+  nodes: ReadonlyArray<TechNode> = getTechNodes(),
+): number {
+  const researched = Array.isArray(researchedInput)
+    ? new Set(researchedInput)
+    : (researchedInput as ReadonlySet<string>);
+  if (nodes.length === 0) return 0;
+
+  // Determine level bounds dynamically from the tech tree
+  let L = 0;
+  for (const n of nodes) if (n.level > L) L = n.level;
+  if (L <= 0) return 0;
+
+  // Precompute total counts per level and researched counts per level
+  const totalPerLevel: number[] = Array(L + 1).fill(0); // 1..L used
+  const researchedPerLevel: number[] = Array(L + 1).fill(0);
+  for (const n of nodes) {
+    totalPerLevel[n.level]++;
+    if (researched.has(n.id)) researchedPerLevel[n.level]++;
+  }
+
+  // Apply the damped-sum formula across levels 1..L
+  let T = 0;
+  let prereq = 1; // product of lower-level completion fractions
+  for (let lvl = 1; lvl <= L; lvl++) {
+    const total = totalPerLevel[lvl];
+    if (total <= 0) continue; // skip empty levels if any
+    const progress = researchedPerLevel[lvl] / total;
+    // Guard non-finite values
+    const p = Number.isFinite(progress)
+      ? Math.max(0, Math.min(1, progress))
+      : 0;
+    T += p * prereq;
+    prereq *= p;
+  }
+  T += 1;
+  return Number.isFinite(T) ? T : 0;
 }
