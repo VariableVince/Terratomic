@@ -115,11 +115,11 @@ export function isTechAvailable(
 }
 
 /**
- * Compute the aggregate research tech level as a simple sum of per-level completion.
- * For each level i, add r_i / n_i, where r_i is the number of researched techs
- * at level i and n_i is the total tech count at level i. Finally, add 1 so the
- * result ranges from 1 (no research) up to L+1 (all levels complete), where L
- * is the highest level in the tech tree.
+ * Compute the aggregate research tech level as a weighted blend of:
+ *  - current additive completion (1 + sum over levels of r_i / n_i), and
+ *  - the highest researched level (highestLevel + 1).
+ * Specifically: 0.8 * additive + 0.2 * (highestLevel + 1).
+ * This yields a value in [1, L+1], where L is the highest level in the tree.
  */
 export function computeResearchLevel(
   researchedInput: ReadonlySet<string> | readonly string[],
@@ -144,14 +144,26 @@ export function computeResearchLevel(
   }
 
   // Sum per-level completion across 1..L and add 1
-  let T = 0;
+  let additive = 0;
   for (let lvl = 1; lvl <= L; lvl++) {
     const total = totalPerLevel[lvl];
     if (total <= 0) continue; // skip empty levels if any
     const ratio = researchedPerLevel[lvl] / total;
     const p = Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
-    T += p;
+    additive += p;
   }
-  const result = T + 1;
-  return Number.isFinite(result) ? result : 0;
+  const currentValue = additive + 1;
+
+  // Find highest researched level among researched nodes
+  let highestLevel = 0;
+  for (let lvl = 1; lvl <= L; lvl++) {
+    if (researchedPerLevel[lvl] > 0) highestLevel = Math.max(highestLevel, lvl);
+  }
+  const highestPlusOne = highestLevel + 1;
+
+  // Weighted average
+  const result = 0.8 * currentValue + 0.2 * highestPlusOne;
+  // Clamp defensively to [1, L+1]
+  const clamped = Math.max(1, Math.min(L + 1, result));
+  return Number.isFinite(clamped) ? clamped : 0;
 }

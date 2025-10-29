@@ -24,23 +24,23 @@ describe("computeResearchLevel", () => {
     expect(T).toBeCloseTo(2, 6);
   });
 
-  it("grows linearly with partial completion of a level", () => {
+  it("weights 80% additive and 20% highest level (half L1)", () => {
     const level1 = idsForLevel(1);
     const halfL1 = new Set<string>(
       level1.slice(0, Math.floor(level1.length / 2)),
     );
     const T_halfL1 = computeResearchLevel(halfL1);
-    // 1 (base) + 0.5 (half of level 1)
-    expect(T_halfL1).toBeCloseTo(1.5, 1);
+    // additive = 1 + 0.5 = 1.5; highestLevel = 1 => (1+1)=2; blended = 0.8*1.5 + 0.2*2 = 1.6
+    expect(T_halfL1).toBeCloseTo(1.6, 2);
   });
 
-  it("gives 2.5 when L1 complete and L2 50% complete (approx)", () => {
+  it("gives ~2.6 when L1 complete and L2 50% complete (approx)", () => {
     const level1 = idsForLevel(1);
     const level2 = idsForLevel(2);
     const halfL2Count = Math.floor(level2.length / 2);
     const chosenL2 = level2.slice(0, halfL2Count);
     const T = computeResearchLevel([...level1, ...chosenL2]);
-    // 1 (base) + 1 (L1) + 0.5 (half of L2) = 2.5 (approx)
-    expect(T).toBeCloseTo(2.5, 1);
+    // additive = 1 + 1 + 0.5 = 2.5; highestLevel = 2 => (2+1)=3; blended = 0.8*2.5 + 0.2*3 = 2.6
+    expect(T).toBeCloseTo(2.6, 2);
   });
 });
