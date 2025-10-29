@@ -5,6 +5,7 @@ import { Game, Player, UpgradeType } from "../game/Game";
 export const RESEARCH_TECH_IDS = {
   WWII_LESSONS: "Land-1",
   POST_WAR_RECONSTRUCTION: "Economy-1",
+  INTERNATIONAL_TRADE: "Economy-2",
 } as const;
 
 export interface TechMeta {
@@ -60,6 +61,21 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
         // Unlock Roads upgrade and trigger reconnection
         if (!player.hasUpgrade?.(UpgradeType.Roads)) {
           player.addUpgrade?.(UpgradeType.Roads);
+          game.markPlayerNodesForReconnection?.(player);
+        }
+      },
+    },
+  },
+  [RESEARCH_TECH_IDS.INTERNATIONAL_TRADE]: {
+    meta: {
+      name: "International Trade",
+      description:
+        "Establish formal trade agreements and routes with allied nations, enabling shared economic prosperity and strategic interdependence. Effects: Unlocks International Trade, allowing road connections to allied territories.",
+    },
+    effects: {
+      onComplete: (player, game) => {
+        if (!player.hasUpgrade?.(UpgradeType.InternationalTrade)) {
+          player.addUpgrade?.(UpgradeType.InternationalTrade);
           game.markPlayerNodesForReconnection?.(player);
         }
       },
