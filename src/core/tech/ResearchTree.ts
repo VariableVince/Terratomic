@@ -115,14 +115,11 @@ export function isTechAvailable(
 }
 
 /**
- * Compute the aggregate research tech level using damped level progression.
- * Returns a value in [0, L], where L is the max level present in the tech tree.
- * The contribution of each level i is its completion fraction multiplied by the
- * product of all lower-level completion fractions, so incomplete earlier levels
- * dampen later levels.
- *
- * Example: if L=5 and only level 1 is half complete, result = 0.5. If level 1
- * is fully complete and level 2 is 50% complete, result = 1.5.
+ * Compute the aggregate research tech level as a simple sum of per-level completion.
+ * For each level i, add r_i / n_i, where r_i is the number of researched techs
+ * at level i and n_i is the total tech count at level i. Finally, add 1 so the
+ * result ranges from 1 (no research) up to L+1 (all levels complete), where L
+ * is the highest level in the tech tree.
  */
 export function computeResearchLevel(
   researchedInput: ReadonlySet<string> | readonly string[],
@@ -146,20 +143,15 @@ export function computeResearchLevel(
     if (researched.has(n.id)) researchedPerLevel[n.level]++;
   }
 
-  // Apply the damped-sum formula across levels 1..L
+  // Sum per-level completion across 1..L and add 1
   let T = 0;
-  let prereq = 1; // product of lower-level completion fractions
   for (let lvl = 1; lvl <= L; lvl++) {
     const total = totalPerLevel[lvl];
     if (total <= 0) continue; // skip empty levels if any
-    const progress = researchedPerLevel[lvl] / total;
-    // Guard non-finite values
-    const p = Number.isFinite(progress)
-      ? Math.max(0, Math.min(1, progress))
-      : 0;
-    T += p * prereq;
-    prereq *= p;
+    const ratio = researchedPerLevel[lvl] / total;
+    const p = Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
+    T += p;
   }
-  T += 1;
-  return Number.isFinite(T) ? T : 0;
+  const result = T + 1;
+  return Number.isFinite(result) ? result : 0;
 }
