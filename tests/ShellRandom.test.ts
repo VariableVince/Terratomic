@@ -35,6 +35,10 @@ describe("Shell Random Damage", () => {
 
     player1 = game.player("player_1_id");
     player2 = game.player("player_2_id");
+
+    // Ensure hostilities are allowed under the new diplomacy rules
+    player1.setWarWith(player2);
+    player2.setWarWith(player1);
   });
 
   test("Shell damage varies randomly between 200-300 base damage", () => {

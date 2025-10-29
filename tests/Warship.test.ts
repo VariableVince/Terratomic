@@ -47,6 +47,11 @@ describe("Warship", () => {
 
     player1 = game.player("player_1_id");
     player2 = game.player("player_2_id");
+
+    // Ensure tests reflect new diplomacy rules: hostile actions require an active war state.
+    // Declare mutual war so warships can legally target enemy ships/units in these scenarios.
+    player1.setWarWith(player2);
+    player2.setWarWith(player1);
   });
 
   test("Warship heals only if player has port", async () => {

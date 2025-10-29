@@ -1,5 +1,10 @@
 import { ResearchTreeSelectExecution } from "../../../src/core/execution/ResearchTreeSelectExecution";
-import { Game, Player, UpgradeType } from "../../../src/core/game/Game";
+import {
+  Game,
+  Player,
+  PlayerType,
+  UpgradeType,
+} from "../../../src/core/game/Game";
 import { RESEARCH_TECH_IDS } from "../../../src/core/tech/TechEffects";
 
 describe("ResearchTreeSelectExecution", () => {
@@ -10,6 +15,7 @@ describe("ResearchTreeSelectExecution", () => {
 
   beforeEach(() => {
     mockPlayer = {
+      type: jest.fn().mockReturnValue(PlayerType.Human),
       hasUpgrade: jest.fn().mockReturnValue(false),
       addUpgrade: jest.fn(),
       // addResearchedTech is duck-typed; the execution checks at runtime
@@ -17,8 +23,28 @@ describe("ResearchTreeSelectExecution", () => {
     } as any;
 
     mockGame = {
+      config: jest.fn().mockReturnValue({
+        gameConfig: jest
+          .fn()
+          .mockReturnValue({ instantResearchHumanOnly: true }),
+      }),
       markPlayerNodesForReconnection: jest.fn(),
     } as any;
+
+    // Simulate PlayerImpl side-effects when research completes
+    (mockPlayer.addResearchedTech as jest.Mock).mockImplementation(
+      (id: string) => {
+        if (id === RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION) {
+          const alreadyHas = (mockPlayer.hasUpgrade as jest.Mock)(
+            UpgradeType.Roads,
+          );
+          if (!alreadyHas) {
+            mockPlayer.addUpgrade(UpgradeType.Roads);
+            mockGame.markPlayerNodesForReconnection(mockPlayer as any);
+          }
+        }
+      },
+    );
   });
 
   it("adds researched tech ID to the player's set", () => {
