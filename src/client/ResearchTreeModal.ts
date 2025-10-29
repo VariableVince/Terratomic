@@ -583,12 +583,14 @@ export class ResearchTreeModal extends LitElement {
               inset 0 0 4px rgba(255, 255, 255, 0.1);
           }
           .progress-fill.priority {
-            /* Keep priority identical to flask reference as requested */
+            /* Same flask gradient, but stronger neon to pop more than base */
             background: linear-gradient(90deg, #00f8ff 0%, #00a6f6 100%);
             box-shadow:
-              0 0 12px rgba(37, 150, 186, 0.65),
-              0 0 20px rgba(0, 166, 246, 0.45),
-              inset 0 0 5px rgba(255, 255, 255, 0.12);
+              0 0 14px rgba(0, 166, 246, 0.75),
+              0 0 26px rgba(0, 248, 255, 0.6),
+              0 0 32px rgba(0, 166, 246, 0.5),
+              inset 0 0 6px rgba(255, 255, 255, 0.16),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.12);
           }
           .cost-inline {
             display: inline-flex;
