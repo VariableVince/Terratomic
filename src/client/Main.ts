@@ -82,10 +82,14 @@ class Client {
   private publicLobby: PublicLobby;
   private googleAds: NodeListOf<GoogleAdElement>;
   private userSettings: UserSettings = new UserSettings();
+  // Main menu background music (loops on menu, paused during gameplay)
+  private menuMusic: HTMLAudioElement | null = null;
 
   constructor() {}
 
   initialize(): void {
+    // Prepare main menu background music
+    this.setupMenuMusic();
     const newsModal = document.querySelector("news-modal") as NewsModal;
     if (!newsModal) {
       console.warn("News modal element not found");
@@ -163,6 +167,9 @@ class Client {
       if (this.gameStop !== null) {
         this.gameStop();
       }
+      // Ensure music is stopped on unload
+      this.menuMusic?.pause();
+      if (this.menuMusic) this.menuMusic.currentTime = 0;
     });
 
     document.addEventListener("join-lobby", this.handleJoinLobby.bind(this));
@@ -319,6 +326,41 @@ class Client {
     }
   }
 
+  private setupMenuMusic(): void {
+    try {
+      // Avoid creating multiple elements
+      if (!this.menuMusic) {
+        const audio = new Audio("/music/berlin-beat-362757.mp3");
+        audio.loop = true;
+        audio.preload = "auto";
+        audio.volume = 0.35; // pleasant background level
+        this.menuMusic = audio;
+
+        // Try to start on first user interaction to comply with autoplay policies
+        const tryPlay = () => {
+          this.menuMusic?.play().catch(() => {
+            // Ignore autoplay rejections; another interaction will retry
+          });
+        };
+        // One-time listeners for common interactions on the menu
+        window.addEventListener("pointerdown", tryPlay, { once: true });
+        window.addEventListener("keydown", tryPlay, { once: true });
+
+        // Also attempt a delayed play in case policies allow without gesture
+        setTimeout(() => {
+          this.menuMusic?.play().catch(() => {});
+        }, 500);
+      }
+
+      // Ensure music plays when we're on the main menu initially
+      this.menuMusic?.play().catch(() => {
+        // Will be retried on user gesture
+      });
+    } catch (e) {
+      console.warn("Failed to set up menu music", e);
+    }
+  }
+
   private handleHash() {
     const { hash } = window.location;
     if (hash.startsWith("#")) {
@@ -357,6 +399,8 @@ class Client {
       },
       () => {
         console.log("Closing modals");
+        // Pause menu music when the game is loading/starting
+        this.menuMusic?.pause();
         document.getElementById("settings-button")?.classList.add("hidden");
         document
           .getElementById("username-validation-error")
@@ -416,6 +460,8 @@ class Client {
     this.gameStop();
     this.gameStop = null;
     this.publicLobby.leaveLobby();
+    // Resume menu music when returning to main menu
+    this.menuMusic?.play().catch(() => {});
   }
 
   private handleKickPlayer(event: CustomEvent) {
