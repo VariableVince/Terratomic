@@ -217,7 +217,9 @@
     "players": "Players",
     "waiting": "Waiting for players...",
     "start": "Start Game",
-    "host_badge": "Host"
+    "host_badge": "Host",
+    "unassigned_players": "Unassigned Players",
+    "spectator": "Spectator"
   },
   "team_colors": {
     "red": "Red",
@@ -597,7 +599,8 @@
     "desync_notice": "You are desynced from other players. What you see might differ from other players."
   },
   "heads_up_message": {
-    "choose_spawn": "Choose a starting location"
+    "choose_spawn": "Choose a starting location",
+    "spectating": "Spectating..."
   },
   "buttons": {
     "focus": "Focus",

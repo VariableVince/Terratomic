@@ -39,7 +39,6 @@ import { PlayerImpl } from "./PlayerImpl";
 import { Road, RoadManager } from "./RoadManager";
 import { Stats } from "./Stats";
 import { StatsImpl } from "./StatsImpl";
-import { assignTeams } from "./TeamAssignment";
 import { TerraNulliusImpl } from "./TerraNulliusImpl";
 import { UnitGrid, UnitPredicate } from "./UnitGrid";
 
@@ -157,16 +156,73 @@ export class GameImpl implements Game {
       this._nations.forEach((n) => this.addPlayer(n.playerInfo));
       return;
     }
+
     const allPlayers = [
       ...this._humans,
       ...this._nations.map((n) => n.playerInfo),
     ];
-    const playerToTeam = assignTeams(allPlayers, this.playerTeams);
-    for (const [playerInfo, team] of playerToTeam.entries()) {
-      if (team === "kicked") {
-        console.warn(`Player ${playerInfo.name} was kicked from team`);
+    const finalPlayerAssignments = new Map<PlayerInfo, Team>();
+    const unassignedPlayers = new Set<PlayerInfo>();
+    const manualAssignments = this._config.playerTeamAssignments() ?? {};
+
+    // First pass: handle manual assignments and identify unassigned players
+    for (const playerInfo of allPlayers) {
+      const clientID = playerInfo.clientID;
+      const teamIndex =
+        clientID !== null ? manualAssignments[clientID] : undefined;
+
+      if (teamIndex === -1) {
+        // This is a spectator, so we do nothing and they are not added to the game.
         continue;
       }
+
+      if (teamIndex === null || teamIndex === undefined) {
+        // Player is unassigned, add to fallback list.
+        unassignedPlayers.add(playerInfo);
+      } else {
+        // Player has a manual team assignment.
+        const manualTeam = this.playerTeams[teamIndex];
+        if (manualTeam) {
+          finalPlayerAssignments.set(playerInfo, manualTeam);
+        } else {
+          // Invalid team index, treat as unassigned.
+          unassignedPlayers.add(playerInfo);
+        }
+      }
+    }
+
+    // Second pass: assign teams to the unassigned players
+    if (unassignedPlayers.size > 0) {
+      const teamCounts = new Map<Team, number>();
+      this.playerTeams.forEach((team) => teamCounts.set(team, 0));
+
+      // Count players already assigned to teams
+      for (const team of finalPlayerAssignments.values()) {
+        teamCounts.set(team, (teamCounts.get(team) ?? 0) + 1);
+      }
+
+      const selectTeamWithFewest = (): Team => {
+        let chosenTeam = this.playerTeams[0];
+        let smallest = teamCounts.get(chosenTeam) ?? Infinity;
+        for (const team of this.playerTeams) {
+          const count = teamCounts.get(team) ?? 0;
+          if (count < smallest) {
+            smallest = count;
+            chosenTeam = team;
+          }
+        }
+        return chosenTeam;
+      };
+
+      for (const playerInfo of unassignedPlayers) {
+        const team = selectTeamWithFewest();
+        finalPlayerAssignments.set(playerInfo, team);
+        teamCounts.set(team, (teamCounts.get(team) ?? 0) + 1);
+      }
+    }
+
+    // Final step: add all players with their final team assignments to the game
+    for (const [playerInfo, team] of finalPlayerAssignments.entries()) {
       this.addPlayer(playerInfo, team);
     }
   }
@@ -537,6 +593,13 @@ export class GameImpl implements Game {
   private maybeAssignTeam(player: PlayerInfo): Team | null {
     if (this._config.gameConfig().gameMode !== GameMode.Team) {
       return null;
+    }
+    const manualAssignments = this._config.playerTeamAssignments();
+    if (player.clientID && manualAssignments) {
+      const teamIndex = manualAssignments[player.clientID];
+      if (typeof teamIndex === "number") {
+        return this.playerTeams[teamIndex] ?? null;
+      }
     }
     if (player.playerType === PlayerType.Bot) {
       return this.botTeam;

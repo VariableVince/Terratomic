@@ -28,6 +28,7 @@ import {
   GameConfig,
   GameID,
   PeaceTimerDuration,
+  PlayerTeamAssignments,
   TeamCountConfig,
 } from "../Schemas";
 import {
@@ -316,6 +317,10 @@ export class DefaultConfig implements Config {
   }
   playerTeams(): TeamCountConfig {
     return this._gameConfig.playerTeams ?? 0;
+  }
+
+  playerTeamAssignments(): PlayerTeamAssignments | undefined {
+    return this._gameConfig.playerTeamAssignments;
   }
 
   spawnNPCs(): boolean {
@@ -776,8 +781,6 @@ export class DefaultConfig implements Config {
         return { cost: costForPlayer(2_000_000n) };
       case UpgradeType.FighterJetNavalTargeting:
         return { cost: costForPlayer(3_000_000n) };
-      case UpgradeType.AirUpgrade2:
-        return { cost: costForPlayer(2_000_000n) };
       case UpgradeType.AirUpgrade3:
         return { cost: costForPlayer(3_000_000n) };
 

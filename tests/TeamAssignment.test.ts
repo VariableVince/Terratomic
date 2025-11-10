@@ -1,5 +1,11 @@
-import { ColoredTeams, PlayerInfo, PlayerType } from "../src/core/game/Game";
+import {
+  ColoredTeams,
+  GameMode,
+  PlayerInfo,
+  PlayerType,
+} from "../src/core/game/Game";
 import { assignTeams } from "../src/core/game/TeamAssignment";
+import { setup } from "./util/Setup";
 
 const teams = [ColoredTeams.Red, ColoredTeams.Blue];
 
@@ -164,5 +170,74 @@ describe("assignTeams", () => {
     expect(result.get(players[11])).toEqual(ColoredTeams.Green);
     expect(result.get(players[12])).toEqual(ColoredTeams.Purple);
     expect(result.get(players[13])).toEqual(ColoredTeams.Orange);
+  });
+
+  it("should honor manual lobby team assignments when provided", async () => {
+    const playerA = new PlayerInfo(
+      "fr",
+      "Player A",
+      PlayerType.Human,
+      "CLIENTA1",
+      "playerA",
+    );
+    const playerB = new PlayerInfo(
+      "fr",
+      "Player B",
+      PlayerType.Human,
+      "CLIENTB1",
+      "playerB",
+    );
+
+    const game = await setup(
+      "Plains",
+      {
+        gameMode: GameMode.Team,
+        playerTeams: 2,
+        playerTeamAssignments: {
+          CLIENTA1: 1,
+          CLIENTB1: 1,
+        },
+      },
+      [playerA, playerB],
+    );
+
+    expect(game.player("playerA").team()).toBe(ColoredTeams.Blue);
+    expect(game.player("playerB").team()).toBe(ColoredTeams.Blue);
+  });
+
+  it("should omit spectators from the active player roster", async () => {
+    const spectator = new PlayerInfo(
+      "fr",
+      "Spectator",
+      PlayerType.Human,
+      "SPECTATOR123",
+      "spectator",
+    );
+    const active = new PlayerInfo(
+      "fr",
+      "Active",
+      PlayerType.Human,
+      "PLAYER123",
+      "active",
+    );
+
+    const game = await setup(
+      "Plains",
+      {
+        gameMode: GameMode.Team,
+        playerTeams: 2,
+        playerTeamAssignments: {
+          SPECTATOR123: -1,
+          PLAYER123: 0,
+        },
+      },
+      [spectator, active],
+    );
+
+    expect(() => game.player("spectator")).toThrow();
+    expect(game.player("active").team()).toBe(ColoredTeams.Red);
+    expect(game.players().some((p) => p.clientID() === "SPECTATOR123")).toBe(
+      false,
+    );
   });
 });
