@@ -144,6 +144,7 @@ export interface UnitInfo {
 export enum UnitType {
   TransportShip = "Transport",
   Warship = "Warship",
+  Submarine = "Submarine",
   Shell = "Shell",
   SAMMissile = "SAMMissile",
   Port = "Port",
@@ -178,6 +179,8 @@ export enum UpgradeType {
   Automation = "Automation",
 
   // Dummy Water Upgrades
+  SubmarineResearch = "SubmarineResearch",
+  NuclearSubmarineResearch = "NuclearSubmarineResearch",
   WaterUpgrade1 = "WaterUpgrade1",
   WaterUpgrade2 = "WaterUpgrade2",
   WaterUpgrade3 = "WaterUpgrade3",
@@ -220,6 +223,10 @@ export interface UnitParamsMap {
   };
 
   [UnitType.Warship]: {
+    patrolTile: TileRef;
+  };
+
+  [UnitType.Submarine]: {
     patrolTile: TileRef;
   };
 
@@ -492,6 +499,12 @@ export interface Unit {
 
   // Insurance (structure units)
   insure(player: Player | null): void;
+
+  // Submarines
+  lastVisibleTick?: number;
+  isDetectedByNavalUnit?: boolean;
+  isAttacking?: boolean;
+  isPeriodicallyVisible(): boolean;
 }
 
 export interface TerraNullius {

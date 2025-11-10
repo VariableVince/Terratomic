@@ -463,6 +463,15 @@ export class DefaultConfig implements Config {
           territoryBound: false,
           maxHealth: 1000,
         };
+      case UnitType.Submarine:
+        return {
+          cost: (p: Player) =>
+            p.type() === PlayerType.Human && this.infiniteGold()
+              ? 0n
+              : 1_000_000n,
+          territoryBound: false,
+          maxHealth: 1000,
+        };
       case UnitType.Shell:
         return {
           cost: () => 0n,
@@ -657,7 +666,10 @@ export class DefaultConfig implements Config {
         assertNever(type);
     }
   }
-  upgradeInfo(type: UpgradeType): { cost: (player: Player) => Gold } {
+  upgradeInfo(type: UpgradeType): {
+    cost: (player: Player) => Gold;
+    prerequisite?: (player: Player) => boolean;
+  } {
     const costForPlayer = (cost: bigint) => (p: Player) => {
       if (p.type() === PlayerType.Human && this.infiniteGold()) {
         return 0n;
@@ -678,6 +690,14 @@ export class DefaultConfig implements Config {
         return { cost: costForPlayer(3_000_000n) };
 
       // Water
+      case UpgradeType.SubmarineResearch:
+        return { cost: costForPlayer(1_000_000n) };
+      case UpgradeType.NuclearSubmarineResearch:
+        return {
+          cost: costForPlayer(3_000_000n),
+          prerequisite: (p: Player) =>
+            p.hasUpgrade(UpgradeType.SubmarineResearch),
+        };
       case UpgradeType.WaterUpgrade1:
         return { cost: costForPlayer(1_000_000n) };
       case UpgradeType.WaterUpgrade2:
