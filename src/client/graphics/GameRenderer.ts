@@ -24,10 +24,12 @@ import { PlayerInfoOverlay } from "./layers/PlayerInfoOverlay";
 import { PlayerPanel } from "./layers/PlayerPanel";
 import { RadialMenu } from "./layers/RadialMenu";
 import { ReplayPanel } from "./layers/ReplayPanel";
+import { ResearchToggleButton } from "./layers/ResearchToggleButton";
 import { RoadLayer } from "./layers/RoadLayer";
 import { SpawnTimer } from "./layers/SpawnTimer";
 import { StructureLayer } from "./layers/StructureLayer";
 import { TeamStats } from "./layers/TeamStats";
+import { TechUnlockNotification } from "./layers/TechUnlockNotification";
 import { TerrainLayer } from "./layers/TerrainLayer";
 import { TerritoryLayer } from "./layers/TerritoryLayer";
 import { TopBar } from "./layers/TopBar";
@@ -115,6 +117,24 @@ export function createRenderer(
   controlPanel2.eventBus = eventBus;
   controlPanel2.uiState = uiState;
   controlPanel2.game = game;
+
+  const researchToggleButton = document.querySelector(
+    "research-toggle-button",
+  ) as ResearchToggleButton;
+  if (!(researchToggleButton instanceof ResearchToggleButton)) {
+    console.error("ResearchToggleButton element not found in the DOM");
+  }
+  researchToggleButton.eventBus = eventBus;
+  researchToggleButton.game = game;
+
+  const techUnlockNotification = document.querySelector(
+    "tech-unlock-notification",
+  ) as TechUnlockNotification;
+  if (!(techUnlockNotification instanceof TechUnlockNotification)) {
+    console.error("TechUnlockNotification element not found in the DOM");
+  }
+  techUnlockNotification.eventBus = eventBus;
+  techUnlockNotification.game = game;
 
   const eventsDisplay = document.querySelector(
     "events-display",
@@ -237,6 +257,8 @@ export function createRenderer(
     gameLeftSidebar,
     controlPanel,
     controlPanel2,
+    researchToggleButton,
+    techUnlockNotification,
     playerInfo,
     winModel,
     optionsMenu,

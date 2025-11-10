@@ -9,11 +9,16 @@ import {
   UpgradeType,
 } from "../../../core/game/Game";
 import { GameView, PlayerView } from "../../../core/game/GameView";
-import { getTechNodes } from "../../../core/tech/ResearchTree";
 import { getTechMeta, RESEARCH_TECH_IDS } from "../../../core/tech/TechEffects";
+import {
+  INVESTMENT_REQUEST_EVENT,
+  INVESTMENT_SYNC_EVENT,
+  INVESTMENT_SYNC_REQUEST_EVENT,
+  type InvestmentRequestDetail,
+  type InvestmentSyncDetail,
+} from "../../events/InvestmentEvents";
 import { PlayerListChangedEvent } from "../../events/PlayerListChangedEvent";
 import { AttackRatioEvent } from "../../InputHandler";
-import "../../ResearchTreeModal";
 import {
   SendBomberIntentEvent,
   SendSetAutoBombingEvent,
@@ -39,9 +44,6 @@ export class ControlPanel2 extends LitElement implements Layer {
   private targetTroopRatio = 0.6;
 
   @state()
-  private currentTroopRatio = 0.6;
-
-  @state()
   private investmentRate: number = 0; // default to 0%
 
   @state()
@@ -62,28 +64,10 @@ export class ControlPanel2 extends LitElement implements Layer {
   private _population: number;
 
   @state()
-  private _maxPopulation: number;
-
-  @state()
-  private popRate: number;
-
-  @state()
-  private _hospitalReturns: number = 0;
-
-  @state()
-  private _troops: number;
-
-  @state()
-  private _workers: number;
-
-  @state()
   private _isVisible = false;
 
   @state()
   private isOpen = false;
-
-  @state()
-  private _manpower: number = 0;
 
   @state()
   private _gold: Gold;
@@ -94,21 +78,10 @@ export class ControlPanel2 extends LitElement implements Layer {
   @state()
   private _productivityGrowth: number;
 
-  @state()
-  private _goldPerSecond: Gold;
-
-  private _lastPopulationIncreaseRate: number;
-
-  private _popRateIsIncreasing: boolean = true;
-
   private init_: boolean = false;
 
   @state()
-  private activeTab: "Build" | "Attack" | "Economy" | "Research" | "Bombers" =
-    "Build";
-
-  @state()
-  private activeResearchTab: "Land" | "Water" | "Air" | "Economy" = "Land";
+  private activeTab: "Build" | "Attack" | "Economy" | "Bombers" = "Build";
 
   @state()
   private _lastAirfieldCount: number = 0;
@@ -185,6 +158,55 @@ export class ControlPanel2 extends LitElement implements Layer {
     UnitType.City,
   ];
 
+  private readonly investmentRequestHandler = (event: Event) => {
+    const { detail } = event as CustomEvent<InvestmentRequestDetail>;
+    if (!detail) return;
+    if (detail.type === "set") {
+      const value = Math.max(0, Math.min(1, detail.value ?? 0));
+      if (detail.slider === "road" && !this.playerHasRoadsUpgrade()) return;
+      this.applyInvestmentChange(detail.slider, value);
+    } else if (detail.type === "toggle-lock") {
+      if (detail.slider === "prod") {
+        this._lockProd = !this._lockProd;
+      } else if (detail.slider === "road") {
+        if (!this.playerHasRoadsUpgrade()) return;
+        this._lockRoad = !this._lockRoad;
+      } else if (detail.slider === "research") {
+        this._lockResearch = !this._lockResearch;
+      }
+      this.emitInvestmentSync();
+      this.requestUpdate();
+    }
+  };
+
+  private readonly investmentSyncRequestHandler = () => {
+    this.emitInvestmentSync();
+  };
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    window.addEventListener(
+      INVESTMENT_REQUEST_EVENT,
+      this.investmentRequestHandler as EventListener,
+    );
+    window.addEventListener(
+      INVESTMENT_SYNC_REQUEST_EVENT,
+      this.investmentSyncRequestHandler,
+    );
+  }
+
+  disconnectedCallback(): void {
+    window.removeEventListener(
+      INVESTMENT_REQUEST_EVENT,
+      this.investmentRequestHandler as EventListener,
+    );
+    window.removeEventListener(
+      INVESTMENT_SYNC_REQUEST_EVENT,
+      this.investmentSyncRequestHandler,
+    );
+    super.disconnectedCallback();
+  }
+
   init() {
     this.attackRatio = Number(
       localStorage.getItem("settings.attackRatio") ?? "0.3",
@@ -212,7 +234,6 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.uiState.investmentRate = this.investmentRate;
     this.init_ = true;
     this.uiState.attackRatio = this.attackRatio;
-    this.currentTroopRatio = this.targetTroopRatio;
 
     this.eventBus.on(AttackRatioEvent, (event: AttackRatioEvent) => {
       let newAttackRatio =
@@ -290,39 +311,10 @@ export class ControlPanel2 extends LitElement implements Layer {
       return;
     }
 
-    const popIncreaseRate = player.population() - this._population;
-    if (this.game.ticks() % 5 === 0) {
-      this._popRateIsIncreasing =
-        popIncreaseRate >= this._lastPopulationIncreaseRate;
-      this._lastPopulationIncreaseRate = popIncreaseRate;
-    }
-
     this._population = player.population();
-    this._maxPopulation = this.game.config().maxPopulation(player);
-    this._hospitalReturns = player.hospitalReturns() * 10;
     this._gold = player.gold();
     this._productivity = player.productivity();
     this._productivityGrowth = player.productivityGrowthPerMinute();
-    this._troops = player.troops();
-    this._workers = player.workers();
-    this.popRate = this.game.config().populationIncreaseRate(player) * 10;
-    // Compute net gold/sec consistent with server logic
-    {
-      const grossPerTick = this.game.config().grossGoldAdditionRate(player);
-      const prod = player.investmentRate?.() ?? 0;
-      const hasRoads = player.hasUpgrade(UpgradeType.Roads);
-      const effectiveRoad = hasRoads ? this._roadInvestmentRate : 0;
-      let totalInvest = prod + effectiveRoad + this._researchInvestmentRate;
-      const hasTreasury = (this._gold ?? 0n) > 0n;
-      const maxTotal = hasTreasury ? 1.1 : 1.0;
-      if (!Number.isFinite(totalInvest)) totalInvest = 0;
-      if (totalInvest > maxTotal) totalInvest = maxTotal;
-      let netPerTickDouble = grossPerTick * (1 - totalInvest);
-      if (!Number.isFinite(netPerTickDouble)) netPerTickDouble = 0;
-      const netPerTick = BigInt(Math.floor(netPerTickDouble));
-      this._goldPerSecond = netPerTick * 10n;
-    }
-
     this.investmentRate = player.investmentRate();
     // If Roads are not researched, force road investment to 0 and persist
     const hasRoadsUpgrade = player.hasUpgrade(UpgradeType.Roads);
@@ -422,7 +414,6 @@ export class ControlPanel2 extends LitElement implements Layer {
         }
       }
     }
-    this.currentTroopRatio = player.troops() / player.population();
 
     // Track relevant state for dynamic updates
     const currentAirfieldCount = player.units(UnitType.Airfield).length;
@@ -569,6 +560,79 @@ export class ControlPanel2 extends LitElement implements Layer {
     return { prod: currentProd, road: currentRoad, research: currentResearch };
   }
 
+  private applyInvestmentChange(
+    changed: "prod" | "road" | "research",
+    proposed: number,
+  ) {
+    const { prod, road, research } = this._applyTripleInvestmentConstraint(
+      changed,
+      proposed,
+    );
+    this.commitInvestmentRates(prod, road, research);
+  }
+
+  private commitInvestmentRates(
+    prod: number,
+    road: number,
+    research: number,
+  ): boolean {
+    const prodChanged = Math.abs(prod - this.investmentRate) > 1e-6;
+    const roadChanged = Math.abs(road - this._roadInvestmentRate) > 1e-6;
+    const researchChanged =
+      Math.abs(research - this._researchInvestmentRate) > 1e-6;
+
+    if (!prodChanged && !roadChanged && !researchChanged) {
+      return false;
+    }
+
+    this.investmentRate = prod;
+    this._roadInvestmentRate = road;
+    this._researchInvestmentRate = research;
+
+    if (prodChanged) {
+      this.onInvestmentRateChange(this.investmentRate);
+      this.uiState.investmentRate = this.investmentRate;
+      localStorage.setItem(
+        "settings.investmentRate",
+        this.investmentRate.toString(),
+      );
+    }
+    if (roadChanged) {
+      this.onRoadInvestmentChange(this._roadInvestmentRate);
+      localStorage.setItem(
+        "settings.roadInvestmentRate",
+        this._roadInvestmentRate.toString(),
+      );
+    }
+    if (researchChanged) {
+      this.onResearchInvestmentChange(this._researchInvestmentRate);
+      localStorage.setItem(
+        "settings.researchInvestmentRate",
+        this._researchInvestmentRate.toString(),
+      );
+    }
+
+    this.emitInvestmentSync();
+    return true;
+  }
+
+  private emitInvestmentSync() {
+    const detail: InvestmentSyncDetail = {
+      prod: this.investmentRate,
+      road: this._roadInvestmentRate,
+      research: this._researchInvestmentRate,
+      lockProd: this._lockProd,
+      lockRoad: this._lockRoad,
+      lockResearch: this._lockResearch,
+      roadEnabled: this.playerHasRoadsUpgrade(),
+    };
+    window.dispatchEvent(
+      new CustomEvent<InvestmentSyncDetail>(INVESTMENT_SYNC_EVENT, {
+        detail,
+      }),
+    );
+  }
+
   renderLayer(context: CanvasRenderingContext2D) {
     // Render any necessary canvas elements
   }
@@ -582,17 +646,13 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.requestUpdate();
   }
 
-  targetTroops(): number {
-    return this._manpower * this.targetTroopRatio;
-  }
-
   onTroopChange(newRatio: number) {
     this.eventBus.emit(new SendSetTargetTroopRatioEvent(newRatio));
   }
 
-  delta(): number {
-    const d = this._population - this.targetTroops();
-    return d;
+  private playerHasRoadsUpgrade(): boolean {
+    const player = this.game?.myPlayer?.();
+    return player?.hasUpgrade?.(UpgradeType.Roads) ?? false;
   }
 
   private _getPlayersInAirfieldRange(): PlayerView[] {
@@ -786,9 +846,7 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.uiState.multibuildEnabled = checkbox.checked;
   }
 
-  private _changeTab(
-    tab: "Build" | "Attack" | "Economy" | "Research" | "Bombers",
-  ) {
+  private _changeTab(tab: "Build" | "Attack" | "Economy" | "Bombers") {
     this.activeTab = tab;
     if (this.uiState.pendingBuildUnitType) {
       this.uiState.pendingBuildUnitType = null;
@@ -802,7 +860,6 @@ export class ControlPanel2 extends LitElement implements Layer {
 
     const player = this.game.myPlayer();
     const hasRoads = player?.hasUpgrade(UpgradeType.Roads) ?? false;
-    // Research tab has been simplified; upgrade buttons and sub-tabs removed.
 
     return html`
       <style>
@@ -868,7 +925,7 @@ export class ControlPanel2 extends LitElement implements Layer {
           box-shadow: none;
         }
 
-        /* Top-level ControlPanel2 tabs (Build/Attack/Economy/Research/Bombers) */
+        /* Top-level ControlPanel2 tabs (Build/Attack/Economy/Bombers) */
         .cp2-tab {
           color: #c9dbff;
           border: 1px solid #0e1a33;
@@ -890,78 +947,6 @@ export class ControlPanel2 extends LitElement implements Layer {
           color: #e3edff;
           border-color: #27476e;
           box-shadow: 0 0 0 1px rgba(39, 71, 110, 0.35) inset;
-        }
-
-        .research-tabs {
-          display: flex;
-          margin-top: auto;
-          /* submarine palette divider */
-          border-top: 1px solid #27476e;
-        }
-
-        .research-tab {
-          flex-grow: 1;
-          padding: 8px 0;
-          text-align: center;
-          cursor: pointer;
-          /* submarine palette button base */
-          border: 1px solid #0e1a33;
-          border-top: none;
-          background-color: #0b1220;
-          color: #c9dbff;
-          box-shadow: inset 0px 2px 5px rgba(0, 0, 0, 0.4);
-        }
-
-        .research-tab:hover:not(.active) {
-          background-color: #162544;
-          color: #e3edff;
-        }
-
-        .research-tab.active {
-          background-color: #182742;
-          color: #e3edff;
-          border-color: #27476e;
-          border-bottom-color: transparent;
-          box-shadow: 0px -2px 5px rgba(0, 0, 0, 0.2);
-          position: relative;
-          top: -1px;
-          border-radius: 6px 6px 0 0;
-        }
-
-        /* Dedicated Research Tree button aligned to submarine palette */
-        .research-button {
-          background-color: #183152; /* slightly brighter than panel */
-          color: #e3edff;
-          border: 1px solid #27476e;
-          padding: 4px 10px;
-          text-transform: uppercase;
-          font-size: 12px;
-          font-family: monospace;
-          transition:
-            background-color 0.15s ease-in-out,
-            box-shadow 0.15s ease-in-out,
-            border-color 0.15s ease-in-out;
-          box-shadow: 0 0 0 1px rgba(39, 71, 110, 0.35) inset;
-          border-radius: 6px;
-        }
-        .research-button:hover {
-          background-color: #1d3a60;
-          border-color: #32629b;
-          box-shadow: 0 0 0 2px rgba(50, 98, 155, 0.45) inset;
-        }
-
-        /* Simple progress bar for research items */
-        .progress-track {
-          width: 100%;
-          height: 6px;
-          background: rgba(39, 71, 110, 0.25);
-          border: 1px solid rgba(39, 71, 110, 0.35);
-          border-radius: 6px;
-          overflow: hidden;
-        }
-        .progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #60a5fa, #3b82f6);
         }
 
         input[type="range"] {
@@ -1080,15 +1065,6 @@ export class ControlPanel2 extends LitElement implements Layer {
             @click=${() => this._changeTab("Economy")}
           >
             Economy
-          </button>
-          <button
-            class="py-2 px-4 text-center font-ocr uppercase cp2-tab ${this
-              .activeTab === "Research"
-              ? "active"
-              : ""}"
-            @click=${() => this._changeTab("Research")}
-          >
-            Research
           </button>
           ${this._hasAirfields
             ? html`
@@ -1353,59 +1329,15 @@ export class ControlPanel2 extends LitElement implements Layer {
                           ._lockProd
                           ? "slider-locked"
                           : ""}"
-                        @dblclick=${() => (this._lockProd = !this._lockProd)}
+                        @dblclick=${() => {
+                          this._lockProd = !this._lockProd;
+                          this.emitInvestmentSync();
+                        }}
                         @input=${(e: Event) => {
-                          if (this._lockProd) {
-                            (e.target as HTMLInputElement).value = (
-                              this.investmentRate * 100
-                            ).toString();
-                            return;
-                          }
-                          const proposed =
-                            parseInt((e.target as HTMLInputElement).value) /
-                            100;
-                          const { prod, road, research } =
-                            this._applyTripleInvestmentConstraint(
-                              "prod",
-                              proposed,
-                            );
-
-                          const prodChanged = prod !== this.investmentRate;
-                          const roadChanged = road !== this._roadInvestmentRate;
-                          const researchChanged =
-                            research !== this._researchInvestmentRate;
-
-                          this.investmentRate = prod;
-                          this._roadInvestmentRate = road;
-                          this._researchInvestmentRate = research;
-
-                          if (prodChanged)
-                            this.onInvestmentRateChange(this.investmentRate);
-                          if (roadChanged)
-                            this.onRoadInvestmentChange(
-                              this._roadInvestmentRate,
-                            );
-                          if (researchChanged)
-                            this.onResearchInvestmentChange(
-                              this._researchInvestmentRate,
-                            );
-
-                          localStorage.setItem(
-                            "settings.investmentRate",
-                            this.investmentRate.toString(),
-                          );
-                          localStorage.setItem(
-                            "settings.roadInvestmentRate",
-                            this._roadInvestmentRate.toString(),
-                          );
-                          localStorage.setItem(
-                            "settings.researchInvestmentRate",
-                            this._researchInvestmentRate.toString(),
-                          );
-                          // Snap slider back to the effective value in case constraint blocked change
-                          (e.target as HTMLInputElement).value = (
-                            this.investmentRate * 100
-                          ).toString();
+                          const input = e.target as HTMLInputElement;
+                          const proposed = parseInt(input.value) / 100;
+                          this.applyInvestmentChange("prod", proposed);
+                          input.value = (this.investmentRate * 100).toString();
                         }}
                       />
                     </div>
@@ -1573,55 +1505,10 @@ export class ControlPanel2 extends LitElement implements Layer {
                           : ""}
                         @input=${(e: Event) => {
                           if (!hasRoads) return;
-                          if (this._lockRoad) {
-                            (e.target as HTMLInputElement).value = (
-                              this._roadInvestmentRate * 100
-                            ).toString();
-                            return;
-                          }
-                          const proposed =
-                            parseInt((e.target as HTMLInputElement).value) /
-                            100;
-                          const { prod, road, research } =
-                            this._applyTripleInvestmentConstraint(
-                              "road",
-                              proposed,
-                            );
-
-                          const prodChanged = prod !== this.investmentRate;
-                          const roadChanged = road !== this._roadInvestmentRate;
-                          const researchChanged =
-                            research !== this._researchInvestmentRate;
-
-                          this.investmentRate = prod;
-                          this._roadInvestmentRate = road;
-                          this._researchInvestmentRate = research;
-
-                          if (roadChanged)
-                            this.onRoadInvestmentChange(
-                              this._roadInvestmentRate,
-                            );
-                          if (prodChanged)
-                            this.onInvestmentRateChange(this.investmentRate);
-                          if (researchChanged)
-                            this.onResearchInvestmentChange(
-                              this._researchInvestmentRate,
-                            );
-
-                          localStorage.setItem(
-                            "settings.roadInvestmentRate",
-                            this._roadInvestmentRate.toString(),
-                          );
-                          localStorage.setItem(
-                            "settings.investmentRate",
-                            this.investmentRate.toString(),
-                          );
-                          localStorage.setItem(
-                            "settings.researchInvestmentRate",
-                            this._researchInvestmentRate.toString(),
-                          );
-                          // Snap slider to effective value
-                          (e.target as HTMLInputElement).value = (
+                          const input = e.target as HTMLInputElement;
+                          const proposed = parseInt(input.value) / 100;
+                          this.applyInvestmentChange("road", proposed);
+                          input.value = (
                             this._roadInvestmentRate * 100
                           ).toString();
                         }}
@@ -1629,8 +1516,12 @@ export class ControlPanel2 extends LitElement implements Layer {
                           ._lockRoad && hasRoads
                           ? "slider-locked"
                           : ""}"
-                        @dblclick=${() =>
-                          hasRoads && (this._lockRoad = !this._lockRoad)}
+                        @dblclick=${() => {
+                          if (hasRoads) {
+                            this._lockRoad = !this._lockRoad;
+                            this.emitInvestmentSync();
+                          }
+                        }}
                       />
                     </div>
                     <div
@@ -1699,55 +1590,10 @@ export class ControlPanel2 extends LitElement implements Layer {
                           this._researchInvestmentRate * 100
                         ).toString()}
                         @input=${(e: Event) => {
-                          if (this._lockResearch) {
-                            (e.target as HTMLInputElement).value = (
-                              this._researchInvestmentRate * 100
-                            ).toString();
-                            return;
-                          }
-                          const proposed =
-                            parseInt((e.target as HTMLInputElement).value) /
-                            100;
-                          const { prod, road, research } =
-                            this._applyTripleInvestmentConstraint(
-                              "research",
-                              proposed,
-                            );
-
-                          const prodChanged = prod !== this.investmentRate;
-                          const roadChanged = road !== this._roadInvestmentRate;
-                          const researchChanged =
-                            research !== this._researchInvestmentRate;
-
-                          this.investmentRate = prod;
-                          this._roadInvestmentRate = road;
-                          this._researchInvestmentRate = research;
-
-                          if (prodChanged)
-                            this.onInvestmentRateChange(this.investmentRate);
-                          if (roadChanged)
-                            this.onRoadInvestmentChange(
-                              this._roadInvestmentRate,
-                            );
-                          if (researchChanged)
-                            this.onResearchInvestmentChange(
-                              this._researchInvestmentRate,
-                            );
-
-                          localStorage.setItem(
-                            "settings.investmentRate",
-                            this.investmentRate.toString(),
-                          );
-                          localStorage.setItem(
-                            "settings.roadInvestmentRate",
-                            this._roadInvestmentRate.toString(),
-                          );
-                          localStorage.setItem(
-                            "settings.researchInvestmentRate",
-                            this._researchInvestmentRate.toString(),
-                          );
-                          // Snap slider to effective value
-                          (e.target as HTMLInputElement).value = (
+                          const input = e.target as HTMLInputElement;
+                          const proposed = parseInt(input.value) / 100;
+                          this.applyInvestmentChange("research", proposed);
+                          input.value = (
                             this._researchInvestmentRate * 100
                           ).toString();
                         }}
@@ -1755,8 +1601,10 @@ export class ControlPanel2 extends LitElement implements Layer {
                           ._lockResearch
                           ? "slider-locked"
                           : ""}"
-                        @dblclick=${() =>
-                          (this._lockResearch = !this._lockResearch)}
+                        @dblclick=${() => {
+                          this._lockResearch = !this._lockResearch;
+                          this.emitInvestmentSync();
+                        }}
                       />
                     </div>
                   </div>
@@ -1803,100 +1651,6 @@ export class ControlPanel2 extends LitElement implements Layer {
                   </div>
                 </div>
               `
-            : ""}
-          ${this.activeTab === "Research"
-            ? (() => {
-                const me = this.game?.myPlayer?.();
-                const techs = getTechNodes();
-                const researched = new Set<string>();
-                if (me) {
-                  for (const t of techs)
-                    if (me.hasResearchedTech(t.id)) researched.add(t.id);
-                }
-                const active = me
-                  ? techs
-                      .map((t) => {
-                        const beakers = me.researchBeakers?.(t.id) ?? 0;
-                        const cost = t.cost || 1;
-                        const pct = Math.max(
-                          0,
-                          Math.min(100, Math.floor((beakers / cost) * 100)),
-                        );
-                        return {
-                          id: t.id,
-                          name: t.name,
-                          beakers,
-                          cost,
-                          pct,
-                          isDone: researched.has(t.id),
-                        };
-                      })
-                      .filter((x) => x.beakers > 0 && !x.isDone)
-                      .sort((a, b) => b.pct - a.pct)
-                  : [];
-                const priorityId = me?.researchPriorityTech?.() ?? null;
-                const priorityName = priorityId
-                  ? getTechMeta(priorityId, { strict: false }).name
-                  : "None";
-                return html`<div class="flex h-full flex-col">
-                  <h3 class="military-heading mb-2">Research</h3>
-                  <div class="mb-2 military-label" style="font-size: 11px;">
-                    Current Priority:
-                    <span class="font-semibold">${priorityName}</span>
-                  </div>
-                  <div
-                    class="grid grid-cols-2 gap-x-3 gap-y-1 pr-1"
-                    style="font-size: 11px;"
-                  >
-                    ${active.length === 0
-                      ? html`<div class="opacity-70 col-span-2">
-                          No active research yet. Set a priority in the Research
-                          Tree or allocate Research investment.
-                        </div>`
-                      : (() => {
-                          const n = active.length;
-                          const leftCount = Math.ceil(n / 2);
-                          const remapped: typeof active = [];
-                          for (let i = 0; i < leftCount; i++) {
-                            remapped.push(active[i]);
-                            if (i + leftCount < n)
-                              remapped.push(active[i + leftCount]);
-                          }
-                          return remapped.map(
-                            (it) =>
-                              html`<div
-                                class="flex items-center justify-between"
-                                title="${it.name}"
-                              >
-                                <div class="truncate pr-2">${it.name}</div>
-                                <div class="opacity-80" translate="no">
-                                  ${it.beakers.toLocaleString()} /
-                                  ${it.cost.toLocaleString()} (${it.pct}%)
-                                </div>
-                              </div>`,
-                          );
-                        })()}
-                  </div>
-                  <div class="mt-auto flex justify-end pt-2">
-                    <button
-                      class="research-button"
-                      title="Open Research Tree"
-                      @click=${() => {
-                        const modal = document.querySelector(
-                          "research-tree-modal",
-                        ) as any;
-                        if (modal) {
-                          modal.game = this.game;
-                          modal.eventBus = this.eventBus;
-                          modal.open();
-                        }
-                      }}
-                    >
-                      Research Tree
-                    </button>
-                  </div>
-                </div>`;
-              })()
             : ""}
         </div>
       </div>
