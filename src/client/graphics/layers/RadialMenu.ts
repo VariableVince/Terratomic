@@ -1,5 +1,6 @@
 import * as d3 from "d3";
 import doveIcon from "../../../../proprietary/images/dove.png";
+import airAttackIcon from "../../../../resources/images/AirAttackIconWhite.svg";
 import allianceIcon from "../../../../resources/images/AllianceIconWhite.svg";
 import boatIcon from "../../../../resources/images/BoatIconWhite.svg";
 import disabledIcon from "../../../../resources/images/DisabledIcon.svg";
@@ -10,8 +11,10 @@ import { EventBus } from "../../../core/EventBus";
 import {
   Cell,
   PlayerActions,
+  PlayerType,
   TerraNullius,
   UnitType,
+  UpgradeType,
 } from "../../../core/game/Game";
 import { TileRef } from "../../../core/game/GameMap";
 import { GameView, PlayerView } from "../../../core/game/GameView";
@@ -25,6 +28,7 @@ import {
   SendAttackIntentEvent,
   SendBoatAttackIntentEvent,
   SendBreakAllianceIntentEvent,
+  SendParatrooperAttackIntentEvent,
   SendPeaceRequestIntentEvent,
   SendSpawnIntentEvent,
 } from "../../Transport";
@@ -40,6 +44,7 @@ enum Slot {
   Boat,
   Ally,
   Peace,
+  AirAttack,
 }
 
 export class RadialMenu implements Layer {
@@ -70,14 +75,15 @@ export class RadialMenu implements Layer {
       },
     ],
     [
-      Slot.Ally,
+      Slot.AirAttack,
       {
-        name: "ally",
+        name: "airAttack",
         disabled: true,
         action: () => {},
+        color: null,
+        icon: null,
       },
     ],
-
     [
       Slot.Info,
       {
@@ -88,6 +94,7 @@ export class RadialMenu implements Layer {
         icon: null,
       },
     ],
+    [Slot.Ally, { name: "ally", disabled: true, action: () => {} }],
     [
       Slot.Peace,
       {
@@ -437,9 +444,83 @@ export class RadialMenu implements Layer {
       this.enableCenterButton(true);
     }
 
+    if (this.shouldShowAirAttack(myPlayer, tile)) {
+      this.activateMenuElement(Slot.AirAttack, "#8B0000", airAttackIcon, () => {
+        if (this.clickedCell === null) return;
+        const dst = this.g.ref(this.clickedCell.x, this.clickedCell.y);
+        this.eventBus.emit(
+          new SendParatrooperAttackIntentEvent(
+            this.g.owner(tile).id(),
+            dst,
+            this.uiState.attackRatio * myPlayer.troops(),
+          ),
+        );
+      });
+    }
+
     if (!this.g.hasOwner(tile)) {
       return;
     }
+  }
+
+  private shouldShowAirAttack(player: PlayerView, tile: TileRef): boolean {
+    if (!player.hasUpgrade(UpgradeType.AirUpgrade1)) {
+      return false;
+    }
+    if (player.units(UnitType.Airfield).length === 0) {
+      return false;
+    }
+    if (!this.g.isLand(tile)) {
+      return false;
+    }
+    const owner = this.g.owner(tile);
+    if (owner === player) {
+      return false;
+    }
+
+    const peaceTimerEndsAtTick = this.g.peaceTimerEndsAtTick();
+    const isPeaceTimerActive =
+      peaceTimerEndsAtTick !== null && this.g.ticks() < peaceTimerEndsAtTick;
+
+    if (isPeaceTimerActive && owner.isPlayer()) {
+      const attackerType = player.type();
+      const defenderType = (owner as PlayerView).type();
+
+      if (
+        (attackerType === PlayerType.Human ||
+          attackerType === PlayerType.FakeHuman) &&
+        (defenderType === PlayerType.Human ||
+          defenderType === PlayerType.FakeHuman)
+      ) {
+        return false;
+      }
+    }
+
+    if (
+      owner.isPlayer &&
+      owner.isPlayer() &&
+      player.isFriendly(owner as PlayerView)
+    ) {
+      return false;
+    }
+
+    const airfields = player.units(UnitType.Airfield);
+    const closestAirfield = airfields.reduce(
+      (closest, airfield) => {
+        const dist = this.g.manhattanDist(airfield.tile(), tile);
+        if (dist < closest.dist) {
+          return { airfield, dist };
+        }
+        return closest;
+      },
+      { airfield: null, dist: Infinity },
+    );
+
+    if (closestAirfield.dist > this.g.config().paratrooperMaxRange()) {
+      return false;
+    }
+
+    return true;
   }
 
   private onPointerUp(event: MouseUpEvent) {
