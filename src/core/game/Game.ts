@@ -183,7 +183,7 @@ export enum UpgradeType {
   SubmarineResearch = "SubmarineResearch",
   NuclearSubmarineResearch = "NuclearSubmarineResearch",
   WaterUpgrade1 = "WaterUpgrade1",
-  WaterUpgrade2 = "WaterUpgrade2",
+  WarshipAntiAir = "WarshipAntiAir",
   WaterUpgrade3 = "WaterUpgrade3",
 
   // Dummy Air Upgrades
@@ -643,7 +643,7 @@ export interface Player {
   lastAggressionTick(other: Player): Tick;
   isOnSameTeam(other: Player): boolean;
   // Either allied or on same team.
-  isFriendly(other: Player): boolean;
+  isFriendly(other: Player | PlayerView): boolean;
   team(): Team | null;
   clan(): string | null;
   incomingAllianceRequests(): AllianceRequest[];
