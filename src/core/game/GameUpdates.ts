@@ -50,7 +50,6 @@ export enum GameUpdateType {
   Roads,
   CargoTrucks,
   TileOwnerChanged,
-  CitySamCooldown,
 }
 
 export interface SerializedCargoTruck {
@@ -101,14 +100,7 @@ export type GameUpdate =
   | BomberExplosionUpdate
   | RoadsUpdate
   | CargoTrucksUpdate
-  | TileOwnerChangedUpdate
-  | CitySamCooldownUpdate;
-
-export interface CitySamCooldownUpdate {
-  type: GameUpdateType.CitySamCooldown;
-  cityId: number;
-  cooldown: number;
-}
+  | TileOwnerChangedUpdate;
 
 export interface BomberExplosionUpdate {
   type: GameUpdateType.BomberExplosion;
@@ -140,7 +132,10 @@ export interface UnitUpdate {
   targetTile?: TileRef; // Only for nukes
   health?: number;
   constructionType?: UnitType;
+  // Deprecated: ticksLeftInCooldown is replaced by cooldownEndsAt
   ticksLeftInCooldown?: Tick;
+  // Unified cooldown end tick; client derives remaining as (endsAt - currentTick)
+  cooldownEndsAt?: Tick;
   returning?: boolean;
   cooldownDuration?: Tick;
   isAttacking?: boolean;

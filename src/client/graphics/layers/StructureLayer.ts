@@ -235,7 +235,10 @@ export class StructureLayer implements Layer {
 
     let cooldownChanged = false;
     if (unit.type() === UnitType.City) {
-      const isOnCooldown = this.game.isCitySamOnCooldown(unit.id());
+      const endsAt = unit.cooldownEndsAt?.call(unit) ?? undefined;
+      const isOnCooldown =
+        (endsAt !== undefined && this.game.ticks() < endsAt) ||
+        (unit.ticksLeftInCooldown() ?? 0) > 0;
       if (isOnCooldown !== render.isOnCooldown) {
         cooldownChanged = true;
         render.isOnCooldown = isOnCooldown;
@@ -260,7 +263,11 @@ export class StructureLayer implements Layer {
       ? `construction-${structureType}`
       : `${unit.owner().id()}-${structureType}`;
     if (unit.type() === UnitType.City) {
-      cacheKey += `-${this.game.isCitySamOnCooldown(unit.id())}`;
+      const endsAt = unit.cooldownEndsAt?.call(unit) ?? undefined;
+      const isOnCooldown =
+        (endsAt !== undefined && this.game.ticks() < endsAt) ||
+        (unit.ticksLeftInCooldown() ?? 0) > 0;
+      cacheKey += `-${isOnCooldown}`;
     }
     if (this.textureCache.has(cacheKey)) {
       return this.textureCache.get(cacheKey)!;
@@ -289,11 +296,14 @@ export class StructureLayer implements Layer {
       borderColor = border.darken(0.17).toRgbString();
     }
 
-    if (
-      unit.type() === UnitType.City &&
-      this.game.isCitySamOnCooldown(unit.id())
-    ) {
-      borderColor = reloadingColor;
+    if (unit.type() === UnitType.City) {
+      const endsAt = unit.cooldownEndsAt?.call(unit) ?? undefined;
+      const isOnCooldown =
+        (endsAt !== undefined && this.game.ticks() < endsAt) ||
+        (unit.ticksLeftInCooldown() ?? 0) > 0;
+      if (isOnCooldown) {
+        borderColor = reloadingColor;
+      }
     }
 
     // Draw background shape

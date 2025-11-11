@@ -177,7 +177,7 @@ export class ParatrooperAttackExecution implements Execution {
 
     const readyInterceptors = this.eligibleCities.filter(
       (city) =>
-        !game.isCitySamOnCooldown(city.id()) &&
+        (city.ticksLeftInCooldown() ?? 0) <= 0 &&
         game.euclideanDistSquared(paratrooper.tile(), city.tile()) <=
           game.config().citySamLaunchRange() *
             game.config().citySamLaunchRange(),

@@ -33,7 +33,6 @@ import { GameMap, TileRef, TileUpdate } from "./GameMap";
 import {
   AllianceViewData,
   AttackUpdate,
-  CitySamCooldownUpdate,
   GameUpdateType,
   GameUpdateViewData,
   PlayerUpdate,
@@ -127,10 +126,17 @@ export class UnitView {
   ticksLeftInCooldown(): Tick | undefined {
     return this.data.ticksLeftInCooldown;
   }
+  cooldownEndsAt(): Tick | undefined {
+    return (this.data as any).cooldownEndsAt;
+  }
   cooldownDuration(): Tick | undefined {
     return this.data.cooldownDuration;
   }
   isCooldown(): boolean {
+    const endsAt = (this.data as any).cooldownEndsAt as Tick | undefined;
+    if (endsAt !== undefined) {
+      return this.gameView.ticks() < endsAt;
+    }
     if (this.data.ticksLeftInCooldown === undefined) return false;
     return this.data.ticksLeftInCooldown > 0;
   }
@@ -430,7 +436,7 @@ export class GameView implements GameMap {
   private _focusedPlayer: PlayerView | null = null;
   private _alliances: AllianceViewData[] = [];
   private _submarinePings: Map<number, number> = new Map();
-  private citySamCooldowns = new Map<number, number>();
+  private _cooldownActive = new Set<number>();
 
   private unitGrid: UnitGrid;
   private structureIndex: SpatialIndex;
@@ -488,15 +494,7 @@ export class GameView implements GameMap {
     gu.updates[GameUpdateType.SubmarinePing].forEach((update) => {
       this._submarinePings.set(update.unitId, this.ticks());
     });
-    (
-      gu.updates[GameUpdateType.CitySamCooldown] as CitySamCooldownUpdate[]
-    ).forEach((update) => {
-      if (update.cooldown > 0) {
-        this.citySamCooldowns.set(update.cityId, update.cooldown);
-      } else {
-        this.citySamCooldowns.delete(update.cityId);
-      }
-    });
+    // City SAM cooldown updates have been removed; cooldown is now derived from each unit's cooldownEndsAt field.
     gu.updates[GameUpdateType.Player].forEach((pu) => {
       this.smallIDToID.set(pu.smallID, pu.id);
       const player = this._players.get(pu.id);
@@ -579,28 +577,31 @@ export class GameView implements GameMap {
         p._recomputeResearchTechLevelCache(t);
       }
     }
+    this._emitEndedUnitCooldowns();
   }
 
   public alliances(): AllianceViewData[] {
     return this._alliances;
   }
 
-  public isCitySamOnCooldown(cityId: number): boolean {
-    return (this.citySamCooldowns.get(cityId) ?? 0) > 0;
-  }
-
-  public tick(): void {
-    for (const [cityId, ticks] of this.citySamCooldowns.entries()) {
-      if (ticks > 0) {
-        this.citySamCooldowns.set(cityId, ticks - 1);
-      } else {
-        this.citySamCooldowns.delete(cityId);
-        const city = this.unit(cityId);
-        if (city) {
-          this.eventBus.emit(new UnitCooldownEndedEvent(city));
-        }
+  private _emitEndedUnitCooldowns(): void {
+    const now = this.ticks();
+    const nextActive = new Set<number>();
+    for (const unit of this._units.values()) {
+      const endsAt = (unit as any).data?.cooldownEndsAt as Tick | undefined;
+      const active =
+        endsAt !== undefined
+          ? now < endsAt
+          : (unit.ticksLeftInCooldown() ?? 0) > 0;
+      if (active) nextActive.add(unit.id());
+    }
+    for (const id of this._cooldownActive) {
+      if (!nextActive.has(id)) {
+        const unit = this.unit(id);
+        if (unit) this.eventBus.emit(new UnitCooldownEndedEvent(unit));
       }
     }
+    this._cooldownActive = nextActive;
   }
 
   recentlyUpdatedTiles(): TileRef[] {

@@ -89,7 +89,7 @@ export class BomberExecution implements Execution {
       const currentBomber = this.bomber;
       const readyInterceptors = this.eligibleCities.filter(
         (city) =>
-          !this.mg.isCitySamOnCooldown(city.id()) &&
+          (city.ticksLeftInCooldown() ?? 0) <= 0 &&
           this.mg.euclideanDistSquared(currentBomber.tile(), city.tile()) <=
             this.mg.config().citySamLaunchRange() *
               this.mg.config().citySamLaunchRange(),

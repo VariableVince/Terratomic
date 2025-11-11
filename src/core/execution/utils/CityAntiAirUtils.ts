@@ -50,12 +50,14 @@ export function findEligibleCitiesForBomber(bomber: Unit, game: Game): Unit[] {
  * Attempts to have a single city intercept an aircraft or nuke.
  */
 export function attemptInterception(target: Unit, game: Game, city: Unit) {
-  if (!city.isActive() || game.isCitySamOnCooldown(city.id())) {
+  // Use per-unit cooldown state for cities, same as other units
+  if (!city.isActive() || (city.ticksLeftInCooldown() ?? 0) > 0) {
     return;
   }
 
   target.setTargetedBySAM(true);
   const sam = new SAMMissileExecution(city.tile(), city.owner(), city, target);
   game.addExecution(sam);
-  game.setCitySamCooldown(city.id(), game.config().citySamCooldown());
+  // Start city SAM cooldown using standard unit cooldown API
+  city.launch(game.config().citySamCooldown());
 }

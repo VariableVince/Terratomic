@@ -197,7 +197,7 @@ export class NukeExecution implements Execution {
       const currentNuke = this.nuke;
       const readyInterceptors = this.eligibleCities.filter(
         (city) =>
-          !this.mg.isCitySamOnCooldown(city.id()) &&
+          (city.ticksLeftInCooldown() ?? 0) <= 0 &&
           this.mg.euclideanDistSquared(currentNuke.tile(), city.tile()) <=
             this.mg.config().citySamLaunchRange() *
               this.mg.config().citySamLaunchRange(),

@@ -403,7 +403,6 @@ export class GameImpl implements Game {
   }
 
   executeNextTick(): GameUpdates {
-    this.tickCitySamCooldowns();
     this.updates = this.createGameUpdatesMap();
     this.execs.forEach((e) => {
       if (
@@ -477,34 +476,8 @@ export class GameImpl implements Game {
     return hash;
   }
 
-  citySamCooldowns: Map<number, number> = new Map();
-
-  setCitySamCooldown(cityId: number, ticks: number): void {
-    this.citySamCooldowns.set(cityId, ticks);
-    this.addUpdate({
-      type: GameUpdateType.CitySamCooldown,
-      cityId,
-      cooldown: ticks,
-    });
-    const city = this.unit(cityId);
-    if (city) {
-      city.touch();
-    }
-  }
-
-  isCitySamOnCooldown(cityId: number): boolean {
-    return (this.citySamCooldowns.get(cityId) ?? 0) > 0;
-  }
-
-  tickCitySamCooldowns(): void {
-    for (const [cityId, ticks] of this.citySamCooldowns.entries()) {
-      if (ticks > 0) {
-        this.citySamCooldowns.set(cityId, ticks - 1);
-      } else {
-        this.citySamCooldowns.delete(cityId);
-      }
-    }
-  }
+  // City SAM cooldowns now rely on per-unit cooldown (UnitImpl.launch + ticksLeftInCooldown)
+  // Legacy map and tick/decrement logic removed.
 
   terraNullius(): TerraNullius {
     return this._terraNullius;

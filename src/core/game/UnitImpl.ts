@@ -149,7 +149,12 @@ export class UnitImpl implements Unit {
       constructionType: this._constructionType,
       targetUnitId: this._targetUnit?.id() ?? undefined,
       targetTile: this.targetTile() ?? undefined,
+      // Provide both for transition; cooldownEndsAt is the unified field
       ticksLeftInCooldown: this.ticksLeftInCooldown() ?? undefined,
+      cooldownEndsAt:
+        this._cooldownStartTick !== null && this._cooldownDuration !== null
+          ? this._cooldownStartTick + this._cooldownDuration
+          : undefined,
       cooldownDuration: this._cooldownDuration ?? undefined,
       returning: this.returning(),
       isAttacking: this.isAttacking,

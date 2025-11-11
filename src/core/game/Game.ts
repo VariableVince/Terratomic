@@ -763,11 +763,7 @@ export interface Game extends GameMap {
   config(): Config;
   peaceTimerEndsAtTick: Tick | null;
 
-  // City SAM Cooldowns
-  citySamCooldowns: Map<number, number>;
-  setCitySamCooldown(cityId: number, ticks: number): void;
-  isCitySamOnCooldown(cityId: number): boolean;
-  tickCitySamCooldowns(): void;
+  // City SAM Cooldowns are handled per-unit via standard cooldown fields.
 
   // Units
   units(...types: UnitType[]): Unit[];
