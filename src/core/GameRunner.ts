@@ -114,6 +114,11 @@ export class GameRunner {
 
   private playerViewData: Record<PlayerID, NameViewData> = {};
   private clientID: ClientID;
+  // Per-client submarine visibility state
+  private lastVisibleBySub: Map<number, boolean> = new Map();
+  private lastRevealTickBySub: Map<number, number> = new Map();
+  private lastKnownPosBySub: Map<number, TileRef> = new Map();
+  private ghostActiveUntilBySub: Map<number, number> = new Map();
 
   constructor(
     public game: Game,
@@ -122,6 +127,107 @@ export class GameRunner {
     clientID: ClientID,
   ) {
     this.clientID = clientID;
+  }
+
+  /**
+   * Filter and augment Unit updates for this specific client to enforce submarine stealth rules.
+   * Exported for tests to validate visibility behavior without needing to spin the runner loop.
+   */
+  public filterUpdatesForClient(updates: GameUpdates): GameUpdates {
+    // Start from a shallow copy to preserve all non-Unit update arrays
+    const filtered = { ...(updates as any) } as GameUpdates;
+    const newUnits: (typeof updates)[GameUpdateType.Unit] = [];
+
+    const me = this.game.playerByClientID(this.clientID);
+    const tickNow = this.game.ticks();
+    const linger = this.game.config().submarineDetectionLingerTicks?.() ?? 20;
+    const ghostLinger = this.game.config().submarineGhostLingerTicks?.() ?? 300;
+
+    for (const u of updates[GameUpdateType.Unit]) {
+      // Only filter submarines; pass-through everything else
+      if (u.unitType !== UnitType.Submarine) {
+        newUnits.push(u);
+        continue;
+      }
+
+      // Owner always sees their own submarine
+      const owner = this.game.playerBySmallID(u.ownerID);
+      if (me && owner.isPlayer() && me.smallID() === owner.smallID()) {
+        this.lastVisibleBySub.set(u.id, true);
+        this.lastRevealTickBySub.set(u.id, tickNow);
+        this.lastKnownPosBySub.set(u.id, u.pos);
+        this.ghostActiveUntilBySub.delete(u.id);
+        newUnits.push(u);
+        continue;
+      }
+
+      // Compute visibility for this viewer
+      const isAttacking = (u as any).isAttacking === true;
+      const endsAt = (u as any).cooldownEndsAt as number | undefined;
+      const ticksLeft = (u as any).ticksLeftInCooldown as number | undefined;
+      const isOnCooldown =
+        endsAt !== undefined ? tickNow < endsAt : (ticksLeft ?? 0) > 0;
+
+      // Detection is per-viewer: only if viewer has their own naval unit nearby
+      let detectedByViewer = false;
+      if (me && owner.isPlayer() && me.smallID() !== owner.smallID()) {
+        const range = this.game.config().warshipTargettingRange();
+        const nearby = this.game.nearbyUnits(u.pos, range, [
+          UnitType.Warship,
+          UnitType.Submarine,
+        ]);
+        detectedByViewer = nearby.some(({ unit }) => unit.owner() === me);
+      }
+
+      const baseVisible = isAttacking || isOnCooldown || detectedByViewer;
+      const lastReveal = this.lastRevealTickBySub.get(u.id);
+      const lingerVisible =
+        lastReveal !== undefined ? tickNow - lastReveal < linger : false;
+      const visibleNow = baseVisible || lingerVisible;
+
+      if (visibleNow) {
+        this.lastVisibleBySub.set(u.id, true);
+        if (baseVisible) this.lastRevealTickBySub.set(u.id, tickNow);
+        this.lastKnownPosBySub.set(u.id, u.pos);
+        this.ghostActiveUntilBySub.delete(u.id);
+        newUnits.push(u);
+        continue;
+      }
+
+      // Hidden now; maybe emit a one-time ghost update when transitioning from visible
+      const wasVisible = this.lastVisibleBySub.get(u.id) === true;
+      this.lastVisibleBySub.set(u.id, false);
+      if (wasVisible) {
+        const until = tickNow + ghostLinger;
+        this.ghostActiveUntilBySub.set(u.id, until);
+        const ghostUpdate = {
+          ...u,
+          isActive: false,
+          targetable: false,
+          retreating: false,
+          reachedTarget: false,
+          troops: 0,
+          pos: this.lastKnownPosBySub.get(u.id) ?? u.pos,
+          lastPos: this.lastKnownPosBySub.get(u.id) ?? u.lastPos,
+          ghost: true,
+          ghostExpiresAt: until,
+        } as any;
+        newUnits.push(ghostUpdate);
+        continue;
+      }
+
+      // If ghost is still active, do not send repeats; otherwise drop completely
+      const ghostUntil = this.ghostActiveUntilBySub.get(u.id);
+      if (ghostUntil && tickNow < ghostUntil) {
+        // No-op: keep hidden without resending
+      } else if (ghostUntil && tickNow >= ghostUntil) {
+        this.ghostActiveUntilBySub.delete(u.id);
+      }
+      // Drop this update for the viewer
+    }
+
+    filtered[GameUpdateType.Unit] = newUnits;
+    return filtered;
   }
 
   init() {
@@ -190,21 +296,10 @@ export class GameRunner {
       });
     }
 
-    // Submarine periodic visibility ping
-    this.game.players().forEach((p) => {
-      p.units(UnitType.Submarine).forEach((submarine) => {
-        if (
-          this.game.ticks() - (submarine.lastVisibleTick ?? -Infinity) >
-          15 * (1000 / this.game.config().serverConfig().turnIntervalMs())
-        ) {
-          submarine.lastVisibleTick = this.game.ticks();
-          updates[GameUpdateType.SubmarinePing].push({
-            type: GameUpdateType.SubmarinePing,
-            unitId: submarine.id(),
-          });
-        }
-      });
-    });
+    // Submarine periodic visibility ping disabled: removing automatic reveal blips
+
+    // Apply per-client submarine filtering before sending
+    updates = this.filterUpdatesForClient(updates);
 
     // Many tiles are updated to pack it into an array
     const packedTileUpdates = updates[GameUpdateType.Tile].map((u) => u.update);

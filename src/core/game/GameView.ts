@@ -435,7 +435,9 @@ export class GameView implements GameMap {
   private _myPlayer: PlayerView | null = null;
   private _focusedPlayer: PlayerView | null = null;
   private _alliances: AllianceViewData[] = [];
-  private _submarinePings: Map<number, number> = new Map();
+  // Submarine periodic pings removed; ghosts are used instead
+  private _submarineGhosts: Map<number, { pos: TileRef; expiresAt: Tick }> =
+    new Map();
   private _cooldownActive = new Set<number>();
 
   private unitGrid: UnitGrid;
@@ -491,9 +493,7 @@ export class GameView implements GameMap {
     if (gu.alliances) {
       this._alliances = gu.alliances;
     }
-    gu.updates[GameUpdateType.SubmarinePing].forEach((update) => {
-      this._submarinePings.set(update.unitId, this.ticks());
-    });
+    // Submarine pings removed
     // City SAM cooldown updates have been removed; cooldown is now derived from each unit's cooldownEndsAt field.
     gu.updates[GameUpdateType.Player].forEach((pu) => {
       this.smallIDToID.set(pu.smallID, pu.id);
@@ -516,6 +516,20 @@ export class GameView implements GameMap {
       unit.lastPos = unit.lastPos.slice(-1);
     }
     gu.updates[GameUpdateType.Unit].forEach((update) => {
+      // Handle ghost updates for submarines
+      if (
+        update.unitType === UnitType.Submarine &&
+        (update as any).ghost === true
+      ) {
+        const expiresAt = (update as any).ghostExpiresAt as Tick | undefined;
+        this._submarineGhosts.set(update.id, {
+          pos: update.pos,
+          expiresAt: expiresAt ?? this.ticks() + 300,
+        });
+      } else if (update.unitType === UnitType.Submarine) {
+        // Receiving a real sub update clears any ghost
+        this._submarineGhosts.delete(update.id);
+      }
       let unit = this._units.get(update.id);
       if (unit !== undefined) {
         unit.update(update);
@@ -541,9 +555,7 @@ export class GameView implements GameMap {
       }
     });
 
-    gu.updates[GameUpdateType.SubmarinePing].forEach((update) => {
-      this._submarinePings.set(update.unitId, this.ticks());
-    });
+    // Submarine pings removed
 
     // Fingerprint AFTER the update
     const newAlivePlayerIds = new Set(
@@ -578,6 +590,19 @@ export class GameView implements GameMap {
       }
     }
     this._emitEndedUnitCooldowns();
+  }
+
+  submarineGhosts(): Array<{ id: number; pos: TileRef; expiresAt: Tick }> {
+    const now = this.ticks();
+    const result: Array<{ id: number; pos: TileRef; expiresAt: Tick }> = [];
+    for (const [id, ghost] of this._submarineGhosts) {
+      if (ghost.expiresAt > now) {
+        result.push({ id, pos: ghost.pos, expiresAt: ghost.expiresAt });
+      } else {
+        this._submarineGhosts.delete(id);
+      }
+    }
+    return result;
   }
 
   public alliances(): AllianceViewData[] {
@@ -829,12 +854,5 @@ export class GameView implements GameMap {
     this._focusedPlayer = player;
   }
 
-  isUnitPeriodicallyVisible(unitId: number): boolean {
-    const lastPing = this._submarinePings.get(unitId);
-    if (lastPing === undefined) {
-      return false;
-    }
-    // Assumes 3 seconds visibility, 10 ticks per second
-    return this.ticks() - lastPing < 30;
-  }
+  // isUnitPeriodicallyVisible removed with ping feature
 }

@@ -275,6 +275,31 @@ export class UnitLayer implements Layer {
 
     this.updateUnitsSprites(this.game.units().map((unit) => unit.id()));
 
+    // After redrawing units, render submarine ghosts (last known positions)
+    const ghosts = (this.game as any).submarineGhosts?.call(this.game) ?? [];
+    for (const ghost of ghosts as Array<{
+      id: number;
+      pos: number;
+      expiresAt: number;
+    }>) {
+      // Draw a faint submarine sprite at ghost.pos
+      const x = this.game.x(ghost.pos);
+      const y = this.game.y(ghost.pos);
+      // Simple faint marker: paint a small translucent cell using enemy color as default
+      this.context.save();
+      this.context.globalAlpha = 0.3;
+      const dummyUnit = {
+        tile: () => ghost.pos,
+        type: () => UnitType.Submarine,
+        owner: () => this.game.myPlayer() ?? (this.game.players()[0] as any),
+        targetable: () => true,
+        isActive: () => false,
+        lastTile: () => ghost.pos,
+      } as unknown as UnitView;
+      this.drawSprite(dummyUnit as UnitView);
+      this.context.restore();
+    }
+
     this.unitToTrail.forEach((trail, unit) => {
       for (const t of trail) {
         this.paintCell(
@@ -378,19 +403,12 @@ export class UnitLayer implements Layer {
       unit.type() === UnitType.Submarine &&
       unit.owner() !== this.game.myPlayer()
     ) {
-      const isPeriodicallyVisible = this.game.isUnitPeriodicallyVisible(
-        unit.id(),
-      );
       const isAttacking = unit.isAttacking();
       const isDetected = unit.isDetectedByNavalUnit();
-
-      if (
-        !isPeriodicallyVisible &&
-        !isAttacking &&
-        !isDetected &&
-        !unit.isCooldown()
-      ) {
-        return; // Don't render the submarine
+      const isOnCooldown = unit.isCooldown();
+      const shouldShow = isAttacking || isDetected || isOnCooldown;
+      if (!shouldShow) {
+        return; // Hidden submarine (no ghost rendering here; ghosts handled separately)
       }
     }
 
@@ -399,18 +417,11 @@ export class UnitLayer implements Layer {
       unit.type() === UnitType.Submarine &&
       unit.owner() === this.game.myPlayer()
     ) {
-      const isPeriodicallyVisible = this.game.isUnitPeriodicallyVisible(
-        unit.id(),
-      );
       const isAttacking = unit.isAttacking();
       const isDetected = unit.isDetectedByNavalUnit();
       const isOnCooldown = unit.isCooldown();
-
-      const isVisibleToEnemies =
-        isPeriodicallyVisible || isAttacking || isDetected || isOnCooldown;
-
+      const isVisibleToEnemies = isAttacking || isDetected || isOnCooldown;
       if (!isVisibleToEnemies) {
-        // If hidden, draw it smaller and return early
         this.drawSprite(unit, undefined, 0.75);
         return;
       }

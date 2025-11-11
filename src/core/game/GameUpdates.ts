@@ -29,7 +29,6 @@ export interface ErrorUpdate {
 }
 
 export enum GameUpdateType {
-  SubmarinePing,
   Tile,
   Unit,
   Player,
@@ -75,13 +74,7 @@ export interface RoadsUpdate {
   removed: string[];
 }
 
-export interface SubmarinePingUpdate {
-  type: GameUpdateType.SubmarinePing;
-  unitId: number;
-}
-
 export type GameUpdate =
-  | SubmarinePingUpdate
   | TileUpdateWrapper
   | UnitUpdate
   | PlayerUpdate
@@ -141,6 +134,9 @@ export interface UnitUpdate {
   isAttacking?: boolean;
   isDetectedByNavalUnit?: boolean;
   targetedBySAM?: boolean;
+  // Client-only hint: this update represents a ghosted last-known position
+  ghost?: boolean;
+  ghostExpiresAt?: Tick;
 }
 
 export interface AttackUpdate {

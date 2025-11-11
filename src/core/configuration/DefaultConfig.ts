@@ -1226,6 +1226,16 @@ export class DefaultConfig implements Config {
     return 20;
   }
 
+  // --- Submarine Stealth Config ---
+  // Number of ticks a submarine remains visible to a player after last detection/attack
+  submarineDetectionLingerTicks(): number {
+    return 20; // ~2s at 10 ticks/sec
+  }
+  // Number of ticks a ghost (last known position) remains after visibility fully ends
+  submarineGhostLingerTicks(): number {
+    return 300; // ~30s at 10 ticks/sec
+  }
+
   defensePostShellAttackRate(): number {
     return 100;
   }

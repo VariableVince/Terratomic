@@ -216,6 +216,9 @@ export interface Config {
   warshipAACooldown(): number;
   warshipAAScanInterval(): number;
   warshipAAHittingChance(): number;
+  // Submarine stealth parameters
+  submarineDetectionLingerTicks(): number;
+  submarineGhostLingerTicks(): number;
   // 0-1
   traitorDefenseDebuff(): number;
   traitorDuration(): number;
