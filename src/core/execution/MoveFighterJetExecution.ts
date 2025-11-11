@@ -26,8 +26,11 @@ export class MoveFighterJetExecution implements Execution {
       return;
     }
 
+    // Make fighter jet head immediately to the clicked tile while updating patrol anchor.
     fighterJet.setPatrolTile(this.position);
-    fighterJet.setTargetTile(undefined);
+    fighterJet.setTargetTile(this.position);
+    // Clear any active target so movement isn't preempted by combat.
+    fighterJet.setTargetUnit(undefined);
   }
 
   tick(): void {}

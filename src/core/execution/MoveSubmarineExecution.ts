@@ -20,8 +20,12 @@ export class MoveSubmarineExecution implements Execution {
       console.warn("MoveSubmarineExecution: submarine is not active");
       return;
     }
+    // Move intent should immediately head toward the clicked tile, while
+    // also updating the patrol anchor so future roaming centers there.
     submarine.setPatrolTile(this.position);
-    submarine.setTargetTile(undefined);
+    submarine.setTargetTile(this.position);
+    // Clear any current target unit so movement isn't preempted by combat.
+    submarine.setTargetUnit(undefined);
   }
 
   tick(ticks: number): void {}
