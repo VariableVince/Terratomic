@@ -225,7 +225,13 @@
       id="settings-button"
       title="Settings"
       class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center hover:bg-[var(--ui-primary-hover)]"
-      style="width: 72px; height: 72px; background-color: var(--ui-primary)"
+      style="
+        width: 72px;
+        height: 72px;
+        background-color: var(--ui-primary);
+        transform: scale(0.9);
+        transform-origin: bottom right;
+      "
     >
       <img
         src="../../resources/images/SettingIconWhite.svg"
@@ -293,7 +299,7 @@
     </div>
 
     <!-- Footer section -->
-    <footer class="l-footer fixed inset-x-0 bottom-0 z-20">
+    <footer class="l-footer l-footer--compact fixed inset-x-0 bottom-0 z-20">
       <div class="l-footer__content w-full max-w-none">
         <div class="l-footer__col t-text-white">
           <a
@@ -327,8 +333,8 @@
             Terms of Service
           </a>
         </div>
-        <div class="l-footer__col t-text-white items-center mr-[100px]">
-          <span class="text-xs opacity-60 select-text">Based on OpenFront</span>
+        <div class="l-footer__col l-footer__col--right t-text-white">
+          <span class="select-text">Based on OpenFront</span>
         </div>
       </div>
     </footer>

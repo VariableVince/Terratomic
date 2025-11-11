@@ -1,13 +1,20 @@
 .l-footer {
+  --footer-scale: 1; /* default scale; overridden by modifier */
   background: var(--boxBackgroundColor);
   backdrop-filter: blur(var(--blur-md));
   display: flex;
   justify-content: center;
-  padding: 12px;
+  font-size: calc(1em * var(--footer-scale));
+  padding: calc(12px * var(--footer-scale));
 
   @media (min-width: 800px) {
-    padding: 12px 24px;
+    padding: calc(12px * var(--footer-scale)) calc(24px * var(--footer-scale));
   }
+}
+
+/* Compact/10% smaller variant without transform hacks */
+.l-footer--compact {
+  --footer-scale: 0.9;
 }
 
 .l-footer__content {
@@ -21,5 +28,22 @@
 
 .l-footer__col {
   display: flex;
-  gap: 20px;
+  gap: calc(20px * var(--footer-scale));
+}
+
+/* Keep right column clear of the fixed Settings button */
+.l-footer__col--right {
+  margin-right: var(--footer-right-safe, 96px);
+}
+
+/* Icons scale with footer scale for visual balance */
+.l-footer__col img {
+  width: calc(20px * var(--footer-scale));
+  height: calc(20px * var(--footer-scale));
+}
+
+/* Ensure Tailwind's rem-based text utilities scale with footer */
+.l-footer .text-xs {
+  font-size: calc(0.75rem * var(--footer-scale));
+  line-height: calc(1rem * var(--footer-scale));
 }
