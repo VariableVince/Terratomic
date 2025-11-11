@@ -99,6 +99,10 @@ export class GameServer {
     if (gameConfig.instantBuild !== undefined) {
       this.gameConfig.instantBuild = gameConfig.instantBuild;
     }
+    if (gameConfig.instantResearchHumanOnly !== undefined) {
+      this.gameConfig.instantResearchHumanOnly =
+        gameConfig.instantResearchHumanOnly;
+    }
     if (gameConfig.gameMode !== undefined) {
       this.gameConfig.gameMode = gameConfig.gameMode;
     }
