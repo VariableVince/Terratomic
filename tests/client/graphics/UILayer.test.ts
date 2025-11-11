@@ -169,4 +169,76 @@ describe("UILayer", () => {
     ui.tick();
     expect((ui as any)["allProgressBars"].has(2)).toBe(false);
   });
+
+  it("should show submarine health bar for owner when damaged", () => {
+    const ui = new UILayer(game, eventBus, transformHandler);
+    ui.redraw();
+
+    const owner = { id: () => 1 };
+    game.myPlayer = () => owner;
+
+    const sub: any = {
+      id: () => 100,
+      type: () => "Submarine",
+      health: () => 5,
+      tile: () => ({}),
+      owner: () => owner,
+      isActive: () => true,
+      isAttacking: () => false,
+      isDetectedByNavalUnit: () => false,
+      isCooldown: () => false,
+    };
+
+    // Routed through onUnitEvent to apply visibility rules
+    (ui as any).onUnitEvent(sub);
+    expect((ui as any)["allHealthBars"].has(100)).toBe(true);
+  });
+
+  it("should not show enemy submarine health bar when hidden", () => {
+    const ui = new UILayer(game, eventBus, transformHandler);
+    ui.redraw();
+
+    const me = { id: () => 1 };
+    const enemy = { id: () => 2 };
+    game.myPlayer = () => me;
+
+    const sub: any = {
+      id: () => 101,
+      type: () => "Submarine",
+      health: () => 5,
+      tile: () => ({}),
+      owner: () => enemy,
+      isActive: () => true,
+      isAttacking: () => false,
+      isDetectedByNavalUnit: () => false,
+      isCooldown: () => false,
+    };
+
+    (ui as any).onUnitEvent(sub);
+    expect((ui as any)["allHealthBars"].has(101)).toBe(false);
+  });
+
+  it("should show enemy submarine health bar when visible (detected)", () => {
+    const ui = new UILayer(game, eventBus, transformHandler);
+    ui.redraw();
+
+    const me = { id: () => 1 };
+    const enemy = { id: () => 2 };
+    game.myPlayer = () => me;
+
+    const sub: any = {
+      id: () => 102,
+      type: () => "Submarine",
+      health: () => 5,
+      tile: () => ({}),
+      owner: () => enemy,
+      isActive: () => true,
+      isAttacking: () => false,
+      isDetectedByNavalUnit: () => true,
+      isCooldown: () => false,
+    };
+
+    (ui as any).onUnitEvent(sub);
+    expect((ui as any)["allHealthBars"].has(102)).toBe(true);
+  });
 });

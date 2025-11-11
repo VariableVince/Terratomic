@@ -131,6 +131,27 @@ export class UILayer implements Layer {
         this.drawHealthBar(unit);
         break;
       }
+      case UnitType.Submarine: {
+        // Only draw health bar when submarine is visible to the local player.
+        // Visibility rules mirror UnitLayer: enemy subs are visible only when
+        // attacking, detected by naval unit, or on cooldown; owner always sees their own sub.
+        const isOwner = unit.owner() === this.game.myPlayer();
+        const isAttacking = unit.isAttacking?.() === true;
+        const isDetected = unit.isDetectedByNavalUnit?.() === true;
+        const isOnCooldown = unit.isCooldown?.() === true;
+        const enemyVisible = isAttacking || isDetected || isOnCooldown;
+        const shouldShow = isOwner || enemyVisible;
+        if (!shouldShow) {
+          // Clear any existing bar if sub became hidden
+          if (this.allHealthBars.has(unit.id())) {
+            this.allHealthBars.get(unit.id())?.clear();
+            this.allHealthBars.delete(unit.id());
+          }
+          break;
+        }
+        this.drawHealthBar(unit);
+        break;
+      }
       case UnitType.MissileSilo:
         if (
           unit.isActive() &&
