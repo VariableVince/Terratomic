@@ -764,6 +764,8 @@ export interface Game extends GameMap {
   peaceTimerEndsAtTick: Tick | null;
 
   // City SAM Cooldowns are handled per-unit via standard cooldown fields.
+  // Helper to query a city's SAM cooldown state by unit ID.
+  isCitySamOnCooldown(cityId: number): boolean;
 
   // Units
   units(...types: UnitType[]): Unit[];

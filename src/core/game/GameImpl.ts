@@ -479,6 +479,15 @@ export class GameImpl implements Game {
   // City SAM cooldowns now rely on per-unit cooldown (UnitImpl.launch + ticksLeftInCooldown)
   // Legacy map and tick/decrement logic removed.
 
+  // Public helper used by tests/UI to check if a given city is in SAM cooldown
+  public isCitySamOnCooldown(cityId: number): boolean {
+    const u = this.unit(cityId);
+    if (!u) return false;
+    if (u.type() !== UnitType.City) return false;
+    const left = u.ticksLeftInCooldown();
+    return (left ?? 0) > 0;
+  }
+
   terraNullius(): TerraNullius {
     return this._terraNullius;
   }
