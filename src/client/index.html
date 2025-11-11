@@ -80,7 +80,7 @@
       }
 
       .dark .bg-image {
-        filter: blur(4px) brightness(0.8) saturate(0.3) contrast(1.2);
+        filter: var(--ui-lobby-filter, brightness(0.6) saturate(1.5));
       }
 
       /* display:none if child has class parent-hidden since we can't use shadow DOM in Lit due to Tailwind */
@@ -224,8 +224,8 @@
     <button
       id="settings-button"
       title="Settings"
-      class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center hover:bg-[var(--primaryColorHover)]"
-      style="width: 72px; height: 72px; background-color: var(--primaryColor)"
+      class="fixed bottom-4 right-4 z-50 rounded-full p-2 shadow-lg transition-colors duration-300 flex items-center justify-center hover:bg-[var(--ui-primary-hover)]"
+      style="width: 72px; height: 72px; background-color: var(--ui-primary)"
     >
       <img
         src="../../resources/images/SettingIconWhite.svg"
@@ -359,7 +359,13 @@
 
     <player-panel></player-panel>
     <help-modal></help-modal>
-    <sound-button></sound-button>
+    <div
+      id="quick-toggle-container"
+      class="fixed top-0 right-0 z-50 flex gap-2 p-2"
+    >
+      <dark-mode-button></dark-mode-button>
+      <sound-button></sound-button>
+    </div>
     <research-toggle-button></research-toggle-button>
     <alert-frame></alert-frame>
     <tech-unlock-notification></tech-unlock-notification>

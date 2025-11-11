@@ -195,32 +195,11 @@ export class ResearchTreeModal extends LitElement {
 
   private renderLegend() {
     return html`
-      <div
-        class="legend"
-        style="display:flex;gap:12px;font-size:12px;color:#d1d5db;margin-bottom:8px;"
-      >
-        <span
-          ><span
-            class="swatch"
-            style="width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:6px;background: rgba(239,68,68,0.7)"
-          ></span
-          >Required</span
-        >
-        <span
-          ><span
-            class="swatch"
-            style="width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:6px;background: rgba(245,158,11,0.8)"
-          ></span
-          >Requires one of</span
-        >
-        <span
-          ><span
-            class="swatch"
-            style="width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:6px;background:#4b5563"
-          ></span
-          >Researched</span
-        >
-        <span style="opacity:.7">Unmet requirements are grayed out</span>
+      <div class="legend">
+        <span><span class="swatch swatch-required"></span>Required</span>
+        <span><span class="swatch swatch-oneof"></span>Requires one of</span>
+        <span><span class="swatch swatch-researched"></span>Researched</span>
+        <span class="legend-note">Unmet requirements are grayed out</span>
       </div>
     `;
   }
@@ -460,7 +439,9 @@ export class ResearchTreeModal extends LitElement {
     return html`
       <div class="all-view-grid">
         ${this.categories.map((cat) => {
-          const accent = categoryColors[cat] ?? "rgba(59,130,246,0.06)";
+          const accent =
+            categoryColors[cat] ??
+            "color-mix(in srgb, var(--ui-info) 6%, transparent)";
           return html`<div
             class="all-column"
             style=${`--column-accent:${accent}`}
@@ -647,11 +628,11 @@ export class ResearchTreeModal extends LitElement {
     );
     const researched = this.researchedIDsFromGame();
     const categoryColors: Record<Category, string> = {
-      Land: "rgba(59,130,246,0.08)",
-      Sea: "rgba(14,165,233,0.08)",
-      Air: "rgba(168,85,247,0.08)",
-      Nuclear: "rgba(239,68,68,0.08)",
-      Economy: "rgba(34,197,94,0.08)",
+      Land: "color-mix(in srgb, var(--ui-info) 12%, transparent)",
+      Sea: "color-mix(in srgb, var(--ui-info) 10%, transparent)",
+      Air: "color-mix(in srgb, var(--ui-secondary) 12%, transparent)",
+      Nuclear: "color-mix(in srgb, var(--ui-alert) 12%, transparent)",
+      Economy: "color-mix(in srgb, var(--ui-success) 12%, transparent)",
     };
     const me = this.game?.myPlayer?.();
     const priority = me?.researchPriorityTech?.() ?? null;
@@ -721,6 +702,33 @@ export class ResearchTreeModal extends LitElement {
         content-overflow="hidden"
       >
         <style>
+          .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 12px;
+            color: var(--ui-text-light);
+            margin-bottom: 8px;
+          }
+          .legend .swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+            margin-right: 6px;
+          }
+          .legend-note {
+            opacity: 0.7;
+          }
+          .swatch-required {
+            background: color-mix(in srgb, var(--ui-alert) 70%, transparent);
+          }
+          .swatch-oneof {
+            background: color-mix(in srgb, var(--ui-warning) 70%, transparent);
+          }
+          .swatch-researched {
+            background: var(--ui-text-muted);
+          }
           .tab-shell {
             display: flex;
             flex-direction: column;
@@ -731,7 +739,8 @@ export class ResearchTreeModal extends LitElement {
             flex-wrap: wrap;
             gap: 12px;
             padding: 8px 4px 4px;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+            border-bottom: 1px solid
+              color-mix(in srgb, var(--ui-border-muted) 35%, transparent);
             align-items: flex-end;
           }
           .tab-buttons {
@@ -740,9 +749,14 @@ export class ResearchTreeModal extends LitElement {
             gap: 8px;
           }
           .tab-button {
-            background: #0b1428;
-            color: #9fb4d9;
-            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: color-mix(
+              in srgb,
+              var(--ui-panel-shell-top) 90%,
+              transparent
+            );
+            color: var(--ui-text-accent);
+            border: 1px solid
+              color-mix(in srgb, var(--ui-border-muted) 45%, transparent);
             border-radius: 999px;
             padding: 6px 14px;
             font-size: 13px;
@@ -752,29 +766,43 @@ export class ResearchTreeModal extends LitElement {
             transition: all 120ms ease;
           }
           .tab-button:hover {
-            color: #f1f5ff;
-            border-color: rgba(148, 163, 184, 0.4);
+            color: var(--ui-text-light);
+            border-color: color-mix(
+              in srgb,
+              var(--ui-border-muted) 65%,
+              transparent
+            );
           }
           .tab-button.active {
-            color: #f8fbff;
-            border-color: rgba(99, 179, 237, 0.7);
+            color: var(--ui-text-light);
+            border-color: color-mix(in srgb, var(--ui-info) 70%, transparent);
             background:
               linear-gradient(
                 135deg,
-                rgba(59, 130, 246, 0.2),
-                rgba(6, 182, 212, 0.08)
+                color-mix(in srgb, var(--ui-info) 20%, transparent),
+                color-mix(in srgb, var(--ui-info) 8%, transparent)
               ),
-              var(--tab-accent, #132035);
-            box-shadow: 0 0 20px rgba(15, 23, 42, 0.6);
+              var(
+                --tab-accent,
+                color-mix(in srgb, var(--ui-panel-shell-top) 70%, transparent)
+              );
+            box-shadow: 0 0 20px
+              color-mix(in srgb, var(--ui-panel-border) 60%, transparent);
           }
           .tab-panel {
-            background: #050b16;
-            border: 1px solid rgba(15, 23, 42, 0.9);
+            background: color-mix(
+              in srgb,
+              var(--ui-panel-shell-bottom) 92%,
+              transparent
+            );
+            border: 1px solid
+              color-mix(in srgb, var(--ui-panel-border) 90%, transparent);
             border-radius: 14px;
             padding: 12px;
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.05),
-              0 10px 30px rgba(2, 6, 23, 0.65);
+              inset 0 1px 0
+                color-mix(in srgb, var(--ui-text-light) 5%, transparent),
+              0 10px 30px color-mix(in srgb, var(--ui-overlay) 65%, transparent);
           }
           .investment-cluster {
             display: flex;
@@ -787,7 +815,7 @@ export class ResearchTreeModal extends LitElement {
           .investment-slider {
             min-width: 260px;
             width: clamp(260px, 40vw, 390px);
-            color: #dbe7ff;
+            color: var(--ui-text-accent);
             font-size: 12px;
           }
           .investment-slider.disabled {
@@ -812,7 +840,11 @@ export class ResearchTreeModal extends LitElement {
             transform: translateY(-50%);
             height: 6px;
             border-radius: 999px;
-            background-color: rgba(24, 39, 66, 0.85);
+            background-color: color-mix(
+              in srgb,
+              var(--ui-panel-shell-top) 85%,
+              transparent
+            );
           }
           .investment-track-fill {
             position: absolute;
@@ -821,7 +853,11 @@ export class ResearchTreeModal extends LitElement {
             transform: translateY(-50%);
             height: 6px;
             border-radius: 999px;
-            background: linear-gradient(90deg, #5ac8fa, #2563eb);
+            background: linear-gradient(
+              90deg,
+              color-mix(in srgb, var(--ui-info) 85%, transparent),
+              color-mix(in srgb, var(--ui-info) 65%, transparent)
+            );
           }
           .investment-input {
             position: absolute;
@@ -839,19 +875,29 @@ export class ResearchTreeModal extends LitElement {
             width: 14px;
             height: 14px;
             border-radius: 50%;
-            background: #0b1220;
-            border: 2px solid #27476e;
+            background: color-mix(
+              in srgb,
+              var(--ui-panel-shell-top) 95%,
+              transparent
+            );
+            border: 2px solid var(--ui-panel-border);
             cursor: pointer;
-            box-shadow: 0 0 0 1px rgba(39, 71, 110, 0.35) inset;
+            box-shadow: 0 0 0 1px
+              color-mix(in srgb, var(--ui-secondary) 35%, transparent) inset;
           }
           .investment-input::-moz-range-thumb {
             width: 14px;
             height: 14px;
             border-radius: 50%;
-            background: #0b1220;
-            border: 2px solid #27476e;
+            background: color-mix(
+              in srgb,
+              var(--ui-panel-shell-top) 95%,
+              transparent
+            );
+            border: 2px solid var(--ui-panel-border);
             cursor: pointer;
-            box-shadow: 0 0 0 1px rgba(39, 71, 110, 0.35) inset;
+            box-shadow: 0 0 0 1px
+              color-mix(in srgb, var(--ui-secondary) 35%, transparent) inset;
           }
           .investment-input::-webkit-slider-runnable-track,
           .investment-input::-moz-range-track {
@@ -859,15 +905,20 @@ export class ResearchTreeModal extends LitElement {
           }
           .investment-input.locked::-webkit-slider-thumb,
           .investment-input.locked::-moz-range-thumb {
-            border-color: #f59e0b;
-            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.45) inset;
+            border-color: var(--ui-warning);
+            box-shadow: 0 0 0 2px
+              color-mix(in srgb, var(--ui-warning) 45%, transparent) inset;
           }
           .investment-marker {
             position: absolute;
             top: 0;
             width: 2px;
             height: 8px;
-            background: rgba(255, 255, 255, 0.85);
+            background: color-mix(
+              in srgb,
+              var(--ui-text-light) 85%,
+              transparent
+            );
             transform: translateX(-1px);
             border-radius: 1px;
           }
@@ -888,8 +939,13 @@ export class ResearchTreeModal extends LitElement {
             gap: 4px;
             padding: 1px 6px;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: color-mix(
+              in srgb,
+              var(--ui-text-light) 8%,
+              transparent
+            );
+            border: 1px solid
+              color-mix(in srgb, var(--ui-text-light) 20%, transparent);
             font-size: 10px;
           }
           .lock-icon {
@@ -903,7 +959,7 @@ export class ResearchTreeModal extends LitElement {
             max-height: calc(85dvh - 150px);
             padding: 6px;
             scrollbar-width: thin;
-            scrollbar-color: #27476e #0e1a33;
+            scrollbar-color: var(--ui-panel-border) var(--ui-panel-border);
           }
           .tree-container.all-view {
             padding: 12px;
@@ -914,22 +970,36 @@ export class ResearchTreeModal extends LitElement {
             background: transparent;
           }
           .tree-container::-webkit-scrollbar-track {
-            background: #0e1a33;
+            background: var(--ui-panel-border);
             border-radius: 8px;
-            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4);
+            box-shadow: inset 0 0 6px
+              color-mix(in srgb, var(--ui-overlay) 40%, transparent);
           }
           .tree-container::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, #27476e, #1e3554);
+            background: linear-gradient(
+              180deg,
+              var(--ui-panel-border),
+              color-mix(in srgb, var(--ui-panel-shell-bottom) 75%, transparent)
+            );
             border-radius: 8px;
-            border: 1px solid #27476e;
-            box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--ui-panel-border);
+            box-shadow: inset 0 0 4px
+              color-mix(in srgb, var(--ui-text-light) 6%, transparent);
           }
           .tree-container::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(180deg, #32629b, #254a78);
-            border-color: #32629b;
+            background: linear-gradient(
+              180deg,
+              color-mix(in srgb, var(--ui-secondary) 80%, transparent),
+              color-mix(in srgb, var(--ui-secondary) 70%, transparent)
+            );
+            border-color: color-mix(
+              in srgb,
+              var(--ui-secondary) 80%,
+              transparent
+            );
           }
           .tree-container::-webkit-scrollbar-corner {
-            background: #0e1a33;
+            background: var(--ui-panel-border);
           }
           .level-strip {
             display: flex;
@@ -943,18 +1013,31 @@ export class ResearchTreeModal extends LitElement {
             flex: 0 0 auto;
             min-width: 220px;
             border-radius: 12px;
-            border: 1px solid rgba(15, 23, 42, 0.95);
+            border: 1px solid
+              color-mix(in srgb, var(--ui-panel-border) 95%, transparent);
             background:
               linear-gradient(
                 180deg,
-                rgba(3, 7, 14, 0.98),
-                rgba(5, 9, 18, 0.92)
+                color-mix(
+                  in srgb,
+                  var(--ui-panel-shell-bottom) 98%,
+                  transparent
+                ),
+                color-mix(
+                  in srgb,
+                  var(--ui-panel-shell-bottom) 92%,
+                  transparent
+                )
               ),
-              var(--level-accent, rgba(59, 130, 246, 0.06));
+              var(
+                --level-accent,
+                color-mix(in srgb, var(--ui-info) 6%, transparent)
+              );
             padding: 12px;
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.04),
-              0 6px 24px rgba(2, 6, 23, 0.75);
+              inset 0 1px 0
+                color-mix(in srgb, var(--ui-text-light) 4%, transparent),
+              0 6px 24px color-mix(in srgb, var(--ui-overlay) 75%, transparent);
           }
           .all-view-grid {
             display: flex;
@@ -966,20 +1049,33 @@ export class ResearchTreeModal extends LitElement {
             background:
               linear-gradient(
                 180deg,
-                rgba(4, 7, 14, 0.98),
-                rgba(6, 12, 24, 0.92)
+                color-mix(
+                  in srgb,
+                  var(--ui-panel-shell-bottom) 98%,
+                  transparent
+                ),
+                color-mix(
+                  in srgb,
+                  var(--ui-panel-shell-bottom) 92%,
+                  transparent
+                )
               ),
-              var(--column-accent, rgba(59, 130, 246, 0.05));
-            border: 1px solid rgba(15, 23, 42, 0.85);
+              var(
+                --column-accent,
+                color-mix(in srgb, var(--ui-info) 5%, transparent)
+              );
+            border: 1px solid
+              color-mix(in srgb, var(--ui-panel-border) 85%, transparent);
             border-radius: 12px;
             padding: 10px;
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.04),
-              0 4px 16px rgba(2, 6, 23, 0.65);
+              inset 0 1px 0
+                color-mix(in srgb, var(--ui-text-light) 4%, transparent),
+              0 4px 16px color-mix(in srgb, var(--ui-overlay) 65%, transparent);
           }
           .all-column-title {
             font-weight: 600;
-            color: #f0f6ff;
+            color: var(--ui-text-light);
             margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -992,7 +1088,7 @@ export class ResearchTreeModal extends LitElement {
           }
           .compact-level-label {
             font-size: 10px;
-            color: #9fb4d9;
+            color: var(--ui-text-accent);
             padding-top: 2px;
             min-width: 22px;
           }
@@ -1009,13 +1105,22 @@ export class ResearchTreeModal extends LitElement {
             font-size: 11px;
             padding: 4px 6px;
             border-radius: 6px;
-            background: rgba(15, 23, 42, 0.65);
-            border: 1px solid rgba(59, 130, 246, 0.15);
-            color: #dbe7ff;
+            background: color-mix(
+              in srgb,
+              var(--ui-panel-border) 65%,
+              transparent
+            );
+            border: 1px solid
+              color-mix(in srgb, var(--ui-info) 15%, transparent);
+            color: var(--ui-text-accent);
           }
           .compact-tech.researched {
-            background: rgba(22, 82, 58, 0.35);
-            border-color: rgba(34, 197, 94, 0.4);
+            background: color-mix(in srgb, var(--ui-success) 35%, transparent);
+            border-color: color-mix(
+              in srgb,
+              var(--ui-success) 40%,
+              transparent
+            );
           }
           .compact-tech.empty {
             justify-content: center;
@@ -1028,13 +1133,13 @@ export class ResearchTreeModal extends LitElement {
             white-space: nowrap;
           }
           .compact-check {
-            color: #86efac;
+            color: var(--ui-success);
             font-weight: 600;
             margin-left: 8px;
           }
           .level-label {
             font-weight: 600;
-            color: #e3edff;
+            color: var(--ui-text-accent);
             margin-bottom: 10px;
             letter-spacing: 0.04em;
             text-transform: uppercase;
@@ -1046,24 +1151,30 @@ export class ResearchTreeModal extends LitElement {
           }
           .empty-level {
             font-size: 12px;
-            color: #7b8ba8;
+            color: var(--ui-text-muted);
             opacity: 0.8;
             text-align: center;
-            border: 1px dashed rgba(125, 138, 164, 0.4);
+            border: 1px dashed
+              color-mix(in srgb, var(--ui-border-muted) 40%, transparent);
             border-radius: 8px;
             padding: 16px 8px;
           }
           .empty-state {
             padding: 24px;
             text-align: center;
-            color: #9eaec9;
+            color: var(--ui-text-muted);
           }
           .tech {
-            background: linear-gradient(180deg, #122544, #0e1c33);
-            border: 1px solid rgba(59, 130, 246, 0.35);
+            background: linear-gradient(
+              180deg,
+              color-mix(in srgb, var(--ui-panel-shell-top) 85%, transparent),
+              color-mix(in srgb, var(--ui-panel-shell-bottom) 85%, transparent)
+            );
+            border: 1px solid
+              color-mix(in srgb, var(--ui-info) 35%, transparent);
             border-radius: 10px;
             padding: 10px;
-            color: #e4edff;
+            color: var(--ui-text-accent);
             position: relative;
             cursor: pointer;
             transition:
@@ -1074,21 +1185,27 @@ export class ResearchTreeModal extends LitElement {
             width: 100%;
             text-align: left;
             box-shadow:
-              0 6px 16px rgba(2, 6, 23, 0.65),
-              inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+              0 6px 16px color-mix(in srgb, var(--ui-overlay) 65%, transparent),
+              inset 0 0 0 1px
+                color-mix(in srgb, var(--ui-text-light) 2%, transparent);
           }
           .tech:hover {
             box-shadow:
-              0 8px 18px rgba(2, 6, 23, 0.8),
-              0 0 0 2px rgba(59, 130, 246, 0.45) inset;
+              0 8px 18px color-mix(in srgb, var(--ui-overlay) 80%, transparent),
+              0 0 0 2px color-mix(in srgb, var(--ui-info) 45%, transparent)
+                inset;
           }
           .tech.locked {
             opacity: 1;
             cursor: pointer;
           }
           .tech.researched {
-            background: #162544;
-            border-color: #27476e;
+            background: color-mix(
+              in srgb,
+              var(--ui-panel-shell-top) 80%,
+              transparent
+            );
+            border-color: var(--ui-panel-border);
           }
           .tech.researched::after {
             content: "\\2713";
@@ -1096,8 +1213,9 @@ export class ResearchTreeModal extends LitElement {
             top: 6px;
             right: 8px;
             font-weight: bold;
-            color: #86efac;
-            text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+            color: var(--ui-success);
+            text-shadow: 0 1px 0
+              color-mix(in srgb, var(--ui-overlay) 50%, transparent);
           }
           .tech-wrapper {
             display: flex;
@@ -1106,10 +1224,15 @@ export class ResearchTreeModal extends LitElement {
             width: 100%;
           }
           .tech-action {
-            background: rgba(176, 80, 78, 0.18);
-            border: 1px solid rgba(176, 80, 78, 0.45);
+            background: color-mix(in srgb, var(--ui-alert) 18%, transparent);
+            border: 1px solid
+              color-mix(in srgb, var(--ui-alert) 45%, transparent);
             border-radius: 6px;
-            color: #ffd1d1;
+            color: color-mix(
+              in srgb,
+              var(--ui-alert) 70%,
+              var(--ui-text-light) 30%
+            );
             font-size: 11px;
             font-weight: 600;
             padding: 6px 8px;
@@ -1121,31 +1244,38 @@ export class ResearchTreeModal extends LitElement {
               color 120ms ease;
           }
           .tech-action:hover:not([disabled]) {
-            background: rgba(176, 80, 78, 0.3);
-            border-color: rgba(176, 80, 78, 0.6);
+            background: color-mix(in srgb, var(--ui-alert) 30%, transparent);
+            border-color: color-mix(in srgb, var(--ui-alert) 60%, transparent);
           }
           .tech-action[disabled] {
             opacity: 0.65;
             cursor: not-allowed;
           }
           .tech.priority {
-            border-color: rgba(59, 130, 246, 0.9);
+            border-color: color-mix(in srgb, var(--ui-info) 90%, transparent);
             box-shadow:
-              0 0 0 2px rgba(59, 130, 246, 0.35) inset,
-              0 0 10px 2px rgba(59, 130, 246, 0.25);
+              0 0 0 2px color-mix(in srgb, var(--ui-info) 35%, transparent)
+                inset,
+              0 0 10px 2px color-mix(in srgb, var(--ui-info) 25%, transparent);
           }
           .tech .tooltip {
             position: absolute;
             top: 50%;
             left: calc(100% + 12px);
             transform: translateY(-50%);
-            background: #111827;
-            color: #e5e7eb;
-            border: 1px solid #374151;
+            background: color-mix(
+              in srgb,
+              var(--ui-panel-shell-top) 75%,
+              transparent
+            );
+            color: var(--ui-text-light);
+            border: 1px solid
+              color-mix(in srgb, var(--ui-border-muted) 70%, transparent);
             border-radius: 8px;
             box-shadow:
-              0 10px 20px rgba(0, 0, 0, 0.35),
-              inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+              0 10px 20px color-mix(in srgb, var(--ui-overlay) 35%, transparent),
+              inset 0 0 0 1px
+                color-mix(in srgb, var(--ui-text-light) 2%, transparent);
             padding: 8px 10px;
             font-size: 12px;
             line-height: 1.25;
@@ -1166,8 +1296,13 @@ export class ResearchTreeModal extends LitElement {
             transform: translateY(-50%);
             border-width: 6px;
             border-style: solid;
-            border-color: transparent #111827 transparent transparent;
-            filter: drop-shadow(-1px 0 0 rgba(55, 65, 81, 0.9));
+            border-color: transparent
+              color-mix(in srgb, var(--ui-panel-shell-top) 75%, transparent)
+              transparent transparent;
+            filter: drop-shadow(
+              -1px 0 0
+                color-mix(in srgb, var(--ui-border-muted) 90%, transparent)
+            );
           }
           .tech:hover .tooltip {
             opacity: 1;
@@ -1176,35 +1311,51 @@ export class ResearchTreeModal extends LitElement {
           .progress-track {
             width: 100%;
             height: 6px;
-            background: rgba(39, 71, 110, 0.25);
-            border: 1px solid rgba(39, 71, 110, 0.35);
+            background: color-mix(
+              in srgb,
+              var(--ui-secondary) 25%,
+              transparent
+            );
+            border: 1px solid
+              color-mix(in srgb, var(--ui-secondary) 35%, transparent);
             border-radius: 6px;
             overflow: hidden;
             margin: 6px 0 4px;
           }
           .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #00f8ff 0%, #00a6f6 100%);
+            background: linear-gradient(
+              90deg,
+              color-mix(in srgb, var(--ui-info) 90%, transparent) 0%,
+              color-mix(in srgb, var(--ui-info) 70%, transparent) 100%
+            );
             box-shadow:
-              0 0 10px rgba(37, 150, 186, 0.55),
-              0 0 16px rgba(0, 166, 246, 0.35),
-              inset 0 0 4px rgba(255, 255, 255, 0.1);
+              0 0 10px color-mix(in srgb, var(--ui-info) 55%, transparent),
+              0 0 16px color-mix(in srgb, var(--ui-info) 35%, transparent),
+              inset 0 0 4px
+                color-mix(in srgb, var(--ui-text-light) 10%, transparent);
           }
           .progress-fill.priority {
-            background: linear-gradient(90deg, #00f8ff 0%, #00a6f6 100%);
+            background: linear-gradient(
+              90deg,
+              color-mix(in srgb, var(--ui-info) 90%, transparent) 0%,
+              color-mix(in srgb, var(--ui-info) 70%, transparent) 100%
+            );
             box-shadow:
-              0 0 14px rgba(0, 166, 246, 0.75),
-              0 0 26px rgba(0, 248, 255, 0.6),
-              0 0 32px rgba(0, 166, 246, 0.5),
-              inset 0 0 6px rgba(255, 255, 255, 0.16),
-              inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+              0 0 14px color-mix(in srgb, var(--ui-info) 75%, transparent),
+              0 0 26px color-mix(in srgb, var(--ui-info) 60%, transparent),
+              0 0 32px color-mix(in srgb, var(--ui-info) 50%, transparent),
+              inset 0 0 6px
+                color-mix(in srgb, var(--ui-text-light) 16%, transparent),
+              inset 0 0 0 1px
+                color-mix(in srgb, var(--ui-text-light) 12%, transparent);
           }
           .cost-inline {
             display: inline-flex;
             align-items: flex-end;
             gap: 6px;
             font-size: 12px;
-            color: #dbe7ff;
+            color: var(--ui-text-accent);
             opacity: 0.95;
             margin: 2px 0 4px;
           }
@@ -1222,14 +1373,30 @@ export class ResearchTreeModal extends LitElement {
             margin-right: 6px;
           }
           .pill-req {
-            background: rgba(176, 80, 78, 0.18);
-            color: #ffd1d1;
-            border: 1px solid rgba(176, 80, 78, 0.45);
+            background: color-mix(in srgb, var(--ui-alert) 18%, transparent);
+            color: color-mix(
+              in srgb,
+              var(--ui-alert) 70%,
+              var(--ui-text-light) 30%
+            );
+            border: 1px solid
+              color-mix(in srgb, var(--ui-alert) 45%, transparent);
           }
           .pill-oneof {
-            background: rgba(245, 158, 11, 0.14);
-            color: #ffe8a3;
-            border: 1px solid rgba(245, 158, 11, 0.35);
+            background: color-mix(in srgb, var(--ui-warning) 14%, transparent);
+            color: color-mix(
+              in srgb,
+              var(--ui-warning) 70%,
+              var(--ui-text-light) 30%
+            );
+            border: 1px solid
+              color-mix(in srgb, var(--ui-warning) 35%, transparent);
+          }
+          .pill-priority {
+            background: color-mix(in srgb, var(--ui-info) 18%, transparent);
+            color: var(--ui-text-accent);
+            border: 1px solid
+              color-mix(in srgb, var(--ui-info) 45%, transparent);
           }
           .line-layer {
             position: absolute;
@@ -1246,15 +1413,17 @@ export class ResearchTreeModal extends LitElement {
             stroke-width: 2;
           }
           .edge.req {
-            stroke: rgba(176, 80, 78, 0.85);
+            stroke: color-mix(in srgb, var(--ui-alert) 85%, transparent);
           }
           .edge.oneof {
-            stroke: rgba(245, 158, 11, 0.85);
+            stroke: color-mix(in srgb, var(--ui-warning) 85%, transparent);
             stroke-dasharray: 6 4;
           }
           .edge.highlight {
             stroke-width: 3;
-            filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.45));
+            filter: drop-shadow(
+              0 0 4px color-mix(in srgb, var(--ui-info) 45%, transparent)
+            );
           }
         </style>
         ${this.renderLegend()}
@@ -1270,7 +1439,7 @@ export class ResearchTreeModal extends LitElement {
                   role="tab"
                   aria-selected=${String(isActive)}
                   style=${isActive
-                    ? `--tab-accent:${isAllTab ? "rgba(148,163,184,0.25)" : (categoryColors[cat as Category] ?? "transparent")}`
+                    ? `--tab-accent:${isAllTab ? "color-mix(in srgb, var(--ui-border-muted) 25%, transparent)" : (categoryColors[cat as Category] ?? "transparent")}`
                     : ""}
                   @click=${() => this.onTabClick(cat)}
                 >
@@ -1447,8 +1616,7 @@ export class ResearchTreeModal extends LitElement {
                                           : ""}
                                         ${priority === tech.id && !isResearched
                                           ? html`<span
-                                              class="pill"
-                                              style="background:rgba(59,130,246,0.18);color:#cfe3ff;border:1px solid rgba(59,130,246,0.45);"
+                                              class="pill pill-priority"
                                               >Priority</span
                                             >`
                                           : ""}

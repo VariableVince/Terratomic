@@ -4,6 +4,8 @@ import { getServerConfigFromClient } from "../core/configuration/ConfigLoader";
 import { GameType } from "../core/game/Game";
 import { UserSettings } from "../core/game/UserSettings";
 import { joinLobby } from "./ClientGameRunner";
+import "./DarkModeButton";
+import { DarkModeButton } from "./DarkModeButton";
 import "./FlagInput";
 import { FlagInput } from "./FlagInput";
 import { GameStartingModal } from "./GameStartingModal";
@@ -32,6 +34,7 @@ import { OButton } from "./components/baseComponents/Button";
 import "./components/baseComponents/Modal";
 import { isLoggedIn } from "./jwt";
 import "./styles.css";
+import { applyUiPalette, getUiPalette } from "./theme/UiPaletteLoader";
 
 declare global {
   interface Window {
@@ -40,6 +43,7 @@ declare global {
         newPageView: () => void;
       };
     };
+    __LEGACY_UI_PALETTE__?: boolean;
     ramp: {
       que: Array<() => void>;
       passiveMode: boolean;
@@ -75,6 +79,7 @@ class Client {
 
   private usernameInput: UsernameInput | null = null;
   private flagInput: FlagInput | null = null;
+  private darkModeButton: DarkModeButton | null = null;
 
   private joinModal: JoinPrivateLobbyModal;
   private publicLobby: PublicLobby;
@@ -87,7 +92,27 @@ class Client {
 
   constructor() {}
 
+  private handleDarkModeChangedEvent = () => {
+    this.applyUiPaletteFromSettings();
+  };
+
+  private applyUiPaletteFromSettings() {
+    if (window.__LEGACY_UI_PALETTE__) {
+      return;
+    }
+    try {
+      applyUiPalette(getUiPalette(this.userSettings));
+    } catch (error) {
+      console.error("Failed to apply UI palette", error);
+    }
+  }
+
   initialize(): void {
+    this.applyUiPaletteFromSettings();
+    window.addEventListener(
+      "dark-mode-changed",
+      this.handleDarkModeChangedEvent,
+    );
     // Prepare main menu background music
     this.setupMenuMusic();
     // Sync menu music with persisted mute state and react to changes
@@ -138,7 +163,12 @@ class Client {
       console.warn("Flag input element not found");
     }
 
-    // Dark mode button removed from UI; mechanic persists via UserSettings
+    this.darkModeButton = document.querySelector(
+      "dark-mode-button",
+    ) as DarkModeButton;
+    if (!this.darkModeButton) {
+      console.warn("Dark mode button element not found");
+    }
 
     // const loginDiscordButton = document.getElementById(
     //   "login-discord",
@@ -424,6 +454,9 @@ class Client {
         document
           .getElementById("username-validation-error")
           ?.classList.add("hidden");
+        document
+          .getElementById("quick-toggle-container")
+          ?.classList.add("hidden");
         [
           "single-player-modal",
           "host-lobby-modal",
@@ -481,6 +514,9 @@ class Client {
     this.publicLobby.leaveLobby();
     // We're back on the main menu; allow music again
     this.isOnMainMenu = true;
+    document
+      .getElementById("quick-toggle-container")
+      ?.classList.remove("hidden");
     // Resume menu music when returning to main menu
     this.menuMusic?.play().catch(() => {
       // If autoplay blocks this, attach a one-off listener to start on next interaction
