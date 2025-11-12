@@ -560,15 +560,8 @@ export class StructureLayer implements Layer {
         this.labelContainer.removeChildren();
         this.shouldRedraw = true;
         if (this.renderer) {
-          try {
-            this.renderer.render(this.stage);
-          } catch (err) {
-            // Intentionally ignore render errors that can occur during rapid stage updates
-            // (e.g., context lost or renderer disposed mid-frame). Capturing the error avoids
-            // the no-empty lint rule while keeping behavior silent.
-            // Swallow error intentionally; referencing it avoids unused-vars and no-empty rules.
-            void err;
-          }
+          // Render directly; any rare error (context lost, disposed mid-frame) should surface during development.
+          this.renderer.render(this.stage);
         }
       }
       return;
@@ -687,12 +680,7 @@ export class StructureLayer implements Layer {
     // Force a re-render so hover feedback is immediate
     this.shouldRedraw = true;
     if (this.renderer) {
-      try {
-        this.renderer.render(this.stage);
-      } catch (e) {
-        // Non-fatal: rendering will occur on next frame
-        console.warn("StructureLayer immediate render failed", e);
-      }
+      this.renderer.render(this.stage);
     }
   }
 
