@@ -150,10 +150,12 @@ export class Executor {
       case "upgrade_structure": {
         const unit = player.units().find((u) => u.id() === intent.unitId);
         if (!unit || unit.owner() !== player) return new NoOpExecution();
-        // Allow upgrades for City and Port only
+        // Allow upgrades for City, Port, Hospital, Academy
         const allowed =
           intent.unitType === UnitType.City ||
-          intent.unitType === UnitType.Port;
+          intent.unitType === UnitType.Port ||
+          intent.unitType === UnitType.Hospital ||
+          intent.unitType === UnitType.Academy;
         if (!allowed || unit.type() !== intent.unitType) {
           return new NoOpExecution();
         }

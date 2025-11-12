@@ -436,7 +436,10 @@ export class PlayerImpl implements Player {
         const baseMax = u.info().maxHealth ?? 1;
         const level = (u as any).level?.() ?? 1;
         const effectiveMax =
-          u.type() === UnitType.City || u.type() === UnitType.Port
+          u.type() === UnitType.City ||
+          u.type() === UnitType.Port ||
+          u.type() === UnitType.Hospital ||
+          u.type() === UnitType.Academy
             ? baseMax + 1000 * Math.max(0, level - 1)
             : baseMax;
         const healthRatio = u.hasHealth()

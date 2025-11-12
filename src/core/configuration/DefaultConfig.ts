@@ -1307,6 +1307,8 @@ export class DefaultConfig implements Config {
     switch (type) {
       case UnitType.City:
       case UnitType.Port:
+      case UnitType.Hospital:
+      case UnitType.Academy:
         return 4; // Default 80% -> 4/5
       default:
         return 1;
@@ -1316,6 +1318,8 @@ export class DefaultConfig implements Config {
     switch (type) {
       case UnitType.City:
       case UnitType.Port:
+      case UnitType.Hospital:
+      case UnitType.Academy:
         return 5; // Default 80% -> 4/5
       default:
         return 1;

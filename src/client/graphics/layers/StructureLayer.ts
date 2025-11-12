@@ -82,6 +82,8 @@ export class StructureLayer implements Layer {
   // Track affordability per structure type to refresh highlights correctly
   private lastAffordableForUpgradeCity: boolean | null = null;
   private lastAffordableForUpgradePort: boolean | null = null;
+  private lastAffordableForUpgradeHospital: boolean | null = null;
+  private lastAffordableForUpgradeAcademy: boolean | null = null;
   // Client-side level tracking for structures (temporary)
   private structureLevels = new Map<
     number,
@@ -157,7 +159,9 @@ export class StructureLayer implements Layer {
       for (const r of this.renders) {
         if (
           r.unit.type() === UnitType.City ||
-          r.unit.type() === UnitType.Port
+          r.unit.type() === UnitType.Port ||
+          r.unit.type() === UnitType.Hospital ||
+          r.unit.type() === UnitType.Academy
         ) {
           r.pixiSprite.texture = this.createTexture(r.unit);
         }
@@ -289,41 +293,57 @@ export class StructureLayer implements Layer {
   private updateHighlights() {
     const affordableCity = this.canAffordUpgradeForType(UnitType.City);
     const affordablePort = this.canAffordUpgradeForType(UnitType.Port);
+    const affordableHospital = this.canAffordUpgradeForType(UnitType.Hospital);
+    const affordableAcademy = this.canAffordUpgradeForType(UnitType.Academy);
     if (!this.upgradeMode) {
       if (
         this.lastAffordableForUpgradeCity !== null ||
-        this.lastAffordableForUpgradePort !== null
+        this.lastAffordableForUpgradePort !== null ||
+        this.lastAffordableForUpgradeHospital !== null ||
+        this.lastAffordableForUpgradeAcademy !== null
       ) {
         this.textureCache.clear();
         for (const r of this.renders) {
           if (
             r.unit.type() === UnitType.City ||
-            r.unit.type() === UnitType.Port
+            r.unit.type() === UnitType.Port ||
+            r.unit.type() === UnitType.Hospital ||
+            r.unit.type() === UnitType.Academy
           ) {
             r.pixiSprite.texture = this.createTexture(r.unit);
           }
         }
         this.lastAffordableForUpgradeCity = null;
         this.lastAffordableForUpgradePort = null;
+        this.lastAffordableForUpgradeHospital = null;
+        this.lastAffordableForUpgradeAcademy = null;
         this.shouldRedraw = true;
       }
       return;
     }
     const cityChanged = this.lastAffordableForUpgradeCity !== affordableCity;
     const portChanged = this.lastAffordableForUpgradePort !== affordablePort;
-    if (cityChanged || portChanged) {
+    const hospitalChanged =
+      this.lastAffordableForUpgradeHospital !== affordableHospital;
+    const academyChanged =
+      this.lastAffordableForUpgradeAcademy !== affordableAcademy;
+    if (cityChanged || portChanged || hospitalChanged || academyChanged) {
       this.textureCache.clear();
       for (const r of this.renders) {
         const t = r.unit.type();
         if (
           (cityChanged && t === UnitType.City) ||
-          (portChanged && t === UnitType.Port)
+          (portChanged && t === UnitType.Port) ||
+          (hospitalChanged && t === UnitType.Hospital) ||
+          (academyChanged && t === UnitType.Academy)
         ) {
           r.pixiSprite.texture = this.createTexture(r.unit);
         }
       }
       this.lastAffordableForUpgradeCity = affordableCity;
       this.lastAffordableForUpgradePort = affordablePort;
+      this.lastAffordableForUpgradeHospital = affordableHospital;
+      this.lastAffordableForUpgradeAcademy = affordableAcademy;
       this.shouldRedraw = true;
     }
   }
@@ -431,7 +451,10 @@ export class StructureLayer implements Layer {
     let highlightTint = borderColor;
     if (
       !isConstruction &&
-      (structureType === UnitType.City || structureType === UnitType.Port) &&
+      (structureType === UnitType.City ||
+        structureType === UnitType.Port ||
+        structureType === UnitType.Hospital ||
+        structureType === UnitType.Academy) &&
       this.shouldHighlight(unit)
     ) {
       // Blend neon green with the base border color to reduce intensity
@@ -545,8 +568,13 @@ export class StructureLayer implements Layer {
     const me = this.game.myPlayer();
     if (!me) return false;
     if (unit.type() === UnitType.Construction) return false;
-    // Upgrades apply to cities and ports
-    if (unit.type() !== UnitType.City && unit.type() !== UnitType.Port)
+    // Upgrades apply to City, Port, Hospital, Academy
+    if (
+      unit.type() !== UnitType.City &&
+      unit.type() !== UnitType.Port &&
+      unit.type() !== UnitType.Hospital &&
+      unit.type() !== UnitType.Academy
+    )
       return false;
     return unit.owner().id() === me.id() && this.canAffordUpgrade(unit);
   }
@@ -677,11 +705,13 @@ export class StructureLayer implements Layer {
       if (clickedUnit.owner() !== this.game.myPlayer()) {
         return;
       }
-      // In upgrade mode: attempt to upgrade structure (city/port) immediately
+      // In upgrade mode: attempt to upgrade structure (City/Port/Hospital/Academy) immediately
       if (
         this.upgradeMode &&
         (clickedUnit.type() === UnitType.City ||
-          clickedUnit.type() === UnitType.Port)
+          clickedUnit.type() === UnitType.Port ||
+          clickedUnit.type() === UnitType.Hospital ||
+          clickedUnit.type() === UnitType.Academy)
       ) {
         // Only if affordable
         if (this.canAffordUpgrade(clickedUnit)) {
