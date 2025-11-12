@@ -313,8 +313,14 @@ export class PlayerImpl implements Player {
     let total = 0;
     for (const unit of this._units) {
       if (unit.type() === type) {
-        if (type === UnitType.City || type === UnitType.Port) {
-          // Upgraded cities and ports count toward totals (affects scaling like new build cost)
+        if (
+          type === UnitType.City ||
+          type === UnitType.Port ||
+          type === UnitType.Hospital ||
+          type === UnitType.Academy
+        ) {
+          // Upgraded cities, ports, hospitals, and academies count toward totals
+          // (affects scaling like new build cost and display counts)
           total += (unit as any).level?.() ?? 1;
         } else {
           total++;

@@ -155,7 +155,8 @@ export class Executor {
           intent.unitType === UnitType.City ||
           intent.unitType === UnitType.Port ||
           intent.unitType === UnitType.Hospital ||
-          intent.unitType === UnitType.Academy;
+          intent.unitType === UnitType.Academy ||
+          intent.unitType === UnitType.MissileSilo;
         if (!allowed || unit.type() !== intent.unitType) {
           return new NoOpExecution();
         }

@@ -23,7 +23,6 @@ import { Layer } from "./Layer";
 class StructureRenderInfo {
   public isOnScreen: boolean = false;
   public isOnCooldown: boolean = false;
-  public invalidateTexture: boolean = false; // request a texture rebuild next tick
   constructor(
     public unit: UnitView,
     public owner: PlayerID,
@@ -69,6 +68,7 @@ export class StructureLayer implements Layer {
   private labelContainer: PIXI.Container; // UI overlay for hover labels
   private shouldRedraw: boolean = true;
   private textureCache: Map<string, PIXI.Texture> = new Map();
+  private lastHighlight: Map<number, boolean> = new Map(); // per-unit highlight state to detect changes
   private theme: Theme;
   private renderer: PIXI.Renderer;
   private renders: StructureRenderInfo[] = [];
@@ -84,6 +84,7 @@ export class StructureLayer implements Layer {
   private lastAffordableForUpgradePort: boolean | null = null;
   private lastAffordableForUpgradeHospital: boolean | null = null;
   private lastAffordableForUpgradeAcademy: boolean | null = null;
+  private lastAffordableForUpgradeSilo: boolean | null = null;
   // Client-side level tracking for structures (temporary)
   private structureLevels = new Map<
     number,
@@ -154,14 +155,14 @@ export class StructureLayer implements Layer {
     });
     this.eventBus.on(ToggleUpgradeModeEvent, (e) => {
       this.upgradeMode = e.enabled;
-      // Clear cache and rebuild textures for existing sprites so border tint updates immediately.
-      this.textureCache.clear();
+      // Rebuild textures for existing sprites so border tint updates immediately.
       for (const r of this.renders) {
         if (
           r.unit.type() === UnitType.City ||
           r.unit.type() === UnitType.Port ||
           r.unit.type() === UnitType.Hospital ||
-          r.unit.type() === UnitType.Academy
+          r.unit.type() === UnitType.Academy ||
+          r.unit.type() === UnitType.MissileSilo
         ) {
           r.pixiSprite.texture = this.createTexture(r.unit);
         }
@@ -295,20 +296,22 @@ export class StructureLayer implements Layer {
     const affordablePort = this.canAffordUpgradeForType(UnitType.Port);
     const affordableHospital = this.canAffordUpgradeForType(UnitType.Hospital);
     const affordableAcademy = this.canAffordUpgradeForType(UnitType.Academy);
+    const affordableSilo = this.canAffordUpgradeForType(UnitType.MissileSilo);
     if (!this.upgradeMode) {
       if (
         this.lastAffordableForUpgradeCity !== null ||
         this.lastAffordableForUpgradePort !== null ||
         this.lastAffordableForUpgradeHospital !== null ||
-        this.lastAffordableForUpgradeAcademy !== null
+        this.lastAffordableForUpgradeAcademy !== null ||
+        this.lastAffordableForUpgradeSilo !== null
       ) {
-        this.textureCache.clear();
         for (const r of this.renders) {
           if (
             r.unit.type() === UnitType.City ||
             r.unit.type() === UnitType.Port ||
             r.unit.type() === UnitType.Hospital ||
-            r.unit.type() === UnitType.Academy
+            r.unit.type() === UnitType.Academy ||
+            r.unit.type() === UnitType.MissileSilo
           ) {
             r.pixiSprite.texture = this.createTexture(r.unit);
           }
@@ -317,6 +320,18 @@ export class StructureLayer implements Layer {
         this.lastAffordableForUpgradePort = null;
         this.lastAffordableForUpgradeHospital = null;
         this.lastAffordableForUpgradeAcademy = null;
+        this.lastAffordableForUpgradeSilo = null;
+        this.shouldRedraw = true;
+      }
+      // When exiting upgrade mode, ensure any previously highlighted sprites are refreshed
+      if (this.lastHighlight.size > 0) {
+        for (const r of this.renders) {
+          const was = this.lastHighlight.get(r.unit.id());
+          if (was) {
+            r.pixiSprite.texture = this.createTexture(r.unit);
+          }
+        }
+        this.lastHighlight.clear();
         this.shouldRedraw = true;
       }
       return;
@@ -327,15 +342,22 @@ export class StructureLayer implements Layer {
       this.lastAffordableForUpgradeHospital !== affordableHospital;
     const academyChanged =
       this.lastAffordableForUpgradeAcademy !== affordableAcademy;
-    if (cityChanged || portChanged || hospitalChanged || academyChanged) {
-      this.textureCache.clear();
+    const siloChanged = this.lastAffordableForUpgradeSilo !== affordableSilo;
+    if (
+      cityChanged ||
+      portChanged ||
+      hospitalChanged ||
+      academyChanged ||
+      siloChanged
+    ) {
       for (const r of this.renders) {
         const t = r.unit.type();
         if (
           (cityChanged && t === UnitType.City) ||
           (portChanged && t === UnitType.Port) ||
           (hospitalChanged && t === UnitType.Hospital) ||
-          (academyChanged && t === UnitType.Academy)
+          (academyChanged && t === UnitType.Academy) ||
+          (siloChanged && t === UnitType.MissileSilo)
         ) {
           r.pixiSprite.texture = this.createTexture(r.unit);
         }
@@ -344,6 +366,33 @@ export class StructureLayer implements Layer {
       this.lastAffordableForUpgradePort = affordablePort;
       this.lastAffordableForUpgradeHospital = affordableHospital;
       this.lastAffordableForUpgradeAcademy = affordableAcademy;
+      this.lastAffordableForUpgradeSilo = affordableSilo;
+      this.shouldRedraw = true;
+    }
+
+    // Per-unit sanity check: if highlight eligibility changed (e.g., level cap reached), refresh that unit
+    let anyUnitChanged = false;
+    for (const r of this.renders) {
+      const t = r.unit.type();
+      if (
+        t !== UnitType.City &&
+        t !== UnitType.Port &&
+        t !== UnitType.Hospital &&
+        t !== UnitType.Academy &&
+        t !== UnitType.MissileSilo
+      ) {
+        continue;
+      }
+      const should = this.shouldHighlight(r.unit);
+      const prev = this.lastHighlight.get(r.unit.id()) ?? false;
+      if (prev !== should) {
+        // Refresh just this sprite; cache key accounts for highlight state
+        r.pixiSprite.texture = this.createTexture(r.unit);
+        this.lastHighlight.set(r.unit.id(), should);
+        anyUnitChanged = true;
+      }
+    }
+    if (anyUnitChanged) {
       this.shouldRedraw = true;
     }
   }
@@ -380,11 +429,25 @@ export class StructureLayer implements Layer {
       const record = this.structureLevels.get(unit.id());
       if (record) {
         // Sync primary level from server value.
+        const prevLevel = record.primary;
         const serverLevel = unit.level();
         record.primary = serverLevel;
         // If the hovered structure's level changed, refresh the label immediately.
         if (this.hoveredStructure && this.hoveredStructure.id() === unit.id()) {
           this.updateLabels();
+        }
+        // If level changed and we're in upgrade mode, re-render texture so highlight state updates
+        if (prevLevel !== serverLevel && this.upgradeMode) {
+          // Refresh texture so highlight state updates based on new level
+          const target = this.renders.find((r) => r.unit.id() === unit.id());
+          if (target) {
+            target.pixiSprite.texture = this.createTexture(unit);
+            this.shouldRedraw = true;
+            if (this.renderer) {
+              // Force immediate redraw so highlight state disappears instantly
+              this.renderer.render(this.stage);
+            }
+          }
         }
       }
     }
@@ -404,6 +467,21 @@ export class StructureLayer implements Layer {
         (endsAt !== undefined && this.game.ticks() < endsAt) ||
         (unit.ticksLeftInCooldown() ?? 0) > 0;
       cacheKey += `-${isOnCooldown}`;
+    }
+    // Differentiate textures by upgrade highlight state so mixed eligibility among
+    // units of the same type/owner doesn't lead to incorrect texture reuse.
+    if (!isConstruction) {
+      const t = structureType as UnitType;
+      if (
+        t === UnitType.City ||
+        t === UnitType.Port ||
+        t === UnitType.Hospital ||
+        t === UnitType.Academy ||
+        t === UnitType.MissileSilo
+      ) {
+        const hl = this.shouldHighlight(unit) ? 1 : 0;
+        cacheKey += `-hl${hl}`;
+      }
     }
     if (this.textureCache.has(cacheKey)) {
       // If render requested invalidation (upgrade mode toggle), bypass cache by deleting
@@ -454,7 +532,8 @@ export class StructureLayer implements Layer {
       (structureType === UnitType.City ||
         structureType === UnitType.Port ||
         structureType === UnitType.Hospital ||
-        structureType === UnitType.Academy) &&
+        structureType === UnitType.Academy ||
+        structureType === UnitType.MissileSilo) &&
       this.shouldHighlight(unit)
     ) {
       // Blend neon green with the base border color to reduce intensity
@@ -568,14 +647,19 @@ export class StructureLayer implements Layer {
     const me = this.game.myPlayer();
     if (!me) return false;
     if (unit.type() === UnitType.Construction) return false;
-    // Upgrades apply to City, Port, Hospital, Academy
+    // Upgrades apply to City, Port, Hospital, Academy, Missile Silo
     if (
       unit.type() !== UnitType.City &&
       unit.type() !== UnitType.Port &&
       unit.type() !== UnitType.Hospital &&
-      unit.type() !== UnitType.Academy
+      unit.type() !== UnitType.Academy &&
+      unit.type() !== UnitType.MissileSilo
     )
       return false;
+    // Do not highlight missile silos at max level (3)
+    if (unit.type() === UnitType.MissileSilo && unit.level() >= 3) {
+      return false;
+    }
     return unit.owner().id() === me.id() && this.canAffordUpgrade(unit);
   }
 
@@ -705,15 +789,23 @@ export class StructureLayer implements Layer {
       if (clickedUnit.owner() !== this.game.myPlayer()) {
         return;
       }
-      // In upgrade mode: attempt to upgrade structure (City/Port/Hospital/Academy) immediately
+      // In upgrade mode: attempt to upgrade structure (City/Port/Hospital/Academy/MissileSilo) immediately
       if (
         this.upgradeMode &&
         (clickedUnit.type() === UnitType.City ||
           clickedUnit.type() === UnitType.Port ||
           clickedUnit.type() === UnitType.Hospital ||
-          clickedUnit.type() === UnitType.Academy)
+          clickedUnit.type() === UnitType.Academy ||
+          clickedUnit.type() === UnitType.MissileSilo)
       ) {
         // Only if affordable
+        // And only if not at level cap for Missile Silo
+        if (
+          clickedUnit.type() === UnitType.MissileSilo &&
+          clickedUnit.level() >= 3
+        ) {
+          return;
+        }
         if (this.canAffordUpgrade(clickedUnit)) {
           // Fire transport event to send intent; rely on server update to change level
           this.eventBus.emit(

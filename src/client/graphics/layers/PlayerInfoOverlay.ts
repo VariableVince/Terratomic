@@ -339,8 +339,13 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
               const iconSrc = unitIconMap[unitType];
               if (!iconSrc) return null;
 
+              // Use unitsOwned for upgraded structures (City, Port, Hospital, Academy)
+              // so counts reflect summed levels + constructions, consistent with server.
               const count =
-                unitType === UnitType.City || unitType === UnitType.Port
+                unitType === UnitType.City ||
+                unitType === UnitType.Port ||
+                unitType === UnitType.Hospital ||
+                unitType === UnitType.Academy
                   ? player.unitsOwned(unitType)
                   : player.units(unitType).length;
 

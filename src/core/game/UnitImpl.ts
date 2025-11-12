@@ -234,6 +234,21 @@ export class UnitImpl implements Unit {
         this.mg.addUpdate(this.toUpdate());
         return;
       }
+      case UnitType.MissileSilo: {
+        // Cap silo upgrades at level 3
+        if (this._level >= 3) {
+          return;
+        }
+        this._level += 1;
+        this._bonusMaxHealth += 250;
+        const healed = Number(this._health) + 250;
+        const capped = Math.min(healed, this.effectiveMaxHealth());
+        this._health = toInt(capped);
+        // No change to "unitsOwned" semantics; silos do not count extra per level
+        // No specific cache to invalidate for silos currently
+        this.mg.addUpdate(this.toUpdate());
+        return;
+      }
       case UnitType.Port: {
         this._level += 1;
         this._bonusMaxHealth += 1000;
@@ -475,7 +490,21 @@ export class UnitImpl implements Unit {
     if (duration !== undefined) {
       this._cooldownDuration = duration;
     } else {
-      this._cooldownDuration = this.mg.config().SAMNukeCooldown(); // Default for nukes
+      // Choose default by unit type
+      if (this.type() === UnitType.MissileSilo) {
+        // Reduce cooldown by 20% per upgrade level beyond 1: L1=100%, L2=80%, L3=60%
+        const base = this.mg.config().SiloCooldown();
+        const levelsAboveOne = Math.max(0, this._level - 1);
+        const multiplier = Math.max(0, 1 - 0.2 * levelsAboveOne);
+        this._cooldownDuration = Math.floor(base * multiplier);
+      } else if (this.type() === UnitType.SAMLauncher) {
+        this._cooldownDuration = this.mg.config().SAMNukeCooldown();
+      } else if (this.type() === UnitType.City) {
+        // City anti-air default will be set by caller via duration; fallback to SAM cooldown
+        this._cooldownDuration = this.mg.config().SAMNukeCooldown();
+      } else {
+        this._cooldownDuration = this.mg.config().SAMNukeCooldown();
+      }
     }
     this.mg.addUpdate(this.toUpdate());
   }

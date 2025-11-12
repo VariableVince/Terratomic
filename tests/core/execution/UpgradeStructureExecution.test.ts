@@ -61,4 +61,38 @@ describe("UpgradeStructureExecution", () => {
     expect(mockPlayer.removeGold).not.toHaveBeenCalled();
     expect(mockUnit.upgradeStructure).not.toHaveBeenCalled();
   });
+
+  it("charges 50% of base cost and upgrades a Missile Silo", () => {
+    const { mockPlayer, mockGame, mockUnit } = makeMocks(UnitType.MissileSilo);
+    // Override config for silo to 1/2
+    (mockGame.config as jest.Mock).mockReturnValue({
+      structureUpgradeCostNum: jest.fn().mockImplementation(() => 1),
+      structureUpgradeCostDen: jest.fn().mockImplementation(() => 2),
+    });
+
+    const exec = new UpgradeStructureExecution(mockPlayer, mockUnit);
+    exec.init(mockGame, 0);
+
+    // 50% of 1,250,000 = 625,000
+    expect(mockPlayer.removeGold).toHaveBeenCalledWith(625_000n);
+    expect(mockUnit.upgradeStructure).toHaveBeenCalled();
+  });
+
+  it("does not charge or upgrade a Missile Silo at max level (3)", () => {
+    const { mockPlayer, mockGame } = makeMocks(UnitType.MissileSilo);
+    // Create a unit mock that reports level 3
+    const mockUnit = {
+      isUnit: jest.fn().mockReturnValue(true),
+      type: jest.fn().mockReturnValue(UnitType.MissileSilo),
+      owner: jest.fn().mockReturnValue(mockPlayer),
+      level: jest.fn().mockReturnValue(3),
+      upgradeStructure: jest.fn(),
+    } as unknown as jest.Mocked<Unit & { upgradeStructure: () => void }>;
+
+    const exec = new UpgradeStructureExecution(mockPlayer, mockUnit);
+    exec.init(mockGame, 0);
+
+    expect(mockPlayer.removeGold).not.toHaveBeenCalled();
+    expect(mockUnit.upgradeStructure).not.toHaveBeenCalled();
+  });
 });
