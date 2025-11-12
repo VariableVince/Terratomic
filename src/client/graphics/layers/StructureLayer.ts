@@ -1,3 +1,4 @@
+import { colord } from "colord";
 import * as PIXI from "pixi.js";
 import anchorIcon from "../../../../resources/images/AnchorIcon.png";
 import academyIcon from "../../../../resources/images/buildings/academy_icon.png";
@@ -14,7 +15,7 @@ import { Cell, PlayerID, UnitType } from "../../../core/game/Game";
 import { GameUpdateType } from "../../../core/game/GameUpdates";
 import { GameView, UnitView } from "../../../core/game/GameView";
 import { UnitCooldownEndedEvent } from "../../events/UnitCooldownEndedEvent";
-import { MouseUpEvent } from "../../InputHandler";
+import { MouseMoveEvent, MouseUpEvent } from "../../InputHandler";
 import { TransformHandler } from "../TransformHandler";
 import { Layer } from "./Layer";
 class StructureRenderInfo {
@@ -62,6 +63,7 @@ const STRUCTURE_BG_SHAPES: Partial<Record<UnitType, BgShape>> = {
 export class StructureLayer implements Layer {
   private pixicanvas: HTMLCanvasElement;
   private stage: PIXI.Container;
+  private labelContainer: PIXI.Container; // UI overlay for hover labels
   private shouldRedraw: boolean = true;
   private textureCache: Map<string, PIXI.Texture> = new Map();
   private theme: Theme;
@@ -72,6 +74,12 @@ export class StructureLayer implements Layer {
   // Interaction state
   private selectedStructureUnit: UnitView | null = null;
   private previouslySelected: UnitView | null = null;
+  private hoveredStructure: UnitView | null = null;
+  // Client-side level tracking for structures (temporary)
+  private structureLevels = new Map<
+    number,
+    { primary: number; secondary: number }
+  >();
 
   // Icons registry
   private structures: Map<
@@ -126,6 +134,7 @@ export class StructureLayer implements Layer {
     await this.setupRenderer();
     this.redraw();
     this.eventBus.on(MouseUpEvent, (e) => this.onMouseUp(e));
+    this.eventBus.on(MouseMoveEvent, (e) => this.onMouseMove(e));
     this.eventBus.on(UnitCooldownEndedEvent, (e) => {
       if (e.unit.type() === UnitType.City) {
         const render = this.renders.find((r) => r.unit.id() === e.unit.id());
@@ -145,6 +154,9 @@ export class StructureLayer implements Layer {
     this.stage.position.set(0, 0);
     this.stage.width = this.pixicanvas.width;
     this.stage.height = this.pixicanvas.height;
+    // Create label overlay container rendered above sprites
+    this.labelContainer = new PIXI.Container();
+    this.stage.addChild(this.labelContainer);
     await this.renderer.init({
       canvas: this.pixicanvas,
       resolution: 1,
@@ -218,6 +230,8 @@ export class StructureLayer implements Layer {
       for (const render of this.renders) {
         this.computeNewLocation(render);
       }
+      // Reposition labels on transform changes
+      this.updateLabels();
     }
 
     if (this.transformHandler.hasChanged() || this.shouldRedraw) {
@@ -251,6 +265,11 @@ export class StructureLayer implements Layer {
       render.pixiSprite?.destroy();
       render.pixiSprite = this.createPixiSprite(unit);
       this.shouldRedraw = true;
+    }
+
+    // Initialize structure levels when construction finishes
+    if (!isConstruction) {
+      this.ensureStructureLevels(unit);
     }
   }
 
@@ -415,7 +434,8 @@ export class StructureLayer implements Layer {
     sprite.x = screenPos.x;
     sprite.y = screenPos.y;
     sprite.scale.set(this.iconScreenScale());
-    this.stage.addChild(sprite);
+    // Add sprite below label container so labels render on top
+    this.stage.addChildAt(sprite, Math.max(0, this.stage.children.length - 1));
     return sprite;
   }
 
@@ -525,6 +545,154 @@ export class StructureLayer implements Layer {
       }
     } else {
       this.selectedStructureUnit = null;
+    }
+  }
+
+  private onMouseMove(event: MouseMoveEvent) {
+    const cell = this.transformHandler.screenToWorldCoordinates(
+      event.x,
+      event.y,
+    );
+    if (!this.game.isValidCoord(cell.x, cell.y)) {
+      if (this.hoveredStructure) {
+        this.hoveredStructure = null;
+        // Clear labels immediately
+        this.labelContainer.removeChildren();
+        this.shouldRedraw = true;
+        if (this.renderer) {
+          try {
+            this.renderer.render(this.stage);
+          } catch (err) {
+            // Intentionally ignore render errors that can occur during rapid stage updates
+            // (e.g., context lost or renderer disposed mid-frame). Capturing the error avoids
+            // the no-empty lint rule while keeping behavior silent.
+            // Swallow error intentionally; referencing it avoids unused-vars and no-empty rules.
+            void err;
+          }
+        }
+      }
+      return;
+    }
+    const hovered = this.findStructureUnitAtCell(cell);
+    const effectiveUnit =
+      hovered && hovered.type() !== UnitType.Construction ? hovered : null;
+    if (effectiveUnit !== this.hoveredStructure) {
+      this.hoveredStructure = effectiveUnit;
+      if (effectiveUnit) this.ensureStructureLevels(effectiveUnit);
+      this.updateLabels(); // updateLabels already forces a render when a structure is hovered
+    }
+  }
+
+  private ensureStructureLevels(unit: UnitView) {
+    const id = unit.id();
+    if (
+      !this.structureLevels.has(id) &&
+      unit.type() !== UnitType.Construction
+    ) {
+      this.structureLevels.set(id, { primary: 1, secondary: 0 });
+    }
+  }
+
+  private relationshipColorHexStr(unit: UnitView): string {
+    const my = this.game.myPlayer();
+    let c = this.theme.enemyColor();
+    if (my) {
+      if (unit.owner() === my) c = this.theme.selfColor();
+      else if (my.isFriendly(unit.owner())) c = this.theme.allyColor();
+    }
+    // Ensure single leading '#'
+    const raw = c.toHex().replace(/^#/, "").toLowerCase();
+    return `#${raw}`;
+  }
+
+  private updateLabels() {
+    // Clear existing labels
+    this.labelContainer.removeChildren();
+    const unit = this.hoveredStructure;
+    if (!unit || unit.type() === UnitType.Construction) return;
+    const levels = this.structureLevels.get(unit.id());
+    if (!levels) return;
+
+    const tile = unit.tile();
+    const worldX = this.game.x(tile);
+    const worldY = this.game.y(tile);
+    const screenPos = this.transformHandler.worldToScreenCoordinates(
+      new Cell(worldX, worldY),
+    );
+
+    // Determine icon size for offset
+    const shape: BgShape =
+      STRUCTURE_BG_SHAPES[unit.type() as UnitType] ?? "circle";
+    const iconDim = ICON_SIZES[shape] ?? ICON_SIZE;
+    const scale = this.iconScreenScale();
+
+    // Build texts
+    const baseColorStr = this.relationshipColorHexStr(unit); // "#RRGGBB"
+    const baseRaw = baseColorStr.replace(/^#/, "");
+    const secondaryRaw = colord(`#${baseRaw}`)
+      .desaturate(0.2)
+      .lighten(0.35)
+      .toHex()
+      .replace(/^#/, "");
+    // Use numeric fills (PIXIs accepts number) to avoid string parsing edge cases
+    const baseFill = parseInt(baseRaw, 16);
+    const secondaryFill = parseInt(secondaryRaw, 16);
+    const fontSize = Math.max(10, Math.round(iconDim * scale * 0.55));
+    const stylePrimary = new PIXI.TextStyle({
+      fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+      fontSize,
+      fontWeight: "600",
+      fill: baseFill,
+      align: "center",
+    });
+    const styleSecondary = new PIXI.TextStyle({
+      fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+      fontSize,
+      fontWeight: "600",
+      fill: secondaryFill,
+      align: "center",
+    });
+
+    const tPrimary = new PIXI.Text(String(levels.primary), stylePrimary);
+    const tSecondary = new PIXI.Text(String(levels.secondary), styleSecondary);
+    // Measure and layout
+    const gap = Math.round(fontSize * 0.4);
+    const paddingX = Math.round(fontSize * 0.5);
+    const paddingY = Math.round(fontSize * 0.35);
+    const contentWidth = tPrimary.width + tSecondary.width + gap;
+    const contentHeight = Math.max(tPrimary.height, tSecondary.height);
+    const pillWidth = contentWidth + paddingX * 2;
+    const pillHeight = contentHeight + paddingY * 2;
+    const bg = new PIXI.Graphics();
+    const bgX = Math.round(screenPos.x - pillWidth / 2);
+    const bgY = Math.round(
+      screenPos.y -
+        (iconDim * scale) / 2 -
+        pillHeight -
+        Math.max(4, Math.round(6 * scale)),
+    );
+    // PIXI v8+: use the new Graphics fill API instead of beginFill/endFill
+    bg.roundRect(bgX, bgY, pillWidth, pillHeight, Math.min(14, fontSize)).fill({
+      color: 0x000000,
+      alpha: 0.55,
+    });
+    this.labelContainer.addChild(bg);
+
+    // Position texts inside pill
+    tPrimary.x = bgX + paddingX;
+    tPrimary.y = bgY + Math.round((pillHeight - tPrimary.height) / 2);
+    tSecondary.x = tPrimary.x + tPrimary.width + gap;
+    tSecondary.y = bgY + Math.round((pillHeight - tSecondary.height) / 2);
+    this.labelContainer.addChild(tPrimary, tSecondary);
+    // Force a re-render so hover feedback is immediate
+    this.shouldRedraw = true;
+    if (this.renderer) {
+      try {
+        this.renderer.render(this.stage);
+      } catch (e) {
+        // Non-fatal: rendering will occur on next frame
+        console.warn("StructureLayer immediate render failed", e);
+      }
     }
   }
 
