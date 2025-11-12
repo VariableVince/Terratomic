@@ -513,6 +513,10 @@ export interface Unit {
   isDetectedByNavalUnit?: boolean;
   isAttacking?: boolean;
   isPeriodicallyVisible(): boolean;
+
+  // Upgrades
+  level(): number; // Current upgrade level (>=1)
+  upgradeStructure(): void; // Applies structure-specific upgrade effects (currently City only)
 }
 
 export interface TerraNullius {

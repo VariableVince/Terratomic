@@ -20,6 +20,7 @@ import { translateText } from "../../../client/Utils";
 import { EventBus } from "../../../core/EventBus";
 import { Gold, UnitType, UpgradeType } from "../../../core/game/Game";
 import { GameView } from "../../../core/game/GameView";
+import { ToggleUpgradeModeEvent } from "../../events/ToggleUpgradeModeEvent";
 import { CloseViewEvent } from "../../InputHandler";
 import { displayKey, renderNumber } from "../../Utils";
 import { UIState } from "../UIState";
@@ -423,6 +424,14 @@ export class BuildMenu extends LitElement {
       align-items: center;
       gap: 4px;
     }
+    .upgrade-button.selected {
+      border-color: var(--ui-secondary-hover);
+      box-shadow:
+        0 0 12px rgba(50, 98, 155, 0.75),
+        inset 0 0 12px rgba(0, 0, 0, 0.6);
+      background: var(--ui-secondary);
+      transform: scale(1.05);
+    }
     .upgrade-button:hover {
       background-color: var(--ui-secondary);
       transform: scale(1.05);
@@ -566,11 +575,14 @@ export class BuildMenu extends LitElement {
         )}
         <div class="upgrade-button-container">
           <button
-            class="upgrade-button"
-            title="Upgrade (coming soon)"
-            aria-label="Upgrade (coming soon)"
+            class="upgrade-button ${this.uiState.upgradeMode ? "selected" : ""}"
+            title="Upgrade"
+            aria-label="Upgrade Mode"
             @click=${() => {
-              /* no-op */
+              const enabled = !this.uiState.upgradeMode;
+              this.uiState.upgradeMode = enabled;
+              this.eventBus.emit(new ToggleUpgradeModeEvent(enabled));
+              this.requestUpdate();
             }}
           >
             <img class="upgrade-icon" src=${upgradeArrowIcon} alt="Upgrade" />

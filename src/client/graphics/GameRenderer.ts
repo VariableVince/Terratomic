@@ -53,6 +53,7 @@ export function createRenderer(
     investmentRate: 0.5, // 50% default investment rate
     pendingBuildUnitType: null,
     multibuildEnabled: false,
+    upgradeMode: false,
   };
 
   //hide when the game renders

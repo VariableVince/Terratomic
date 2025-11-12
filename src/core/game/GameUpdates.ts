@@ -137,6 +137,8 @@ export interface UnitUpdate {
   // Client-only hint: this update represents a ghosted last-known position
   ghost?: boolean;
   ghostExpiresAt?: Tick;
+  // Structure upgrade level (>=1). Cities increase level by 1 per upgrade.
+  level?: number;
 }
 
 export interface AttackUpdate {

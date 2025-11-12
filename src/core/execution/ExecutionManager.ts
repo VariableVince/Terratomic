@@ -1,4 +1,4 @@
-import { Execution, Game } from "../game/Game";
+import { Execution, Game, UnitType } from "../game/Game";
 import { PseudoRandom } from "../PseudoRandom";
 import { ClientID, GameID, Intent, Turn } from "../Schemas";
 import { simpleHash } from "../Util";
@@ -36,6 +36,7 @@ import { SetTargetTroopRatioExecution } from "./SetTargetTroopRatioExecution";
 import { SpawnExecution } from "./SpawnExecution";
 import { TargetPlayerExecution } from "./TargetPlayerExecution";
 import { TransportShipExecution } from "./TransportShipExecution";
+import { UpgradeStructureExecution } from "./UpgradeStructureExecution";
 
 export class Executor {
   // private random = new PseudoRandom(999)
@@ -146,6 +147,18 @@ export class Executor {
         return new ConstructionExecution(player, intent.unit, intent.tile);
       case "purchase_upgrade":
         return new PurchaseUpgradeExecution(player, intent.upgrade);
+      case "upgrade_structure": {
+        const unit = player.units().find((u) => u.id() === intent.unitId);
+        if (!unit || unit.owner() !== player) return new NoOpExecution();
+        // For now, only cities are upgradeable.
+        if (
+          intent.unitType !== UnitType.City ||
+          unit.type() !== UnitType.City
+        ) {
+          return new NoOpExecution();
+        }
+        return new UpgradeStructureExecution(player, unit);
+      }
       case "research_tree_select":
         return new ResearchTreeSelectExecution(player, intent.techId);
 

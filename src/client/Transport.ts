@@ -141,6 +141,8 @@ export class SendDonateTroopsIntentEvent implements GameEvent {
   ) {}
 }
 
+// ...
+
 export class SendQuickChatEvent implements GameEvent {
   constructor(
     public readonly recipient: PlayerView,
@@ -311,6 +313,9 @@ export class Transport {
 
     this.eventBus.on(SendPurchaseUpgradeIntentEvent, (e) =>
       this.onSendPurchaseUpgradeIntent(e),
+    );
+    this.eventBus.on(SendUpgradeStructureIntentEvent, (e) =>
+      this.onSendUpgradeStructureIntent(e),
     );
     this.eventBus.on(SendParatrooperAttackIntentEvent, (e) =>
       this.onSendParatrooperAttackIntent(e),
@@ -685,6 +690,17 @@ export class Transport {
       type: "purchase_upgrade",
       clientID: this.lobbyConfig.clientID,
       upgrade: event.upgrade,
+    });
+  }
+
+  private onSendUpgradeStructureIntent(event: SendUpgradeStructureIntentEvent) {
+    if (event.unitType !== UnitType.City) return; // Only cities supported now
+    // Prefer new generic intent; keep backward compatibility path if server still expects upgrade_city.
+    this.sendIntent({
+      type: "upgrade_structure",
+      clientID: this.lobbyConfig.clientID,
+      unitId: event.unitId,
+      unitType: event.unitType,
     });
   }
 

@@ -313,7 +313,12 @@ export class PlayerImpl implements Player {
     let total = 0;
     for (const unit of this._units) {
       if (unit.type() === type) {
-        total++;
+        if (type === UnitType.City) {
+          // Upgraded cities count toward total cities (affects scaling like new city cost)
+          total += (unit as any).level?.() ?? 1;
+        } else {
+          total++;
+        }
         continue;
       }
       if (unit.type() !== UnitType.Construction) continue;
@@ -427,10 +432,17 @@ export class PlayerImpl implements Player {
     const calculatedValue = this._units
       .filter((u) => u.type() === type && u.isActive())
       .reduce((sum, u) => {
+        // Use effective max for health ratio so city upgrades don't inflate ratios.
+        const baseMax = u.info().maxHealth ?? 1;
+        const level = (u as any).level?.() ?? 1;
+        const effectiveMax =
+          u.type() === UnitType.City
+            ? baseMax + 1000 * Math.max(0, level - 1)
+            : baseMax;
         const healthRatio = u.hasHealth()
-          ? Number(u.health()) / (u.info().maxHealth ?? 1)
+          ? Math.min(1, Number(u.health()) / Math.max(1, effectiveMax))
           : 1;
-        return sum + healthRatio;
+        return sum + healthRatio * level;
       }, 0);
     this._effectiveUnitsCache.set(type, calculatedValue);
     return calculatedValue;

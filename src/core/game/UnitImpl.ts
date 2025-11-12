@@ -35,6 +35,7 @@ export class UnitImpl implements Unit {
   private _returning: boolean = false;
   private _patrolTile: TileRef | undefined;
   private _level: number = 1;
+  private _bonusMaxHealth: number = 0; // Extra max health from upgrades (e.g. city upgrades)
   private _targetable: boolean = true;
   private _accumulatedRegen: number = 0;
   private _insuredBy: Player | null = null;
@@ -61,6 +62,7 @@ export class UnitImpl implements Unit {
     params: AllUnitParams = {},
   ) {
     this._lastTile = _tile;
+    // Initialize health to full effective max (base + bonus). Bonus starts at 0.
     this._health = toInt(this.mg.unitInfo(_type).maxHealth ?? 1);
     this._targetTile =
       "targetTile" in params ? (params.targetTile ?? undefined) : undefined;
@@ -146,6 +148,7 @@ export class UnitImpl implements Unit {
       targetable: this._targetable,
       lastPos: this._lastTile,
       health: this.hasHealth() ? Number(this._health) : undefined,
+      level: this._level > 1 ? this._level : undefined,
       constructionType: this._constructionType,
       targetUnitId: this._targetUnit?.id() ?? undefined,
       targetTile: this.targetTile() ?? undefined,
@@ -201,6 +204,47 @@ export class UnitImpl implements Unit {
 
   info(): UnitInfo {
     return this.mg.unitInfo(this._type);
+  }
+
+  private baseMaxHealth(): number {
+    return this.mg.unitInfo(this._type).maxHealth ?? 1;
+  }
+
+  private effectiveMaxHealth(): number {
+    return this.baseMaxHealth() + this._bonusMaxHealth;
+  }
+
+  level(): number {
+    return this._level;
+  }
+
+  /**
+   * Generic structure upgrade entrypoint.
+   * Currently only City supports upgrades: +1 level, +1000 max HP, heal 1000 (capped), invalidate caches, emit update.
+   */
+  upgradeStructure(): void {
+    switch (this._type) {
+      case UnitType.City: {
+        this._level += 1;
+        this._bonusMaxHealth += 1000;
+        const healed = Number(this._health) + 1000;
+        const capped = Math.min(healed, this.effectiveMaxHealth());
+        this._health = toInt(capped);
+        this._owner.invalidateEffectiveUnitsCache(UnitType.City);
+        this.mg.addUpdate(this.toUpdate());
+        return;
+      }
+      default:
+        // Unsupported structure types: no-op for now
+        return;
+    }
+  }
+
+  // Backward compatibility stub (avoid runtime errors if any legacy call sites remain)
+  // Remove once all references to upgradeCity are fully eliminated.
+  // @deprecated Use upgradeStructure()
+  upgradeCity(): void {
+    this.upgradeStructure();
   }
 
   setOwner(newOwner: PlayerImpl): void {
@@ -266,7 +310,7 @@ export class UnitImpl implements Unit {
         this._health = withinInt(
           this._health + BigInt(integerPart),
           0n,
-          toInt(this.info().maxHealth ?? 1),
+          toInt(this.effectiveMaxHealth()),
         );
         this._accumulatedRegen -= integerPart;
       }
@@ -274,7 +318,7 @@ export class UnitImpl implements Unit {
       this._health = withinInt(
         this._health + toInt(delta),
         0n,
-        toInt(this.info().maxHealth ?? 1),
+        toInt(this.effectiveMaxHealth()),
       );
       this._accumulatedRegen = 0;
     }

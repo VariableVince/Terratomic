@@ -160,6 +160,11 @@ export class UnitView {
   targetedBySAM(): boolean {
     return this.data.targetedBySAM ?? false;
   }
+
+  // Structure upgrade level (>=1). Defaults to 1 when undefined in updates.
+  level(): number {
+    return (this.data as any).level ?? 1;
+  }
 }
 
 export class PlayerView {

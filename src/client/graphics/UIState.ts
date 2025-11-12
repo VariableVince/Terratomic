@@ -5,4 +5,6 @@ export interface UIState {
   investmentRate: number;
   pendingBuildUnitType: UnitType | null;
   multibuildEnabled: boolean;
+  // Whether the player is currently in city upgrade targeting mode
+  upgradeMode: boolean;
 }

@@ -14,13 +14,17 @@ import { EventBus } from "../../../core/EventBus";
 import { Cell, PlayerID, UnitType } from "../../../core/game/Game";
 import { GameUpdateType } from "../../../core/game/GameUpdates";
 import { GameView, UnitView } from "../../../core/game/GameView";
+import { ToggleUpgradeModeEvent } from "../../events/ToggleUpgradeModeEvent";
 import { UnitCooldownEndedEvent } from "../../events/UnitCooldownEndedEvent";
 import { MouseMoveEvent, MouseUpEvent } from "../../InputHandler";
+import { SendUpgradeStructureIntentEvent } from "../../Transport";
 import { TransformHandler } from "../TransformHandler";
 import { Layer } from "./Layer";
 class StructureRenderInfo {
   public isOnScreen: boolean = false;
   public isOnCooldown: boolean = false;
+  public invalidateTexture: boolean = false; // request a texture rebuild next tick
+  public halo: PIXI.Graphics | null = null; // glow halo for eligible upgrades
   constructor(
     public unit: UnitView,
     public owner: PlayerID,
@@ -63,6 +67,7 @@ const STRUCTURE_BG_SHAPES: Partial<Record<UnitType, BgShape>> = {
 export class StructureLayer implements Layer {
   private pixicanvas: HTMLCanvasElement;
   private stage: PIXI.Container;
+  private haloContainer: PIXI.Container; // underlay container for halos
   private labelContainer: PIXI.Container; // UI overlay for hover labels
   private shouldRedraw: boolean = true;
   private textureCache: Map<string, PIXI.Texture> = new Map();
@@ -75,6 +80,7 @@ export class StructureLayer implements Layer {
   private selectedStructureUnit: UnitView | null = null;
   private previouslySelected: UnitView | null = null;
   private hoveredStructure: UnitView | null = null;
+  private upgradeMode: boolean = false; // When true, clicking own cities sends upgrade intent
   // Client-side level tracking for structures (temporary)
   private structureLevels = new Map<
     number,
@@ -143,6 +149,21 @@ export class StructureLayer implements Layer {
         }
       }
     });
+    this.eventBus.on(ToggleUpgradeModeEvent, (e) => {
+      this.upgradeMode = e.enabled;
+      // Clear cache and rebuild textures for existing sprites so border tint updates immediately.
+      this.textureCache.clear();
+      for (const r of this.renders) {
+        if (r.unit.type() === UnitType.City) {
+          r.pixiSprite.texture = this.createTexture(r.unit);
+        }
+      }
+      // Force redraw so highlight state applies instantly.
+      this.shouldRedraw = true;
+      // Immediately update halos before rendering so user sees feedback right away
+      this.updateHalos();
+      if (this.renderer) this.renderer.render(this.stage);
+    });
   }
 
   async setupRenderer() {
@@ -154,6 +175,9 @@ export class StructureLayer implements Layer {
     this.stage.position.set(0, 0);
     this.stage.width = this.pixicanvas.width;
     this.stage.height = this.pixicanvas.height;
+    // Create halo underlay container so glows render beneath sprites
+    this.haloContainer = new PIXI.Container();
+    this.stage.addChild(this.haloContainer);
     // Create label overlay container rendered above sprites
     this.labelContainer = new PIXI.Container();
     this.stage.addChild(this.labelContainer);
@@ -234,11 +258,103 @@ export class StructureLayer implements Layer {
       this.updateLabels();
     }
 
+    // Update halos each frame based on affordability and mode
+    this.updateHalos();
+
     if (this.transformHandler.hasChanged() || this.shouldRedraw) {
       this.renderer.render(this.stage);
       this.shouldRedraw = false;
     }
     mainContext.drawImage(this.renderer.canvas, 0, 0);
+  }
+
+  private canAffordCityUpgrade(): boolean {
+    const me = this.game.myPlayer();
+    if (!me) return false;
+    const baseCost = this.game
+      .config()
+      .unitInfo(UnitType.City)
+      .cost(me as any); // PlayerView matches Player shape
+    const upgradeCost = (baseCost * 4n) / 5n; // 80%
+    return me.gold() >= upgradeCost;
+  }
+
+  private updateHalos() {
+    const showHalos = this.upgradeMode && this.game.myPlayer() !== null;
+    // Always create halos for eligible cities in upgrade mode; dim if not affordable
+    const affordable = this.canAffordCityUpgrade();
+    for (const r of this.renders) {
+      const unit = r.unit;
+      const eligible =
+        showHalos &&
+        unit.type() === UnitType.City &&
+        this.game.myPlayer() !== null &&
+        unit.owner().id() === this.game.myPlayer()!.id() &&
+        !r.underConstruction;
+      if (eligible) {
+        if (!r.halo) {
+          r.halo = this.createHaloFor(unit);
+          this.haloContainer.addChild(r.halo);
+          this.shouldRedraw = true;
+        }
+        const tile = unit.tile();
+        const worldX = this.game.x(tile);
+        const worldY = this.game.y(tile);
+        const screenPos = this.transformHandler.worldToScreenCoordinates(
+          new Cell(worldX, worldY),
+        );
+        r.halo.visible = r.isOnScreen;
+        r.halo.x = Math.round(screenPos.x);
+        r.halo.y = Math.round(screenPos.y);
+        r.halo.scale.set(this.iconScreenScale());
+        // Adjust halo alpha if not affordable
+        const glow = affordable ? 0.55 : 0.25;
+        const fillAlpha = affordable ? 0.2 : 0.08;
+        // Rebuild halo graphics only if alpha state changed significantly
+        const desiredKey = affordable ? "affordable" : "unaffordable";
+        const currentKey = (r.halo as any)._affordState;
+        if (currentKey !== desiredKey) {
+          r.halo.clear();
+          const shape: BgShape =
+            STRUCTURE_BG_SHAPES[unit.type() as UnitType] ?? "circle";
+          const ICON_DIM = ICON_SIZES[shape] ?? ICON_SIZE;
+          const radius = (ICON_DIM / 2) * 1.35;
+          r.halo
+            .circle(0, 0, radius)
+            .fill({ color: 0x00ff8a, alpha: fillAlpha });
+          r.halo.circle(0, 0, radius * 1.1).stroke({
+            color: 0x00ff8a,
+            width: 3,
+            alpha: glow,
+          });
+          (r.halo as any)._affordState = desiredKey;
+          this.shouldRedraw = true;
+        }
+      } else if (r.halo) {
+        r.halo.destroy();
+        r.halo = null;
+        this.shouldRedraw = true;
+      }
+    }
+  }
+
+  private createHaloFor(unit: UnitView): PIXI.Graphics {
+    const g = new PIXI.Graphics();
+    // Draw soft glow: filled circle + thicker outer stroke
+    const shape: BgShape =
+      STRUCTURE_BG_SHAPES[unit.type() as UnitType] ?? "circle";
+    const ICON_DIM = ICON_SIZES[shape] ?? ICON_SIZE;
+    const radius = (ICON_DIM / 2) * 1.35; // slightly larger than icon
+    // inner glow
+    g.circle(0, 0, radius).fill({ color: 0x00ff8a, alpha: 0.2 });
+    // outer ring
+    g.circle(0, 0, radius * 1.1).stroke({
+      color: 0x00ff8a,
+      width: 3,
+      alpha: 0.55,
+    });
+    g.zIndex = 0;
+    return g;
   }
 
   private updateRenderState(render: StructureRenderInfo, unit: UnitView) {
@@ -267,9 +383,19 @@ export class StructureLayer implements Layer {
       this.shouldRedraw = true;
     }
 
-    // Initialize structure levels when construction finishes
+    // Initialize or bump structure levels (city level comes from server updates).
     if (!isConstruction) {
       this.ensureStructureLevels(unit);
+      const record = this.structureLevels.get(unit.id());
+      if (record) {
+        // Sync primary level from server value.
+        const serverLevel = unit.level();
+        record.primary = serverLevel;
+        // If the hovered structure's level changed, refresh the label immediately.
+        if (this.hoveredStructure && this.hoveredStructure.id() === unit.id()) {
+          this.updateLabels();
+        }
+      }
     }
   }
 
@@ -289,6 +415,9 @@ export class StructureLayer implements Layer {
       cacheKey += `-${isOnCooldown}`;
     }
     if (this.textureCache.has(cacheKey)) {
+      // If render requested invalidation (upgrade mode toggle), bypass cache by deleting
+      // The caller sets render.invalidateTexture; we can't access it here, so rely on a global flag
+      // Simpler: when upgradeMode toggles we clear relevant city cache entries elsewhere.
       return this.textureCache.get(cacheKey)!;
     }
 
@@ -323,6 +452,7 @@ export class StructureLayer implements Layer {
       if (isOnCooldown) {
         borderColor = reloadingColor;
       }
+      // Border no longer changes for upgrade eligibility; halo handles highlight.
     }
 
     // Draw background shape
@@ -495,10 +625,18 @@ export class StructureLayer implements Layer {
       render.pixiSprite.x = screenPos.x;
       render.pixiSprite.y = screenPos.y;
       render.pixiSprite.scale.set(this.iconScreenScale());
+      // Keep halo in sync with sprite position/scale
+      if (render.halo) {
+        render.halo.x = screenPos.x;
+        render.halo.y = screenPos.y;
+        const s = this.iconScreenScale();
+        render.halo.scale.set(s, s);
+      }
     }
     if (render.isOnScreen !== onScreen) {
       render.isOnScreen = onScreen;
       render.pixiSprite.visible = onScreen;
+      if (render.halo) render.halo.visible = onScreen;
     }
   }
 
@@ -536,6 +674,20 @@ export class StructureLayer implements Layer {
     if (clickedUnit) {
       if (clickedUnit.owner() !== this.game.myPlayer()) {
         return;
+      }
+      // In upgrade mode: attempt to upgrade city immediately
+      if (this.upgradeMode && clickedUnit.type() === UnitType.City) {
+        // Only if affordable
+        if (this.canAffordCityUpgrade()) {
+          // Fire transport event to send intent; rely on server update to change level
+          this.eventBus.emit(
+            new SendUpgradeStructureIntentEvent(
+              clickedUnit.id(),
+              UnitType.City,
+            ),
+          );
+        }
+        return; // Do not change selection while upgrading
       }
       const wasSelected = this.previouslySelected === clickedUnit;
       if (wasSelected) {
@@ -582,7 +734,12 @@ export class StructureLayer implements Layer {
       !this.structureLevels.has(id) &&
       unit.type() !== UnitType.Construction
     ) {
-      this.structureLevels.set(id, { primary: 1, secondary: 0 });
+      // Initialize with server level (typically 1 unless upgraded before client joined)
+      this.structureLevels.set(id, { primary: unit.level(), secondary: 0 });
+    } else if (this.structureLevels.has(id)) {
+      // Keep in sync with authoritative server level each tick/render cycle
+      const rec = this.structureLevels.get(id)!;
+      rec.primary = unit.level();
     }
   }
 

@@ -298,7 +298,15 @@ export class UILayer implements Layer {
    * Draw health bar for a unit
    */
   public drawHealthBar(unit: UnitView) {
-    const maxHealth = this.game.unitInfo(unit.type()).maxHealth;
+    // Use effective max health for cities (may be upgraded) otherwise static info
+    let maxHealth = this.game.unitInfo(unit.type()).maxHealth;
+    if (unit.type() === UnitType.City) {
+      const lvl = unit.level();
+      // Base maxHealth from unitInfo applies to level 1; each upgrade adds +1000
+      if (typeof maxHealth === "number") {
+        maxHealth = maxHealth + (lvl - 1) * 1000;
+      }
+    }
     if (maxHealth === undefined || this.context === null) {
       return;
     }

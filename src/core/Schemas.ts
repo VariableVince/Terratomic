@@ -57,7 +57,8 @@ export type Intent =
   | CancelParatrooperIntent
   | MarkDisconnectedIntent
   | SetAutoBombingIntent
-  | KickPlayerIntent;
+  | KickPlayerIntent
+  | UpgradeStructureIntent;
 
 export type AttackIntent = z.infer<typeof AttackIntentSchema>;
 export type CancelAttackIntent = z.infer<typeof CancelAttackIntentSchema>;
@@ -106,6 +107,9 @@ export type MarkDisconnectedIntent = z.infer<
   typeof MarkDisconnectedIntentSchema
 >;
 export type KickPlayerIntent = z.infer<typeof KickPlayerIntentSchema>;
+export type UpgradeStructureIntent = z.infer<
+  typeof UpgradeStructureIntentSchema
+>;
 
 export type Turn = z.infer<typeof TurnSchema>;
 export enum PeaceTimerDuration {
@@ -402,6 +406,12 @@ export const PurchaseUpgradeIntentSchema = BaseIntentSchema.extend({
   upgrade: z.nativeEnum(UpgradeType),
 });
 
+export const UpgradeStructureIntentSchema = BaseIntentSchema.extend({
+  type: z.literal("upgrade_structure"),
+  unitId: z.number(),
+  unitType: z.enum(UnitType),
+});
+
 export const ResearchTreeSelectIntentSchema = BaseIntentSchema.extend({
   type: z.literal("research_tree_select"),
   techId: z.string().max(128),
@@ -495,6 +505,8 @@ const IntentSchema = z.discriminatedUnion("type", [
   ResearchInvestmentIntentSchema,
   BuildUnitIntentSchema,
   PurchaseUpgradeIntentSchema,
+  UpgradeStructureIntentSchema,
+  UpgradeStructureIntentSchema,
   ResearchTreeSelectIntentSchema,
   EmbargoIntentSchema,
   MoveWarshipIntentSchema,
