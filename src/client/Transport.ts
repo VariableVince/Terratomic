@@ -694,8 +694,7 @@ export class Transport {
   }
 
   private onSendUpgradeStructureIntent(event: SendUpgradeStructureIntentEvent) {
-    if (event.unitType !== UnitType.City) return; // Only cities supported now
-    // Prefer new generic intent; keep backward compatibility path if server still expects upgrade_city.
+    // Prefer new generic intent
     this.sendIntent({
       type: "upgrade_structure",
       clientID: this.lobbyConfig.clientID,

@@ -339,6 +339,11 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
               const iconSrc = unitIconMap[unitType];
               if (!iconSrc) return null;
 
+              const count =
+                unitType === UnitType.City || unitType === UnitType.Port
+                  ? player.unitsOwned(unitType)
+                  : player.units(unitType).length;
+
               return html`
                 <div
                   class="flex flex-col items-center justify-between p-1 border border-gray-400 rounded"
@@ -348,9 +353,7 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
                     class="inline-block w-4 h-4"
                     alt="${unitType}"
                   />
-                  <span class="text-sm opacity-80"
-                    >${player.units(unitType).length}</span
-                  >
+                  <span class="text-sm opacity-80">${count}</span>
                 </div>
               `;
             })}

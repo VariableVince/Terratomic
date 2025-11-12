@@ -86,6 +86,73 @@
       "isBackground": false,
       "problemMatcher": ["$eslint-stylish"],
       "group": "build"
+    },
+    {
+      "label": "npm test",
+      "type": "shell",
+      "command": "npm",
+      "args": ["test"],
+      "group": "build"
+    },
+    {
+      "label": "npm lint",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "lint"],
+      "isBackground": false,
+      "group": "build"
+    },
+    {
+      "label": "npm test",
+      "type": "shell",
+      "command": "npm",
+      "args": ["test"],
+      "group": "build"
+    },
+    {
+      "label": "npm lint",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "lint"],
+      "isBackground": false,
+      "group": "build"
+    },
+    {
+      "label": "npm test",
+      "type": "shell",
+      "command": "npm",
+      "args": ["test"],
+      "group": "build"
+    },
+    {
+      "label": "npm lint",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "lint"],
+      "isBackground": false,
+      "group": "build"
+    },
+    {
+      "label": "npm test",
+      "type": "shell",
+      "command": "npm",
+      "args": ["test"],
+      "group": "build"
+    },
+    {
+      "label": "npm lint",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "lint"],
+      "isBackground": false,
+      "group": "build"
+    },
+    {
+      "label": "npm test",
+      "type": "shell",
+      "command": "npm",
+      "args": ["test"],
+      "group": "build"
     }
   ]
 }

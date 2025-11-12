@@ -220,7 +220,7 @@ export class UnitImpl implements Unit {
 
   /**
    * Generic structure upgrade entrypoint.
-   * Currently only City supports upgrades: +1 level, +1000 max HP, heal 1000 (capped), invalidate caches, emit update.
+   * Supports City and Port upgrades: +1 level, +1000 max HP, heal 1000 (capped), invalidate caches, emit update.
    */
   upgradeStructure(): void {
     switch (this._type) {
@@ -231,6 +231,16 @@ export class UnitImpl implements Unit {
         const capped = Math.min(healed, this.effectiveMaxHealth());
         this._health = toInt(capped);
         this._owner.invalidateEffectiveUnitsCache(UnitType.City);
+        this.mg.addUpdate(this.toUpdate());
+        return;
+      }
+      case UnitType.Port: {
+        this._level += 1;
+        this._bonusMaxHealth += 1000;
+        const healed = Number(this._health) + 1000;
+        const capped = Math.min(healed, this.effectiveMaxHealth());
+        this._health = toInt(capped);
+        this._owner.invalidateEffectiveUnitsCache(UnitType.Port);
         this.mg.addUpdate(this.toUpdate());
         return;
       }

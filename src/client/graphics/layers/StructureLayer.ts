@@ -78,8 +78,10 @@ export class StructureLayer implements Layer {
   private selectedStructureUnit: UnitView | null = null;
   private previouslySelected: UnitView | null = null;
   private hoveredStructure: UnitView | null = null;
-  private upgradeMode: boolean = false; // When true, clicking own cities sends upgrade intent
-  private lastAffordableForUpgrade: boolean | null = null; // track affordability to refresh highlight
+  private upgradeMode: boolean = false; // When true, clicking own cities/ports sends upgrade intent
+  // Track affordability per structure type to refresh highlights correctly
+  private lastAffordableForUpgradeCity: boolean | null = null;
+  private lastAffordableForUpgradePort: boolean | null = null;
   // Client-side level tracking for structures (temporary)
   private structureLevels = new Map<
     number,
@@ -153,7 +155,10 @@ export class StructureLayer implements Layer {
       // Clear cache and rebuild textures for existing sprites so border tint updates immediately.
       this.textureCache.clear();
       for (const r of this.renders) {
-        if (r.unit.type() === UnitType.City) {
+        if (
+          r.unit.type() === UnitType.City ||
+          r.unit.type() === UnitType.Port
+        ) {
           r.pixiSprite.texture = this.createTexture(r.unit);
         }
       }
@@ -265,39 +270,60 @@ export class StructureLayer implements Layer {
   private canAffordUpgrade(unit?: UnitView): boolean {
     const me = this.game.myPlayer();
     if (!me) return false;
-    // For now, upgrades are city-only. Use City cost when unit is absent or city.
+    // Determine structure type (default to City if absent for safety)
     const unitType = unit?.type() ?? UnitType.City;
-    const baseCost = this.game
-      .config()
-      .unitInfo(unitType)
-      .cost(me as any);
-    const upgradeCost = (baseCost * 4n) / 5n; // 80%
+    return this.canAffordUpgradeForType(unitType);
+  }
+
+  private canAffordUpgradeForType(unitType: UnitType): boolean {
+    const me = this.game.myPlayer();
+    if (!me) return false;
+    const cfg = this.game.config();
+    const baseCost = cfg.unitInfo(unitType).cost(me as any);
+    const num = BigInt(cfg.structureUpgradeCostNum(unitType));
+    const den = BigInt(cfg.structureUpgradeCostDen(unitType));
+    const upgradeCost = den === 0n ? baseCost : (baseCost * num) / den;
     return me.gold() >= upgradeCost;
   }
 
   private updateHighlights() {
-    const affordable = this.canAffordUpgrade();
+    const affordableCity = this.canAffordUpgradeForType(UnitType.City);
+    const affordablePort = this.canAffordUpgradeForType(UnitType.Port);
     if (!this.upgradeMode) {
-      if (this.lastAffordableForUpgrade !== null) {
+      if (
+        this.lastAffordableForUpgradeCity !== null ||
+        this.lastAffordableForUpgradePort !== null
+      ) {
         this.textureCache.clear();
         for (const r of this.renders) {
-          if (r.unit.type() === UnitType.City) {
+          if (
+            r.unit.type() === UnitType.City ||
+            r.unit.type() === UnitType.Port
+          ) {
             r.pixiSprite.texture = this.createTexture(r.unit);
           }
         }
-        this.lastAffordableForUpgrade = null;
+        this.lastAffordableForUpgradeCity = null;
+        this.lastAffordableForUpgradePort = null;
         this.shouldRedraw = true;
       }
       return;
     }
-    if (this.lastAffordableForUpgrade !== affordable) {
+    const cityChanged = this.lastAffordableForUpgradeCity !== affordableCity;
+    const portChanged = this.lastAffordableForUpgradePort !== affordablePort;
+    if (cityChanged || portChanged) {
       this.textureCache.clear();
       for (const r of this.renders) {
-        if (r.unit.type() === UnitType.City) {
+        const t = r.unit.type();
+        if (
+          (cityChanged && t === UnitType.City) ||
+          (portChanged && t === UnitType.Port)
+        ) {
           r.pixiSprite.texture = this.createTexture(r.unit);
         }
       }
-      this.lastAffordableForUpgrade = affordable;
+      this.lastAffordableForUpgradeCity = affordableCity;
+      this.lastAffordableForUpgradePort = affordablePort;
       this.shouldRedraw = true;
     }
   }
@@ -405,7 +431,7 @@ export class StructureLayer implements Layer {
     let highlightTint = borderColor;
     if (
       !isConstruction &&
-      structureType === UnitType.City &&
+      (structureType === UnitType.City || structureType === UnitType.Port) &&
       this.shouldHighlight(unit)
     ) {
       // Blend neon green with the base border color to reduce intensity
@@ -519,8 +545,9 @@ export class StructureLayer implements Layer {
     const me = this.game.myPlayer();
     if (!me) return false;
     if (unit.type() === UnitType.Construction) return false;
-    // Currently upgrades apply to cities; naming is generalized for future structures
-    if (unit.type() !== UnitType.City) return false;
+    // Upgrades apply to cities and ports
+    if (unit.type() !== UnitType.City && unit.type() !== UnitType.Port)
+      return false;
     return unit.owner().id() === me.id() && this.canAffordUpgrade(unit);
   }
 
@@ -650,15 +677,19 @@ export class StructureLayer implements Layer {
       if (clickedUnit.owner() !== this.game.myPlayer()) {
         return;
       }
-      // In upgrade mode: attempt to upgrade city immediately
-      if (this.upgradeMode && clickedUnit.type() === UnitType.City) {
+      // In upgrade mode: attempt to upgrade structure (city/port) immediately
+      if (
+        this.upgradeMode &&
+        (clickedUnit.type() === UnitType.City ||
+          clickedUnit.type() === UnitType.Port)
+      ) {
         // Only if affordable
         if (this.canAffordUpgrade(clickedUnit)) {
           // Fire transport event to send intent; rely on server update to change level
           this.eventBus.emit(
             new SendUpgradeStructureIntentEvent(
               clickedUnit.id(),
-              UnitType.City,
+              clickedUnit.type(),
             ),
           );
         }

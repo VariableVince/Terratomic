@@ -1302,6 +1302,25 @@ export class DefaultConfig implements Config {
   automationTroopRegenMultiplierDen(): number {
     return 5;
   }
+  // --- Structure upgrade cost fractions ---
+  structureUpgradeCostNum(type: UnitType): number {
+    switch (type) {
+      case UnitType.City:
+      case UnitType.Port:
+        return 4; // Default 80% -> 4/5
+      default:
+        return 1;
+    }
+  }
+  structureUpgradeCostDen(type: UnitType): number {
+    switch (type) {
+      case UnitType.City:
+      case UnitType.Port:
+        return 5; // Default 80% -> 4/5
+      default:
+        return 1;
+    }
+  }
   // --- Research system defaults ---
   // f(x) = A * investment^B, where investment is gold allocated to research this tick
   researchAlpha(): number {

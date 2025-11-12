@@ -313,8 +313,8 @@ export class PlayerImpl implements Player {
     let total = 0;
     for (const unit of this._units) {
       if (unit.type() === type) {
-        if (type === UnitType.City) {
-          // Upgraded cities count toward total cities (affects scaling like new city cost)
+        if (type === UnitType.City || type === UnitType.Port) {
+          // Upgraded cities and ports count toward totals (affects scaling like new build cost)
           total += (unit as any).level?.() ?? 1;
         } else {
           total++;
@@ -436,7 +436,7 @@ export class PlayerImpl implements Player {
         const baseMax = u.info().maxHealth ?? 1;
         const level = (u as any).level?.() ?? 1;
         const effectiveMax =
-          u.type() === UnitType.City
+          u.type() === UnitType.City || u.type() === UnitType.Port
             ? baseMax + 1000 * Math.max(0, level - 1)
             : baseMax;
         const healthRatio = u.hasHealth()

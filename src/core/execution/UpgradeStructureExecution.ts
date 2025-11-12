@@ -5,7 +5,7 @@ import { NoOpExecution } from "./NoOpExecution";
 
 /**
  * Generic structure upgrade execution.
- * Currently only supports City upgrades; structure branching is ready for future types.
+ * Supports City and Port upgrades.
  */
 export class UpgradeStructureExecution implements Execution {
   private mg!: GameImpl;
@@ -36,11 +36,14 @@ export class UpgradeStructureExecution implements Execution {
     }
 
     switch (this.unit.type()) {
-      case UnitType.City: {
-        const baseCost: Gold = this.mg
-          .unitInfo(UnitType.City)
-          .cost(this.player);
-        const upgradeCost: Gold = (baseCost * 4n) / 5n; // 80%
+      case UnitType.City:
+      case UnitType.Port: {
+        const unitType = this.unit.type();
+        const baseCost: Gold = this.mg.unitInfo(unitType).cost(this.player);
+        const num = BigInt(this.mg.config().structureUpgradeCostNum(unitType));
+        const den = BigInt(this.mg.config().structureUpgradeCostDen(unitType));
+        const upgradeCost: Gold =
+          den === 0n ? baseCost : (baseCost * num) / den;
         if (this.player.gold() < upgradeCost) {
           this._isActive = false;
           return;
