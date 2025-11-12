@@ -24,7 +24,6 @@ class StructureRenderInfo {
   public isOnScreen: boolean = false;
   public isOnCooldown: boolean = false;
   public invalidateTexture: boolean = false; // request a texture rebuild next tick
-  public halo: PIXI.Graphics | null = null; // glow halo for eligible upgrades
   constructor(
     public unit: UnitView,
     public owner: PlayerID,
@@ -67,7 +66,6 @@ const STRUCTURE_BG_SHAPES: Partial<Record<UnitType, BgShape>> = {
 export class StructureLayer implements Layer {
   private pixicanvas: HTMLCanvasElement;
   private stage: PIXI.Container;
-  private haloContainer: PIXI.Container; // underlay container for halos
   private labelContainer: PIXI.Container; // UI overlay for hover labels
   private shouldRedraw: boolean = true;
   private textureCache: Map<string, PIXI.Texture> = new Map();
@@ -81,6 +79,7 @@ export class StructureLayer implements Layer {
   private previouslySelected: UnitView | null = null;
   private hoveredStructure: UnitView | null = null;
   private upgradeMode: boolean = false; // When true, clicking own cities sends upgrade intent
+  private lastAffordableForUpgrade: boolean | null = null; // track affordability to refresh highlight
   // Client-side level tracking for structures (temporary)
   private structureLevels = new Map<
     number,
@@ -160,8 +159,7 @@ export class StructureLayer implements Layer {
       }
       // Force redraw so highlight state applies instantly.
       this.shouldRedraw = true;
-      // Immediately update halos before rendering so user sees feedback right away
-      this.updateHalos();
+      this.updateHighlights();
       if (this.renderer) this.renderer.render(this.stage);
     });
   }
@@ -175,9 +173,6 @@ export class StructureLayer implements Layer {
     this.stage.position.set(0, 0);
     this.stage.width = this.pixicanvas.width;
     this.stage.height = this.pixicanvas.height;
-    // Create halo underlay container so glows render beneath sprites
-    this.haloContainer = new PIXI.Container();
-    this.stage.addChild(this.haloContainer);
     // Create label overlay container rendered above sprites
     this.labelContainer = new PIXI.Container();
     this.stage.addChild(this.labelContainer);
@@ -258,8 +253,7 @@ export class StructureLayer implements Layer {
       this.updateLabels();
     }
 
-    // Update halos each frame based on affordability and mode
-    this.updateHalos();
+    this.updateHighlights();
 
     if (this.transformHandler.hasChanged() || this.shouldRedraw) {
       this.renderer.render(this.stage);
@@ -268,93 +262,44 @@ export class StructureLayer implements Layer {
     mainContext.drawImage(this.renderer.canvas, 0, 0);
   }
 
-  private canAffordCityUpgrade(): boolean {
+  private canAffordUpgrade(unit?: UnitView): boolean {
     const me = this.game.myPlayer();
     if (!me) return false;
+    // For now, upgrades are city-only. Use City cost when unit is absent or city.
+    const unitType = unit?.type() ?? UnitType.City;
     const baseCost = this.game
       .config()
-      .unitInfo(UnitType.City)
-      .cost(me as any); // PlayerView matches Player shape
+      .unitInfo(unitType)
+      .cost(me as any);
     const upgradeCost = (baseCost * 4n) / 5n; // 80%
     return me.gold() >= upgradeCost;
   }
 
-  private updateHalos() {
-    const showHalos = this.upgradeMode && this.game.myPlayer() !== null;
-    // Always create halos for eligible cities in upgrade mode; dim if not affordable
-    const affordable = this.canAffordCityUpgrade();
-    for (const r of this.renders) {
-      const unit = r.unit;
-      const eligible =
-        showHalos &&
-        unit.type() === UnitType.City &&
-        this.game.myPlayer() !== null &&
-        unit.owner().id() === this.game.myPlayer()!.id() &&
-        !r.underConstruction;
-      if (eligible) {
-        if (!r.halo) {
-          r.halo = this.createHaloFor(unit);
-          this.haloContainer.addChild(r.halo);
-          this.shouldRedraw = true;
+  private updateHighlights() {
+    const affordable = this.canAffordUpgrade();
+    if (!this.upgradeMode) {
+      if (this.lastAffordableForUpgrade !== null) {
+        this.textureCache.clear();
+        for (const r of this.renders) {
+          if (r.unit.type() === UnitType.City) {
+            r.pixiSprite.texture = this.createTexture(r.unit);
+          }
         }
-        const tile = unit.tile();
-        const worldX = this.game.x(tile);
-        const worldY = this.game.y(tile);
-        const screenPos = this.transformHandler.worldToScreenCoordinates(
-          new Cell(worldX, worldY),
-        );
-        r.halo.visible = r.isOnScreen;
-        r.halo.x = Math.round(screenPos.x);
-        r.halo.y = Math.round(screenPos.y);
-        r.halo.scale.set(this.iconScreenScale());
-        // Adjust halo alpha if not affordable
-        const glow = affordable ? 0.55 : 0.25;
-        const fillAlpha = affordable ? 0.2 : 0.08;
-        // Rebuild halo graphics only if alpha state changed significantly
-        const desiredKey = affordable ? "affordable" : "unaffordable";
-        const currentKey = (r.halo as any)._affordState;
-        if (currentKey !== desiredKey) {
-          r.halo.clear();
-          const shape: BgShape =
-            STRUCTURE_BG_SHAPES[unit.type() as UnitType] ?? "circle";
-          const ICON_DIM = ICON_SIZES[shape] ?? ICON_SIZE;
-          const radius = (ICON_DIM / 2) * 1.35;
-          r.halo
-            .circle(0, 0, radius)
-            .fill({ color: 0x00ff8a, alpha: fillAlpha });
-          r.halo.circle(0, 0, radius * 1.1).stroke({
-            color: 0x00ff8a,
-            width: 3,
-            alpha: glow,
-          });
-          (r.halo as any)._affordState = desiredKey;
-          this.shouldRedraw = true;
-        }
-      } else if (r.halo) {
-        r.halo.destroy();
-        r.halo = null;
+        this.lastAffordableForUpgrade = null;
         this.shouldRedraw = true;
       }
+      return;
     }
-  }
-
-  private createHaloFor(unit: UnitView): PIXI.Graphics {
-    const g = new PIXI.Graphics();
-    // Draw soft glow: filled circle + thicker outer stroke
-    const shape: BgShape =
-      STRUCTURE_BG_SHAPES[unit.type() as UnitType] ?? "circle";
-    const ICON_DIM = ICON_SIZES[shape] ?? ICON_SIZE;
-    const radius = (ICON_DIM / 2) * 1.35; // slightly larger than icon
-    // inner glow
-    g.circle(0, 0, radius).fill({ color: 0x00ff8a, alpha: 0.2 });
-    // outer ring
-    g.circle(0, 0, radius * 1.1).stroke({
-      color: 0x00ff8a,
-      width: 3,
-      alpha: 0.55,
-    });
-    g.zIndex = 0;
-    return g;
+    if (this.lastAffordableForUpgrade !== affordable) {
+      this.textureCache.clear();
+      for (const r of this.renders) {
+        if (r.unit.type() === UnitType.City) {
+          r.pixiSprite.texture = this.createTexture(r.unit);
+        }
+      }
+      this.lastAffordableForUpgrade = affordable;
+      this.shouldRedraw = true;
+    }
   }
 
   private updateRenderState(render: StructureRenderInfo, unit: UnitView) {
@@ -452,7 +397,21 @@ export class StructureLayer implements Layer {
       if (isOnCooldown) {
         borderColor = reloadingColor;
       }
-      // Border no longer changes for upgrade eligibility; halo handles highlight.
+      // Border may be overridden below if upgrade highlight applies
+    }
+
+    // Apply reduced-strength highlight to both border and icon if upgrade-eligible
+    let highlightEligibleIcon = false;
+    let highlightTint = borderColor;
+    if (
+      !isConstruction &&
+      structureType === UnitType.City &&
+      this.shouldHighlight(unit)
+    ) {
+      // Blend neon green with the base border color to reduce intensity
+      highlightTint = this.blendHexColors("#00FF8A", borderColor, 0.6);
+      borderColor = highlightTint;
+      highlightEligibleIcon = true;
     }
 
     // Draw background shape
@@ -524,7 +483,10 @@ export class StructureLayer implements Layer {
       pentagon: [7, 7],
       circle: [6, 6],
     };
-    const colored = this.getImageColored(structureInfo.image, borderColor);
+    const colored = this.getImageColored(
+      structureInfo.image,
+      highlightEligibleIcon ? highlightTint : borderColor,
+    );
     const centerScaledTypes = new Set<UnitType>([
       UnitType.Airfield,
       UnitType.Hospital,
@@ -550,6 +512,16 @@ export class StructureLayer implements Layer {
     const texture = PIXI.Texture.from(canvas);
     this.textureCache.set(cacheKey, texture);
     return texture;
+  }
+
+  private shouldHighlight(unit: UnitView): boolean {
+    if (!this.upgradeMode) return false;
+    const me = this.game.myPlayer();
+    if (!me) return false;
+    if (unit.type() === UnitType.Construction) return false;
+    // Currently upgrades apply to cities; naming is generalized for future structures
+    if (unit.type() !== UnitType.City) return false;
+    return unit.owner().id() === me.id() && this.canAffordUpgrade(unit);
   }
 
   private createPixiSprite(unit: UnitView): PIXI.Sprite {
@@ -594,6 +566,17 @@ export class StructureLayer implements Layer {
     return imageCanvas;
   }
 
+  // Blend two hex/rgb color strings by a factor t in [0,1]
+  private blendHexColors(c1: string, c2: string, t: number): string {
+    const a = colord(c1).toRgb();
+    const b = colord(c2).toRgb();
+    const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+    const r = clamp(a.r * (1 - t) + b.r * t);
+    const g = clamp(a.g * (1 - t) + b.g * t);
+    const bch = clamp(a.b * (1 - t) + b.b * t);
+    return colord({ r, g, b: bch }).toHex();
+  }
+
   private computeNewLocation(render: StructureRenderInfo) {
     const tile = render.unit.tile();
     const worldX = this.game.x(tile);
@@ -625,18 +608,10 @@ export class StructureLayer implements Layer {
       render.pixiSprite.x = screenPos.x;
       render.pixiSprite.y = screenPos.y;
       render.pixiSprite.scale.set(this.iconScreenScale());
-      // Keep halo in sync with sprite position/scale
-      if (render.halo) {
-        render.halo.x = screenPos.x;
-        render.halo.y = screenPos.y;
-        const s = this.iconScreenScale();
-        render.halo.scale.set(s, s);
-      }
     }
     if (render.isOnScreen !== onScreen) {
       render.isOnScreen = onScreen;
       render.pixiSprite.visible = onScreen;
-      if (render.halo) render.halo.visible = onScreen;
     }
   }
 
@@ -678,7 +653,7 @@ export class StructureLayer implements Layer {
       // In upgrade mode: attempt to upgrade city immediately
       if (this.upgradeMode && clickedUnit.type() === UnitType.City) {
         // Only if affordable
-        if (this.canAffordCityUpgrade()) {
+        if (this.canAffordUpgrade(clickedUnit)) {
           // Fire transport event to send intent; rely on server update to change level
           this.eventBus.emit(
             new SendUpgradeStructureIntentEvent(
