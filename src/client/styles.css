@@ -53,6 +53,7 @@
 @import url("./styles/components/button.css");
 @import url("./styles/components/modal.css");
 @import url("./styles/modal/chat.css");
+@import url("./styles/modal/lobby-team.css");
 @import url("./styles/components/setting.css");
 @import url("./styles/components/controls.css");
 @import url("./styles/core/cursors.css");
@@ -706,42 +707,19 @@ label.option-card:hover {
   padding: 2px 4px;
   font-size: 12px;
   margin-bottom: 8px;
-  /* News Button Notification */
-  news-button .active button {
-    position: relative;
-    border-color: var(--ui-secondary-hover) !important;
-    border-width: 2px !important;
-    box-shadow:
-      0 0 0 1px rgba(37, 99, 235, 0.5),
-      0 0 8px rgba(37, 99, 235, 0.4);
-  }
-  .peace-timer-select option {
-    background-color: var(--ui-panel-shell-bottom);
-    color: var(--ui-text-light);
-  }
+}
 
-  .host-badge {
-    font-size: 11px;
-    color: var(--ui-success);
-    font-weight: bold;
-  }
+/* News Button Notification */
+news-button .active button {
+  position: relative;
+  border-color: var(--ui-secondary-hover) !important;
+  border-width: 2px !important;
+  box-shadow:
+    0 0 0 1px rgba(37, 99, 235, 0.5),
+    0 0 8px rgba(37, 99, 235, 0.4);
+}
 
-  .remove-player-btn {
-    width: 16px;
-    height: 16px;
-    border: none;
-    background: var(--ui-alert);
-    color: var(--ui-button-text);
-    border-radius: 50%;
-    font-size: 11px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: 4px;
-  }
-
-  .remove-player-btn:hover {
-    background: var(--ui-alert-hover);
-  }
+.peace-timer-select option {
+  background-color: var(--ui-panel-shell-bottom);
+  color: var(--ui-text-light);
 }

@@ -1,0 +1,113 @@
+/* Team assignment layout and styling for Host/Join lobby modals */
+
+.team-columns-container {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.teams-layout-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* Shared column chrome */
+.unassigned-column,
+.spectator-column,
+.team-column {
+  background: color-mix(in srgb, var(--ui-panel-shell-bottom) 35%, transparent);
+  border: 1px solid var(--ui-panel-border);
+  border-radius: 12px;
+}
+
+.unassigned-column,
+.spectator-column {
+  min-height: 48px;
+  padding: 8px 12px;
+  width: 100%;
+}
+
+.team-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+.team-column {
+  min-height: 56px;
+  padding: 8px 12px;
+  flex: 1 1 calc(33.333% - 12px);
+  min-width: 180px;
+}
+
+.team-column-header {
+  font-family: "Oswald", sans-serif;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ui-text-accent);
+  margin: 0 0 8px 0;
+}
+
+.team-column-body,
+.unassigned-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* Player chip and inline controls inside columns */
+.player-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ui-panel-shell-bottom);
+  color: var(--ui-text-light);
+  padding: 8px 12px;
+  border: 1px solid var(--ui-panel-border);
+  border-radius: 16px;
+  font-size: 14px;
+}
+
+.player-name {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-team-select {
+  background-color: var(--ui-panel-shell-bottom);
+  color: var(--ui-text-light);
+  border: 1px solid var(--ui-panel-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.remove-player-btn {
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: var(--ui-alert);
+  color: var(--ui-button-text);
+  border-radius: 50%;
+  font-size: 0.6875em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-player-btn:hover {
+  background: var(--ui-alert-hover);
+}
+
+.host-badge {
+  font-size: 0.6875em;
+  color: var(--ui-success);
+  font-weight: bold;
+}
