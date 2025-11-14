@@ -40,21 +40,26 @@ export class UpgradeStructureExecution implements Execution {
       case UnitType.Port:
       case UnitType.Hospital:
       case UnitType.Academy:
-      case UnitType.MissileSilo: {
+      case UnitType.MissileSilo:
+      case UnitType.SAMLauncher: {
         const unitType = this.unit.type();
         // Enforce missile silo max level 3 on the executor side to avoid charging when capped
         if (
-          unitType === UnitType.MissileSilo &&
+          (unitType === UnitType.MissileSilo ||
+            unitType === UnitType.SAMLauncher) &&
           (this.unit.level?.call(this.unit) ?? 1) >= 3
         ) {
           this._isActive = false;
           return;
         }
         const baseCost: Gold = this.mg.unitInfo(unitType).cost(this.player);
-        const num = BigInt(this.mg.config().structureUpgradeCostNum(unitType));
-        const den = BigInt(this.mg.config().structureUpgradeCostDen(unitType));
-        const upgradeCost: Gold =
-          den === 0n ? baseCost : (baseCost * num) / den;
+        // Use decimal multiplier; compute BigInt-safe using fixed scale
+        const multiplier = this.mg
+          .config()
+          .structureUpgradeCostMultiplier(unitType);
+        const scale = 100n; // two decimal digits of precision
+        const scaledMultiplier = BigInt(Math.round(multiplier * Number(scale)));
+        const upgradeCost: Gold = (baseCost * scaledMultiplier) / scale;
         if (this.player.gold() < upgradeCost) {
           this._isActive = false;
           return;
