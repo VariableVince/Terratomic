@@ -116,6 +116,16 @@ import { TransformHandler } from "./graphics/TransformHandler";
 import { UIState } from "./graphics/UIState";
 import { BuildUnitIntentEvent } from "./Transport";
 
+// Post-impact nuke halo event (world tile coordinates)
+export class NukeImpactEvent implements GameEvent {
+  constructor(
+    public readonly worldX: number,
+    public readonly worldY: number,
+    public readonly nukeType: UnitType,
+    public readonly unitId?: number,
+  ) {}
+}
+
 export class InputHandler {
   private _pendingBuildUnitType: UnitType | null = null;
   private lastPointerX: number = 0;
