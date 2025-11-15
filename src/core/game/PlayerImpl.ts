@@ -1265,6 +1265,7 @@ export class PlayerImpl implements Player {
       case UnitType.SAMLauncher:
       case UnitType.City:
       case UnitType.Hospital:
+      case UnitType.ResearchLab:
       case UnitType.Academy:
       case UnitType.Construction:
       case UnitType.Airfield:

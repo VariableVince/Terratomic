@@ -122,6 +122,7 @@ export class ControlPanel2 extends LitElement implements Layer {
   private unitIconMap: { [key: string]: string } = {
     City: "/images/CityIconWhite.svg",
     Hospital: "/images/HospitalIconWhite.svg",
+    "Research Lab": "/images/researchlab.png",
     Academy: "/images/AcademyIconWhite.png",
     Port: "/images/PortIcon.svg",
     "Missile Silo": "/images/MissileSiloIconWhite.svg",
@@ -129,6 +130,25 @@ export class ControlPanel2 extends LitElement implements Layer {
     "Air Field": "/images/AirfieldIcon.svg",
     "Defense Post": "/images/ShieldIconWhite.svg",
   };
+
+  // Per-unit icon scale used for small inline icons in this panel
+  private static readonly ICON_SCALE: Partial<Record<UnitType, number>> = {
+    [UnitType.City]: 1,
+    [UnitType.Hospital]: 1,
+    [UnitType.ResearchLab]: 1.1,
+    [UnitType.Academy]: 1,
+    [UnitType.Port]: 1,
+    [UnitType.MissileSilo]: 1,
+    [UnitType.SAMLauncher]: 1,
+    [UnitType.Airfield]: 1,
+    [UnitType.DefensePost]: 1,
+  };
+
+  private iconPixelSize(t: UnitType | null, base = 16): number {
+    if (!t) return base;
+    const factor = ControlPanel2.ICON_SCALE[t] ?? 1;
+    return Math.max(1, Math.round(base * factor));
+  }
 
   private readonly NukeTypes: UnitType[] = [
     UnitType.AtomBomb,
@@ -157,6 +177,7 @@ export class ControlPanel2 extends LitElement implements Layer {
     UnitType.SAMLauncher,
     UnitType.DefensePost,
     UnitType.Hospital,
+    UnitType.ResearchLab,
     UnitType.Academy,
     UnitType.City,
   ];
@@ -1162,6 +1183,7 @@ export class ControlPanel2 extends LitElement implements Layer {
                                 UnitType.Airfield,
                                 UnitType.Hospital,
                                 UnitType.Academy,
+                                UnitType.ResearchLab,
                               ].map((s) => {
                                 return html`
                                   <label
@@ -1206,7 +1228,12 @@ export class ControlPanel2 extends LitElement implements Layer {
                                       this._currentTargetStructureType
                                     ]}"
                                     alt="${this._currentTargetStructureType}"
-                                    class="inline-block w-4 h-4 align-top ml-1"
+                                    class="inline-block align-top ml-1"
+                                    style="width: ${this.iconPixelSize(
+                                      this._currentTargetStructureType,
+                                    )}px; height: ${this.iconPixelSize(
+                                      this._currentTargetStructureType,
+                                    )}px;"
                                   />`
                               : html`<span class="military-label"
                                   >No target selected</span

@@ -1,5 +1,6 @@
 import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import researchLabIcon from "../../../../proprietary/images/researchlab.png";
 import airfieldIcon from "../../../../resources/images/AirfieldIcon.svg";
 import warshipIcon from "../../../../resources/images/BattleshipIconWhite.svg";
 import academyIcon from "../../../../resources/images/buildings/academy_icon.png";
@@ -104,6 +105,13 @@ const buildTable: BuildItemDisplay[][] = [
       countable: true,
     },
     {
+      unitType: UnitType.ResearchLab,
+      icon: researchLabIcon,
+      description: undefined,
+      key: undefined,
+      countable: true,
+    },
+    {
       unitType: UnitType.Academy,
       icon: academyIcon,
       description: "build_menu.desc.academy",
@@ -160,6 +168,30 @@ export class BuildMenu extends LitElement {
 
   @state()
   private _lastSubmarineUpgradeState: boolean = false;
+
+  // Per-unit icon scale for build menu thumbnails
+  private static readonly ICON_SCALE: Partial<Record<UnitType, number>> = {
+    [UnitType.City]: 1,
+    [UnitType.Port]: 1,
+    [UnitType.Airfield]: 1,
+    [UnitType.Hospital]: 1,
+    [UnitType.ResearchLab]: 1.3,
+    [UnitType.Academy]: 1,
+    [UnitType.MissileSilo]: 1,
+    [UnitType.SAMLauncher]: 1,
+    [UnitType.DefensePost]: 1,
+    [UnitType.Warship]: 1,
+    [UnitType.Submarine]: 1,
+    [UnitType.FighterJet]: 1,
+    [UnitType.AtomBomb]: 1,
+    [UnitType.HydrogenBomb]: 1,
+    [UnitType.MIRV]: 1,
+  };
+
+  private iconPixelSize(t: UnitType, base = 28): number {
+    const factor = BuildMenu.ICON_SCALE[t] ?? 1;
+    return Math.max(1, Math.round(base * factor));
+  }
 
   // Recompute once after first render, and whenever relevant inputs change
   protected firstUpdated(): void {
@@ -515,7 +547,14 @@ export class BuildMenu extends LitElement {
                     <div class="build-hotkey">
                       ${this.hotkeyMap.get(item.unitType)}
                     </div>
-                    <img class="build-icon" src=${item.icon} alt=${name} />
+                    <img
+                      class="build-icon"
+                      src=${item.icon}
+                      alt=${name}
+                      style="width:${this.iconPixelSize(
+                        item.unitType,
+                      )}px;height:${this.iconPixelSize(item.unitType)}px;"
+                    />
                     <div class="build-item-details">
                       <span class="build-name">${name}</span>
                       <span class="build-cost" translate="no">

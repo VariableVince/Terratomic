@@ -1,5 +1,6 @@
 import { colord } from "colord";
 import * as PIXI from "pixi.js";
+import researchLabIcon from "../../../../proprietary/images/researchlab.png";
 import anchorIcon from "../../../../resources/images/AnchorIcon.png";
 import academyIcon from "../../../../resources/images/buildings/academy_icon.png";
 import airfieldIcon from "../../../../resources/images/buildings/airfield.png";
@@ -34,7 +35,7 @@ class StructureRenderInfo {
 
 const ICON_SIZE = 24; // legacy default; specific shapes use ICON_SIZES below
 // Render structure textures at higher pixel density to stay crisp when scaled
-const ICON_TEXTURE_QUALITY = 2; // 2x logical size -> sharper when zooming in
+const ICON_TEXTURE_QUALITY = 4; // 4x logical size -> sharper when zooming in
 const ICON_SIZES: Record<BgShape, number> = {
   circle: 28,
   octagon: 28,
@@ -60,6 +61,7 @@ const STRUCTURE_BG_SHAPES: Partial<Record<UnitType, BgShape>> = {
   [UnitType.SAMLauncher]: "square",
   [UnitType.Airfield]: "square",
   [UnitType.Hospital]: "square",
+  [UnitType.ResearchLab]: "square",
   [UnitType.Academy]: "square",
 };
 
@@ -101,12 +103,26 @@ export class StructureLayer implements Layer {
     [UnitType.City, { iconPath: cityIcon, image: null }],
     [UnitType.Airfield, { iconPath: airfieldIcon, image: null }],
     [UnitType.Hospital, { iconPath: hospitalIcon, image: null }],
+    [UnitType.ResearchLab, { iconPath: researchLabIcon, image: null }],
     [UnitType.Academy, { iconPath: academyIcon, image: null }],
     [UnitType.DefensePost, { iconPath: shieldIcon, image: null }],
     [UnitType.Port, { iconPath: anchorIcon, image: null }],
     [UnitType.MissileSilo, { iconPath: missileSiloIcon, image: null }],
     [UnitType.SAMLauncher, { iconPath: SAMMissileIcon, image: null }],
   ]);
+
+  // Per-structure icon scale factor (1 = default size)
+  private static readonly ICON_DRAW_SCALE: Partial<Record<UnitType, number>> = {
+    [UnitType.City]: 1,
+    [UnitType.Airfield]: 1,
+    [UnitType.Hospital]: 1,
+    [UnitType.ResearchLab]: 1.4,
+    [UnitType.Academy]: 1,
+    [UnitType.DefensePost]: 1,
+    [UnitType.Port]: 1,
+    [UnitType.MissileSilo]: 1,
+    [UnitType.SAMLauncher]: 1,
+  };
 
   constructor(
     private game: GameView,
@@ -673,6 +689,7 @@ export class StructureLayer implements Layer {
       UnitType.Airfield,
       UnitType.Hospital,
       UnitType.Academy,
+      UnitType.ResearchLab,
     ]);
     if (centerScaledTypes.has(structureType as UnitType)) {
       const padded = 4;
@@ -680,15 +697,36 @@ export class StructureLayer implements Layer {
       const maxH = ICON_DIM - padded * 2;
       const iw = Math.max(1, colored.width);
       const ih = Math.max(1, colored.height);
-      const scale = Math.min(maxW / iw, maxH / ih);
-      const dw = Math.max(1, Math.round(iw * scale));
-      const dh = Math.max(1, Math.round(ih * scale));
+      const baseScale = Math.min(maxW / iw, maxH / ih);
+      const factor =
+        StructureLayer.ICON_DRAW_SCALE[structureType as UnitType] ?? 1;
+      // Allow slight oversize within canvas; clamp to canvas bounds
+      const dw = Math.min(
+        ICON_DIM,
+        Math.max(1, Math.round(iw * baseScale * factor)),
+      );
+      const dh = Math.min(
+        ICON_DIM,
+        Math.max(1, Math.round(ih * baseScale * factor)),
+      );
       const dx = Math.round((ICON_DIM - dw) / 2);
       const dy = Math.round((ICON_DIM - dh) / 2);
       ctx.drawImage(colored, dx, dy, dw, dh);
     } else {
       const [offX, offY] = SHAPE_OFFSETS[shape] ?? [4, 4];
-      ctx.drawImage(colored, offX, offY);
+      const factor =
+        StructureLayer.ICON_DRAW_SCALE[structureType as UnitType] ?? 1;
+      if (factor !== 1) {
+        const iw = Math.max(1, colored.width);
+        const ih = Math.max(1, colored.height);
+        const dw = Math.min(ICON_DIM, Math.max(1, Math.round(iw * factor)));
+        const dh = Math.min(ICON_DIM, Math.max(1, Math.round(ih * factor)));
+        const dx = Math.round((ICON_DIM - dw) / 2);
+        const dy = Math.round((ICON_DIM - dh) / 2);
+        ctx.drawImage(colored, dx, dy, dw, dh);
+      } else {
+        ctx.drawImage(colored, offX, offY);
+      }
     }
 
     const texture = PIXI.Texture.from(canvas);

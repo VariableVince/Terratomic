@@ -159,6 +159,7 @@ export enum UnitType {
   MIRVWarhead = "MIRV Warhead",
   Construction = "Construction",
   Hospital = "Hospital",
+  ResearchLab = "Research Lab",
   Academy = "Academy",
   Airfield = "Air Field",
   CargoPlane = "Cargo Plane",
@@ -208,6 +209,7 @@ const _structureTypes: ReadonlySet<UnitType> = new Set([
   UnitType.Port,
   UnitType.Airfield,
   UnitType.Hospital,
+  UnitType.ResearchLab,
   UnitType.Academy,
 ]);
 
@@ -269,6 +271,8 @@ export interface UnitParamsMap {
   [UnitType.MIRV]: Record<string, never>;
 
   [UnitType.Hospital]: Record<string, never>;
+
+  [UnitType.ResearchLab]: Record<string, never>;
 
   [UnitType.Academy]: Record<string, never>;
 
