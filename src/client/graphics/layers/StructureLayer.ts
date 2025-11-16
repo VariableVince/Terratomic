@@ -1,11 +1,12 @@
 import { colord } from "colord";
 import * as PIXI from "pixi.js";
+import airfieldIcon from "../../../../proprietary/images/airfieldicon2.png";
 import researchLabIcon from "../../../../proprietary/images/researchlab.png";
 import anchorIcon from "../../../../resources/images/AnchorIcon.png";
 import academyIcon from "../../../../resources/images/buildings/academy_icon.png";
-import airfieldIcon from "../../../../resources/images/buildings/airfield.png";
 import hospitalIcon from "../../../../resources/images/buildings/hospital.png";
 import cityIcon from "../../../../resources/images/CityIcon.png";
+import factoryIcon from "../../../../resources/images/factoryicon.png";
 import missileSiloIcon from "../../../../resources/images/MissileSiloUnit.png";
 import SAMMissileIcon from "../../../../resources/images/SamLauncherUnit.png";
 // Use the standard shield icon from resources/images
@@ -63,6 +64,7 @@ const STRUCTURE_BG_SHAPES: Partial<Record<UnitType, BgShape>> = {
   [UnitType.Hospital]: "square",
   [UnitType.ResearchLab]: "square",
   [UnitType.Academy]: "square",
+  [UnitType.Factory]: "circle",
 };
 
 export class StructureLayer implements Layer {
@@ -90,6 +92,7 @@ export class StructureLayer implements Layer {
   private lastAffordableForUpgradeResearchLab: boolean | null = null;
   private lastAffordableForUpgradeSilo: boolean | null = null;
   private lastAffordableForUpgradeSAM: boolean | null = null;
+  private lastAffordableForUpgradeFactory: boolean | null = null;
   // Client-side level tracking for structures (temporary)
   private structureLevels = new Map<
     number,
@@ -106,6 +109,7 @@ export class StructureLayer implements Layer {
     [UnitType.Hospital, { iconPath: hospitalIcon, image: null }],
     [UnitType.ResearchLab, { iconPath: researchLabIcon, image: null }],
     [UnitType.Academy, { iconPath: academyIcon, image: null }],
+    [UnitType.Factory, { iconPath: factoryIcon, image: null }],
     [UnitType.DefensePost, { iconPath: shieldIcon, image: null }],
     [UnitType.Port, { iconPath: anchorIcon, image: null }],
     [UnitType.MissileSilo, { iconPath: missileSiloIcon, image: null }],
@@ -115,10 +119,11 @@ export class StructureLayer implements Layer {
   // Per-structure icon scale factor (1 = default size)
   private static readonly ICON_DRAW_SCALE: Partial<Record<UnitType, number>> = {
     [UnitType.City]: 1,
-    [UnitType.Airfield]: 1,
+    [UnitType.Airfield]: 1.4,
     [UnitType.Hospital]: 1,
     [UnitType.ResearchLab]: 1.4,
     [UnitType.Academy]: 1,
+    [UnitType.Factory]: 1,
     [UnitType.DefensePost]: 1,
     [UnitType.Port]: 1,
     [UnitType.MissileSilo]: 1,
@@ -182,7 +187,9 @@ export class StructureLayer implements Layer {
           r.unit.type() === UnitType.Hospital ||
           r.unit.type() === UnitType.Academy ||
           r.unit.type() === UnitType.MissileSilo ||
-          r.unit.type() === UnitType.SAMLauncher
+          r.unit.type() === UnitType.SAMLauncher ||
+          r.unit.type() === UnitType.ResearchLab ||
+          r.unit.type() === UnitType.Factory
         ) {
           r.pixiSprite.texture = this.createTexture(r.unit);
         }
@@ -343,6 +350,7 @@ export class StructureLayer implements Layer {
       unit.type() !== UnitType.Hospital &&
       unit.type() !== UnitType.Academy &&
       unit.type() !== UnitType.ResearchLab &&
+      unit.type() !== UnitType.Factory &&
       unit.type() !== UnitType.MissileSilo &&
       unit.type() !== UnitType.SAMLauncher
     )
@@ -362,6 +370,7 @@ export class StructureLayer implements Layer {
     const affordableResearchLab = this.canAffordUpgradeForType(
       UnitType.ResearchLab,
     );
+    const affordableFactory = this.canAffordUpgradeForType(UnitType.Factory);
     if (!this.upgradeMode) {
       if (
         this.lastAffordableForUpgradeCity !== null ||
@@ -370,7 +379,8 @@ export class StructureLayer implements Layer {
         this.lastAffordableForUpgradeAcademy !== null ||
         this.lastAffordableForUpgradeResearchLab !== null ||
         this.lastAffordableForUpgradeSilo !== null ||
-        this.lastAffordableForUpgradeSAM !== null
+        this.lastAffordableForUpgradeSAM !== null ||
+        this.lastAffordableForUpgradeFactory !== null
       ) {
         for (const r of this.renders) {
           if (
@@ -380,7 +390,8 @@ export class StructureLayer implements Layer {
             r.unit.type() === UnitType.Academy ||
             r.unit.type() === UnitType.ResearchLab ||
             r.unit.type() === UnitType.MissileSilo ||
-            r.unit.type() === UnitType.SAMLauncher
+            r.unit.type() === UnitType.SAMLauncher ||
+            r.unit.type() === UnitType.Factory
           ) {
             r.pixiSprite.texture = this.createTexture(r.unit);
           }
@@ -390,6 +401,7 @@ export class StructureLayer implements Layer {
         this.lastAffordableForUpgradeHospital = null;
         this.lastAffordableForUpgradeAcademy = null;
         this.lastAffordableForUpgradeResearchLab = null;
+        this.lastAffordableForUpgradeFactory = null;
         this.lastAffordableForUpgradeSilo = null;
         this.lastAffordableForUpgradeSAM = null;
         this.shouldRedraw = true;
@@ -417,6 +429,8 @@ export class StructureLayer implements Layer {
     const samChanged = this.lastAffordableForUpgradeSAM !== affordableSAM;
     const labChanged =
       this.lastAffordableForUpgradeResearchLab !== affordableResearchLab;
+    const factoryChanged =
+      this.lastAffordableForUpgradeFactory !== affordableFactory;
     if (
       cityChanged ||
       portChanged ||
@@ -424,7 +438,8 @@ export class StructureLayer implements Layer {
       academyChanged ||
       siloChanged ||
       samChanged ||
-      labChanged
+      labChanged ||
+      factoryChanged
     ) {
       for (const r of this.renders) {
         const t = r.unit.type();
@@ -435,7 +450,8 @@ export class StructureLayer implements Layer {
           (academyChanged && t === UnitType.Academy) ||
           (labChanged && t === UnitType.ResearchLab) ||
           (siloChanged && t === UnitType.MissileSilo) ||
-          (samChanged && t === UnitType.SAMLauncher)
+          (samChanged && t === UnitType.SAMLauncher) ||
+          (factoryChanged && t === UnitType.Factory)
         ) {
           r.pixiSprite.texture = this.createTexture(r.unit);
         }
@@ -447,6 +463,7 @@ export class StructureLayer implements Layer {
       this.lastAffordableForUpgradeResearchLab = affordableResearchLab;
       this.lastAffordableForUpgradeSilo = affordableSilo;
       this.lastAffordableForUpgradeSAM = affordableSAM;
+      this.lastAffordableForUpgradeFactory = affordableFactory;
       this.shouldRedraw = true;
     }
 
@@ -460,6 +477,7 @@ export class StructureLayer implements Layer {
         t !== UnitType.Hospital &&
         t !== UnitType.Academy &&
         t !== UnitType.ResearchLab &&
+        t !== UnitType.Factory &&
         t !== UnitType.MissileSilo &&
         t !== UnitType.SAMLauncher
       ) {
@@ -560,7 +578,9 @@ export class StructureLayer implements Layer {
         t === UnitType.Hospital ||
         t === UnitType.Academy ||
         t === UnitType.MissileSilo ||
-        t === UnitType.SAMLauncher
+        t === UnitType.SAMLauncher ||
+        t === UnitType.ResearchLab ||
+        t === UnitType.Factory
       ) {
         const hl = this.shouldHighlight(unit) ? 1 : 0;
         cacheKey += `-hl${hl}`;
@@ -617,6 +637,7 @@ export class StructureLayer implements Layer {
         structureType === UnitType.Hospital ||
         structureType === UnitType.Academy ||
         structureType === UnitType.ResearchLab ||
+        structureType === UnitType.Factory ||
         structureType === UnitType.MissileSilo ||
         structureType === UnitType.SAMLauncher) &&
       this.shouldHighlight(unit)
@@ -705,6 +726,7 @@ export class StructureLayer implements Layer {
       UnitType.Hospital,
       UnitType.Academy,
       UnitType.ResearchLab,
+      UnitType.Factory,
     ]);
     if (centerScaledTypes.has(structureType as UnitType)) {
       const padded = 4;
@@ -772,6 +794,13 @@ export class StructureLayer implements Layer {
     sprite.scale.set(this.iconScreenScale());
     // Add sprite below label container so labels render on top
     this.stage.addChildAt(sprite, Math.max(0, this.stage.children.length - 1));
+    // Ensure label container remains the topmost child after inserting sprites
+    if (this.labelContainer && this.stage.children.length > 1) {
+      this.stage.setChildIndex(
+        this.labelContainer,
+        this.stage.children.length - 1,
+      );
+    }
     return sprite;
   }
 
@@ -892,6 +921,7 @@ export class StructureLayer implements Layer {
           clickedUnit.type() === UnitType.Hospital ||
           clickedUnit.type() === UnitType.Academy ||
           clickedUnit.type() === UnitType.ResearchLab ||
+          clickedUnit.type() === UnitType.Factory ||
           clickedUnit.type() === UnitType.MissileSilo ||
           clickedUnit.type() === UnitType.SAMLauncher)
       ) {
@@ -1005,7 +1035,11 @@ export class StructureLayer implements Layer {
         const shape: BgShape =
           STRUCTURE_BG_SHAPES[unit.type() as UnitType] ?? "circle";
         const iconDim = ICON_SIZES[shape] ?? ICON_SIZE;
-        const scale = this.iconScreenScale();
+        // Use icon scale for positioning relative to icon size, but compute
+        // label sizing using a complementary scale that ignores the texture
+        // quality downscale applied to sprites so zoom behavior matches.
+        const iconScale = this.iconScreenScale();
+        const labelScale = iconScale * ICON_TEXTURE_QUALITY;
 
         const baseColorStr = this.relationshipColorHexStr(unit); // "#RRGGBB"
         const baseRaw = baseColorStr.replace(/^#/, "");
@@ -1016,7 +1050,8 @@ export class StructureLayer implements Layer {
           .replace(/^#/, "");
         const baseFill = parseInt(baseRaw, 16);
         const secondaryFill = parseInt(secondaryRaw, 16);
-        const fontSize = Math.max(10, Math.round(iconDim * scale * 0.55));
+        // Shrink level indicator by 50%
+        const fontSize = Math.round(iconDim * labelScale * 0.275);
         const stylePrimary = new PIXI.TextStyle({
           fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
           fontSize,
@@ -1052,9 +1087,9 @@ export class StructureLayer implements Layer {
         const bgX = Math.round(screenPos.x - pillWidth / 2);
         const bgY = Math.round(
           screenPos.y -
-            (iconDim * scale) / 2 -
+            (iconDim * labelScale) / 2 -
             pillHeight -
-            Math.max(4, Math.round(6 * scale)),
+            Math.round(1 * labelScale),
         );
         bg.roundRect(
           bgX,
@@ -1102,12 +1137,11 @@ export class StructureLayer implements Layer {
           const shape: BgShape =
             STRUCTURE_BG_SHAPES[u.type() as UnitType] ?? "circle";
           const iconDim = ICON_SIZES[shape] ?? ICON_SIZE;
-          const scale = this.iconScreenScale();
+          const iconScale = this.iconScreenScale();
+          const labelScale = iconScale * ICON_TEXTURE_QUALITY;
 
-          const fontSize = Math.max(
-            10,
-            Math.round(iconDim * scale * 0.5 || priceFontSizeBase),
-          );
+          // Shrink cost indicator by 50%
+          const fontSize = Math.round(iconDim * labelScale * 0.25);
           // Use green (self relationship color) only when affordable; otherwise white
           const baseColorStr = this.relationshipColorHexStr(u); // "#RRGGBB" (self => green)
           const baseRaw = baseColorStr.replace(/^#/, "");
@@ -1132,10 +1166,11 @@ export class StructureLayer implements Layer {
           const pillWidth = t.width + paddingX * 2;
           const pillHeight = t.height + paddingY * 2;
           const bg = new PIXI.Graphics();
-          const gapBelow = Math.max(4, Math.round(6 * scale));
+          // Nudge even closer to icon (further up)
+          const gapBelow = Math.round(1 * labelScale);
           const bgX = Math.round(screenPos.x - pillWidth / 2);
           const bgY = Math.round(
-            screenPos.y + (iconDim * scale) / 2 + gapBelow,
+            screenPos.y + (iconDim * labelScale) / 2 + gapBelow,
           );
           bg.roundRect(
             bgX,

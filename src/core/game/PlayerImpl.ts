@@ -446,7 +446,8 @@ export class PlayerImpl implements Player {
           u.type() === UnitType.Port ||
           u.type() === UnitType.Hospital ||
           u.type() === UnitType.Academy ||
-          u.type() === UnitType.ResearchLab
+          u.type() === UnitType.ResearchLab ||
+          u.type() === UnitType.Factory
             ? baseMax + 1000 * Math.max(0, level - 1)
             : baseMax;
         const healthRatio = u.hasHealth()
@@ -1268,6 +1269,7 @@ export class PlayerImpl implements Player {
       case UnitType.Hospital:
       case UnitType.ResearchLab:
       case UnitType.Academy:
+      case UnitType.Factory:
       case UnitType.Construction:
       case UnitType.Airfield:
         return this.landBasedStructureSpawn(targetTile, validTiles);

@@ -5,6 +5,7 @@ import airfieldIcon from "../../../../resources/images/AirfieldIcon.svg";
 import warshipIcon from "../../../../resources/images/BattleshipIconWhite.svg";
 import academyIcon from "../../../../resources/images/buildings/academy_icon.png";
 import cityIcon from "../../../../resources/images/CityIconWhite.svg";
+import factoryIcon from "../../../../resources/images/factoryicon.png";
 import fighterJetIcon from "../../../../resources/images/FighterJetIcon.svg";
 import goldCoinIcon from "../../../../resources/images/GoldCoinIcon.svg";
 import hospitalIcon from "../../../../resources/images/HospitalIconWhite.svg";
@@ -18,8 +19,13 @@ import shieldIcon from "../../../../resources/images/ShieldIconWhite.svg";
 import submarineIcon from "../../../../resources/images/submarine.svg";
 import { translateText } from "../../../client/Utils";
 import { EventBus } from "../../../core/EventBus";
+import { aggregateStructureBuildCost } from "../../../core/game/Costs";
 import { Gold, UnitType, UpgradeType } from "../../../core/game/Game";
 import { GameView } from "../../../core/game/GameView";
+import {
+  isUpgradeableStructure,
+  maxStructureLevel,
+} from "../../../core/game/Upgradeables";
 import { ToggleUpgradeModeEvent } from "../../events/ToggleUpgradeModeEvent";
 import { CloseViewEvent } from "../../InputHandler";
 import { displayKey, renderNumber } from "../../Utils";
@@ -107,8 +113,15 @@ const buildTable: BuildItemDisplay[][] = [
     {
       unitType: UnitType.ResearchLab,
       icon: researchLabIcon,
-      description: undefined,
-      key: undefined,
+      description: "build_menu.desc.research_lab",
+      key: "unit_type.research_lab",
+      countable: true,
+    },
+    {
+      unitType: UnitType.Factory,
+      icon: factoryIcon,
+      description: "build_menu.desc.factory",
+      key: "unit_type.factory",
       countable: true,
     },
     {
@@ -177,6 +190,7 @@ export class BuildMenu extends LitElement {
     [UnitType.Hospital]: 1,
     [UnitType.ResearchLab]: 1.3,
     [UnitType.Academy]: 1,
+    [UnitType.Factory]: 1,
     [UnitType.MissileSilo]: 1,
     [UnitType.SAMLauncher]: 1,
     [UnitType.DefensePost]: 1,
@@ -230,6 +244,7 @@ export class BuildMenu extends LitElement {
       buildHospital: "KeyO",
       buildAcademy: "KeyP",
       buildResearchLab: "KeyL",
+      buildFactory: "KeyF",
       buildMissileSilo: "KeyH",
       buildSAMLauncher: "KeyJ",
       buildDefensePost: "KeyK",
@@ -248,6 +263,7 @@ export class BuildMenu extends LitElement {
       [keybinds.buildHospital]: UnitType.Hospital,
       [keybinds.buildAcademy]: UnitType.Academy,
       [keybinds.buildResearchLab]: UnitType.ResearchLab,
+      [keybinds.buildFactory]: UnitType.Factory,
       [keybinds.buildMissileSilo]: UnitType.MissileSilo,
       [keybinds.buildSAMLauncher]: UnitType.SAMLauncher,
       [keybinds.buildDefensePost]: UnitType.DefensePost,
@@ -482,10 +498,37 @@ export class BuildMenu extends LitElement {
   }
 
   private cost(item: BuildItemDisplay): Gold {
-    return this.game
+    const base = this.game
       .config()
       .unitInfo(item.unitType)
       .cost(this.game.myPlayer()!);
+    if (!isUpgradeableStructure(item.unitType)) return base;
+    const desired = this._desiredLevel(item.unitType);
+    if (desired <= 1) return base;
+    const multiplier = this.game
+      .config()
+      .structureUpgradeCostMultiplier(item.unitType);
+    return aggregateStructureBuildCost(
+      this.game.config(),
+      this.game.myPlayer()!,
+      item.unitType,
+      desired,
+      multiplier,
+    );
+  }
+
+  private _desiredLevel(type: UnitType): number {
+    try {
+      const raw = localStorage.getItem("buildSettings.levels");
+      if (!raw) return 1;
+      const obj = JSON.parse(raw);
+      const key = String(type);
+      const val = obj?.[key];
+      if (typeof val !== "number" || val < 1) return 1;
+      return Math.min(maxStructureLevel(type), val);
+    } catch (_) {
+      return 1;
+    }
   }
 
   private count(item: BuildItemDisplay): string {
@@ -532,6 +575,9 @@ export class BuildMenu extends LitElement {
                   : String(item.unitType);
                 const price =
                   this.game && this.game.myPlayer() ? this.cost(item) : 0;
+                const desiredLevel = isUpgradeableStructure(item.unitType)
+                  ? this._desiredLevel(item.unitType)
+                  : 1;
 
                 return html`
                   <button
@@ -568,6 +614,12 @@ export class BuildMenu extends LitElement {
                           height="12"
                           style="vertical-align: middle;"
                         />
+                        ${desiredLevel > 1
+                          ? html`<span
+                              style="margin-left:4px;font-size:9px;color:var(--ui-text-muted)"
+                              >L${desiredLevel}</span
+                            >`
+                          : ""}
                       </span>
                     </div>
                     ${item.countable
