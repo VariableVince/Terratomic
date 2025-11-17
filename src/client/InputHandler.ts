@@ -393,6 +393,7 @@ export class InputHandler {
         this.uiState.upgradeMode = false;
         this.eventBus.emit(new ToggleUpgradeModeEvent(false));
       }
+      // unit upgrade mode removed
       const cell = this.transformHandler.screenToWorldCoordinates(
         this.lastPointerX,
         this.lastPointerY,
@@ -484,6 +485,7 @@ export class InputHandler {
         this.uiState.upgradeMode = false;
         this.eventBus.emit(new ToggleUpgradeModeEvent(false));
       }
+      // unit upgrade mode removed
       this.eventBus.emit(
         new BuildUnitIntentEvent(this.uiState.pendingBuildUnitType, tile),
       );

@@ -12,7 +12,7 @@ import {
 } from "../../../core/game/Game";
 import { GameView, PlayerView } from "../../../core/game/GameView";
 import { getTechMeta, RESEARCH_TECH_IDS } from "../../../core/tech/TechEffects";
-// Ensure modal custom element registers at runtime
+// Ensure modal custom elements register at runtime
 import "../../BuildSettingsModal";
 import {
   INVESTMENT_REQUEST_EVENT,
@@ -32,6 +32,7 @@ import {
   SendSetRoadInvestmentEvent,
   SendSetTargetTroopRatioEvent,
 } from "../../Transport";
+import "../../UnitUpgradeSettingsModal";
 import { UIState } from "../UIState";
 import { ToggleBuildPanelEvent } from "./ControlPanel";
 import { Layer } from "./Layer";
@@ -915,6 +916,40 @@ export class ControlPanel2 extends LitElement implements Layer {
     return el;
   }
 
+  private _openUnitUpgradeSettings() {
+    const modal =
+      (document.querySelector("unit-upgrade-settings-modal") as any) ||
+      this._ensureUnitUpgradeSettingsModal();
+    if (!modal) {
+      console.warn(
+        "UnitUpgradeSettingsModal element not found or failed to create",
+      );
+      return;
+    }
+    const openFn = modal.open;
+    const unitTypes = [
+      UnitType.Warship,
+      UnitType.FighterJet,
+      UnitType.Submarine,
+    ];
+    if (typeof openFn !== "function") {
+      console.warn("UnitUpgradeSettingsModal missing open() method");
+      return;
+    }
+    openFn.call(modal, unitTypes, {});
+  }
+
+  private _ensureUnitUpgradeSettingsModal(): HTMLElement | null {
+    let el = document.querySelector(
+      "unit-upgrade-settings-modal",
+    ) as HTMLElement | null;
+    if (!el) {
+      el = document.createElement("unit-upgrade-settings-modal");
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+
   private _changeTab(tab: "Build" | "Attack" | "Economy" | "Bombers") {
     this.activeTab = tab;
     if (this.uiState.pendingBuildUnitType) {
@@ -1393,32 +1428,16 @@ export class ControlPanel2 extends LitElement implements Layer {
                     <span>Multi-Build Units</span>
                   </button>
                   <button
-                    class="upgrade-structures-button ${this.uiState.upgradeMode
-                      ? "selected"
-                      : ""}"
-                    title="Upgrade Structures"
-                    @click=${() => {
-                      const enabled = !this.uiState.upgradeMode;
-                      this.uiState.upgradeMode = enabled;
-                      this.eventBus.emit(new ToggleUpgradeModeEvent(enabled));
-                      // Disable mass production if upgrade is enabled
-                      if (enabled && this._multibuildEnabled) {
-                        this._multibuildEnabled = false;
-                        this.uiState.multibuildEnabled = false;
-                      }
-                      // Clear pending build selection when upgrade is enabled
-                      if (enabled) {
-                        this.uiState.pendingBuildUnitType = null;
-                      }
-                      this.requestUpdate();
-                    }}
+                    class="upgrade-structures-button"
+                    title="Set default upgrade levels for units"
+                    @click=${() => this._openUnitUpgradeSettings()}
                   >
                     <img
                       class="upgrade-icon"
                       src=${upgradeArrowIcon}
                       alt="Upgrade"
                     />
-                    <span>Upgrade Structures</span>
+                    <span>Upgrade Units</span>
                   </button>
                 </div>
                 <build-menu

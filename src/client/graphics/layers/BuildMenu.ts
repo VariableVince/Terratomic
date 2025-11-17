@@ -24,7 +24,9 @@ import { Gold, UnitType, UpgradeType } from "../../../core/game/Game";
 import { GameView } from "../../../core/game/GameView";
 import {
   isUpgradeableStructure,
+  isUpgradeableUnit,
   maxStructureLevel,
+  maxUnitLevel,
 } from "../../../core/game/Upgradeables";
 import { ToggleUpgradeModeEvent } from "../../events/ToggleUpgradeModeEvent";
 import { CloseViewEvent } from "../../InputHandler";
@@ -443,6 +445,17 @@ export class BuildMenu extends LitElement {
       font-size: 9px;
       border: 1px solid var(--ui-border-muted);
     }
+    .build-level-chip {
+      position: absolute;
+      top: -5px;
+      left: -5px;
+      background-color: var(--ui-panel-shell-bottom);
+      color: var(--ui-text-light);
+      padding: 1px 5px;
+      border-radius: 10px;
+      font-size: 9px;
+      border: 1px solid var(--ui-border-muted);
+    }
     .build-hotkey {
       position: absolute;
       bottom: 2px;
@@ -454,10 +467,22 @@ export class BuildMenu extends LitElement {
       background-color: var(--ui-panel-shell-top);
       border-color: var(--ui-border-muted);
     }
+    .build-button:not(:disabled):hover > .build-level-chip {
+      background-color: var(--ui-panel-shell-top);
+      border-color: var(--ui-border-muted);
+    }
     .build-button:not(:disabled):active > .build-count-chip {
       background-color: var(--ui-panel-shell-bottom);
     }
+    .build-button:not(:disabled):active > .build-level-chip {
+      background-color: var(--ui-panel-shell-bottom);
+    }
     .build-button:disabled > .build-count-chip {
+      background-color: var(--ui-surface-dark);
+      border-color: var(--ui-border-muted);
+      cursor: not-allowed;
+    }
+    .build-button:disabled > .build-level-chip {
       background-color: var(--ui-surface-dark);
       border-color: var(--ui-border-muted);
       cursor: not-allowed;
@@ -502,22 +527,40 @@ export class BuildMenu extends LitElement {
       .config()
       .unitInfo(item.unitType)
       .cost(this.game.myPlayer()!);
-    if (!isUpgradeableStructure(item.unitType)) return base;
-    const desired = this._desiredLevel(item.unitType);
-    if (desired <= 1) return base;
-    const multiplier = this.game
-      .config()
-      .structureUpgradeCostMultiplier(item.unitType);
-    return aggregateStructureBuildCost(
-      this.game.config(),
-      this.game.myPlayer()!,
-      item.unitType,
-      desired,
-      multiplier,
-    );
+    // Structures: use configured structure multiplier
+    if (isUpgradeableStructure(item.unitType)) {
+      const desired = this._desiredStructureLevel(item.unitType);
+      if (desired <= 1) return base;
+      const multiplier = this.game
+        .config()
+        .structureUpgradeCostMultiplier(item.unitType);
+      return aggregateStructureBuildCost(
+        this.game.config(),
+        this.game.myPlayer()!,
+        item.unitType,
+        desired,
+        multiplier,
+      );
+    }
+    // Units: apply configured per-step multiplier for upgradeable combat units
+    if (isUpgradeableUnit(item.unitType)) {
+      const desired = this._desiredUnitLevel(item.unitType);
+      if (desired <= 1) return base;
+      const multiplier = this.game
+        .config()
+        .unitUpgradeCostMultiplier(item.unitType);
+      return aggregateStructureBuildCost(
+        this.game.config(),
+        this.game.myPlayer()!,
+        item.unitType,
+        desired,
+        multiplier,
+      );
+    }
+    return base;
   }
 
-  private _desiredLevel(type: UnitType): number {
+  private _desiredStructureLevel(type: UnitType): number {
     try {
       const raw = localStorage.getItem("buildSettings.levels");
       if (!raw) return 1;
@@ -526,6 +569,20 @@ export class BuildMenu extends LitElement {
       const val = obj?.[key];
       if (typeof val !== "number" || val < 1) return 1;
       return Math.min(maxStructureLevel(type), val);
+    } catch (_) {
+      return 1;
+    }
+  }
+
+  private _desiredUnitLevel(type: UnitType): number {
+    try {
+      const raw = localStorage.getItem("unitUpgradeSettings.levels");
+      if (!raw) return 1;
+      const obj = JSON.parse(raw);
+      const key = String(type);
+      const val = obj?.[key];
+      if (typeof val !== "number" || val < 1) return 1;
+      return Math.min(maxUnitLevel(type), val);
     } catch (_) {
       return 1;
     }
@@ -576,8 +633,10 @@ export class BuildMenu extends LitElement {
                 const price =
                   this.game && this.game.myPlayer() ? this.cost(item) : 0;
                 const desiredLevel = isUpgradeableStructure(item.unitType)
-                  ? this._desiredLevel(item.unitType)
-                  : 1;
+                  ? this._desiredStructureLevel(item.unitType)
+                  : isUpgradeableUnit(item.unitType)
+                    ? this._desiredUnitLevel(item.unitType)
+                    : 1;
 
                 return html`
                   <button
@@ -614,14 +673,13 @@ export class BuildMenu extends LitElement {
                           height="12"
                           style="vertical-align: middle;"
                         />
-                        ${desiredLevel > 1
-                          ? html`<span
-                              style="margin-left:4px;font-size:9px;color:var(--ui-text-muted)"
-                              >L${desiredLevel}</span
-                            >`
-                          : ""}
                       </span>
                     </div>
+                    ${desiredLevel > 1
+                      ? html`<div class="build-level-chip">
+                          L${desiredLevel}
+                        </div>`
+                      : ""}
                     ${item.countable
                       ? html`<div class="build-count-chip">
                           <span class="build-count">${this.count(item)}</span>

@@ -447,6 +447,7 @@ export const MoveFighterJetIntentSchema = BaseIntentSchema.extend({
   unitId: z.number(),
   tile: z.number(),
 });
+
 export const BomberIntentSchema = BaseIntentSchema.extend({
   type: z.literal("bomber_intent"),
   targetID: ID.nullable(), // who to attack

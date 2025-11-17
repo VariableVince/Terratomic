@@ -7,4 +7,6 @@ export interface UIState {
   multibuildEnabled: boolean;
   // Whether the player is currently in city upgrade targeting mode
   upgradeMode: boolean;
+  // Local client-side unit levels (id -> level)
+  unitLevels: Record<number, number>;
 }

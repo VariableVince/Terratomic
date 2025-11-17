@@ -16,6 +16,7 @@ import {
   MoveWarshipIntentEvent,
 } from "../../Transport";
 import { TransformHandler } from "../TransformHandler";
+import { UIState } from "../UIState";
 import { Layer } from "./Layer";
 
 import { GameUpdateType } from "../../../core/game/GameUpdates";
@@ -64,6 +65,7 @@ export class UnitLayer implements Layer {
     private game: GameView,
     private eventBus: EventBus,
     transformHandler: TransformHandler,
+    private uiState: UIState,
   ) {
     this.theme = game.config().theme();
     this.transformHandler = transformHandler;
@@ -175,6 +177,8 @@ export class UnitLayer implements Layer {
     const nearbyWarships = this.findWarshipsNearCell(cell);
     const nearbySubmarines = this.findSubmarinesNearCell(cell);
     const nearbyFighterJets = this.findFighterJetsNearCell(cell);
+
+    // unit upgrade mode removed: proceed with selection/move logic only
 
     if (this.selectedUnit) {
       const clickRef = this.game.ref(cell.x, cell.y);
@@ -346,10 +350,21 @@ export class UnitLayer implements Layer {
     unitViews
       .filter((unitView) => isSpriteReady(unitView.type()))
       .forEach((unitView) => {
-        // Use cached sprite size to limit clear area to near sprite bounds
+        // Compute the same geometry used during draw to clear sprite + dot overlays
         const spriteSize = this.getSpriteSize(unitView);
-        const padding = 2; // small safety margin
-        const clearsize = spriteSize + padding;
+        const sizeMult = this.effectiveSizeMultiplier(unitView);
+        const newWidth = spriteSize * sizeMult;
+        const newHeight = spriteSize * sizeMult;
+
+        // Badge overlay parameters: badge sits 1px outside top-right
+        const level = (unitView as any).level ? (unitView as any).level() : 1;
+        const badgeSize = Math.max(2, Math.min(3, Math.round(newWidth * 0.18)));
+        const offset = 1;
+        const overlayTop = badgeSize + offset; // extend upwards to cover outside badge
+        const extraRight = badgeSize + offset; // full right-side extension beyond sprite
+
+        const padding = 2; // small safety margin around computed bounds
+        const maxHalfWidth = newWidth / 2 + extraRight;
         const lastX = this.game.x(unitView.lastTile());
         const lastY = this.game.y(unitView.lastTile());
         const angle = angleByUnit.get(unitView) ?? null;
@@ -359,12 +374,14 @@ export class UnitLayer implements Layer {
           this.context.rotate(angle);
           this.context.translate(-lastX, -lastY);
         }
-        this.context.clearRect(
-          lastX - clearsize / 2,
-          lastY - clearsize / 2,
-          clearsize,
-          clearsize,
-        );
+
+        // Clear an axis-aligned box in the rotated space that covers the sprite and the dots above
+        const left = lastX - maxHalfWidth - padding;
+        const top = lastY - newHeight / 2 - overlayTop - padding;
+        const width = maxHalfWidth * 2 + padding * 2;
+        const height = newHeight + overlayTop + padding * 2;
+        this.context.clearRect(left, top, width, height);
+
         if (angle !== null) {
           this.context.restore();
         }
@@ -787,23 +804,45 @@ export class UnitLayer implements Layer {
       }
 
       const angle = angleByUnit?.get(unit) ?? this.getUnitAngle(unit);
-      if (angle !== null) {
-        this.context.save();
-        this.context.translate(x, y);
-        this.context.rotate(angle);
-        this.context.translate(-x, -y);
-      }
-
+      const cx = Math.round(x);
+      const cy = Math.round(y);
       const newWidth = sprite.width * sizeMult;
       const newHeight = sprite.width * sizeMult; // Keep aspect ratio square
 
+      if (angle !== null) {
+        this.context.save();
+        this.context.translate(cx, cy);
+        this.context.rotate(angle);
+        this.context.translate(-cx, -cy);
+      }
+
       this.context.drawImage(
         sprite,
-        Math.round(x - newWidth / 2),
-        Math.round(y - newHeight / 2),
+        cx - newWidth / 2,
+        cy - newHeight / 2,
         newWidth,
         newHeight,
       );
+
+      // Draw a tiny top-right corner badge offset 1px outside the sprite
+      const level = unit.level ? unit.level() : 1;
+      // Tier color mapping: 1→bronze, 2→silver, 3→gold, 4+→platinum
+      const tierColor =
+        level >= 4
+          ? "#E5E4E2" /* platinum */
+          : level === 3
+            ? "#FFD700" /* gold */
+            : level === 2
+              ? "#C0C0C0" /* silver */
+              : "#CD7F32"; /* bronze */
+      // Badge size: crisp 2–3 px depending on sprite size
+      const badgeSize = Math.max(2, Math.min(3, Math.round(newWidth * 0.18)));
+      // Offset 1px to the right and 1px above the sprite's top-right corner
+      const offset = 1;
+      const badgeLeft = Math.round(cx + newWidth / 2 + offset);
+      const badgeTop = Math.round(cy - newHeight / 2 - badgeSize - offset);
+      this.context.fillStyle = tierColor;
+      this.context.fillRect(badgeLeft, badgeTop, badgeSize, badgeSize);
 
       if (angle !== null) {
         this.context.restore();
@@ -814,6 +853,9 @@ export class UnitLayer implements Layer {
       }
     }
   }
+
+  // Previously used for colored borders; kept for potential future styling
+  // but currently unused after switching to dot indicators.
 
   private getUnitAngle(unit: UnitView): number | null {
     const lastTile = unit.lastTile();
@@ -879,5 +921,22 @@ export class UnitLayer implements Layer {
     const size = canvas.width;
     this.spriteSizeCache.set(t, size);
     return size;
+  }
+
+  // Mirror draw-time size multiplier decisions for clearing
+  private effectiveSizeMultiplier(unit: UnitView): number {
+    if (
+      unit.type() === UnitType.Submarine &&
+      unit.owner() === this.game.myPlayer()
+    ) {
+      const isAttacking = (unit as any).isAttacking?.() ?? false;
+      const isDetected = (unit as any).isDetectedByNavalUnit?.() ?? false;
+      const isOnCooldown = (unit as any).isCooldown?.() ?? false;
+      const isVisibleToEnemies = isAttacking || isDetected || isOnCooldown;
+      if (!isVisibleToEnemies) {
+        return 0.75;
+      }
+    }
+    return 1.0;
   }
 }
