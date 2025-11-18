@@ -23,6 +23,7 @@ import {
   AllPlayers,
   Attack,
   BuildableUnit,
+  Cell,
   ColoredTeams,
   Embargo,
   EmojiMessage,
@@ -133,6 +134,9 @@ export class PlayerImpl implements Player {
   private _autoBombingEnabled: boolean = false;
   public bombersOnTarget = new Map<TileRef, number>();
 
+  // Cached capital (geographic center) of player's territory
+  private _capital: Cell | null = null;
+
   constructor(
     private mg: GameImpl,
     private _smallID: number,
@@ -168,8 +172,13 @@ export class PlayerImpl implements Player {
       playerType: this.type(),
       isAlive: this.isAlive(),
       isDisconnected: this.isDisconnected(),
+      capital:
+        this._capital !== null
+          ? { x: this._capital.x, y: this._capital.y }
+          : undefined,
       tilesOwned: this.numTilesOwned(),
       gold: this._gold,
+      gdp: this.gdp(),
       population: this.population(),
       totalPopulation: this.totalPopulation(),
       hospitalReturns: this.hospitalReturns(),
@@ -179,6 +188,8 @@ export class PlayerImpl implements Player {
       roadNetworkCompletion: this.roadNetworkCompletion(),
       roadNetworkLength: this.mg.getRoadLengthForPlayer(this.id()),
       roadNetPixelsPerSecond: this.mg.getRoadNetPixelsPerSecond(this.id()),
+      // Trade: expose current global demand queue length
+      tradeDemandQueueLength: (this.mg as any).tradeDemandQueueLength?.() ?? 0,
       troops: this.troops(),
       attackingTroops: this.attackingTroops(),
       targetTroopRatio: this.targetTroopRatio(),
@@ -261,6 +272,16 @@ export class PlayerImpl implements Player {
 
   type(): PlayerType {
     return this.playerInfo.playerType;
+  }
+
+  // Economic: GDP proxy as parameter * max population
+  gdp(): number {
+    const factor = this.mg.config().gdpFactor();
+    const maxPop = this.mg.config().maxPopulation(this);
+    const g = factor * maxPop;
+    // Ensure finite, non-negative number
+    if (!Number.isFinite(g) || g < 0) return 0;
+    return Math.floor(g);
   }
 
   clan(): string | null {
@@ -1438,6 +1459,15 @@ export class PlayerImpl implements Player {
   }
   lastTileChange(): Tick {
     return this._lastTileChange;
+  }
+
+  capital(): Cell | null {
+    return this._capital;
+  }
+
+  /** Internal setter used by background executions */
+  public _setCapital(capital: Cell | null): void {
+    this._capital = capital;
   }
 
   isDisconnected(): boolean {

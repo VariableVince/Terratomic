@@ -57,6 +57,16 @@ export class UnitImpl implements Unit {
   private _trajectoryIndex: number = 0;
   private _trajectory: TrajectoryTile[];
 
+  // Trade-ship specific: route owners for warship consideration
+  private _tradeRouteStartOwner: PlayerImpl | null = null;
+  private _tradeRouteEndOwner: PlayerImpl | null = null;
+  // Trade-ship specific: cargo carried (gold)
+  private _cargoGold: bigint = 0n;
+  private _tradePhase: "toStart" | "toEnd" | null = null;
+  // Port-specific: pending trade ship construction due tick (legacy single) and multiple concurrent builds
+  private _pendingTradeShipDueTick: Tick | null = null; // deprecated after multi-build
+  private _pendingTradeShipDueTicks: Tick[] = [];
+
   constructor(
     private _type: UnitType,
     private mg: GameImpl,
@@ -167,6 +177,31 @@ export class UnitImpl implements Unit {
       returning: this.returning(),
       isAttacking: this.isAttacking,
       isDetectedByNavalUnit: this.isDetectedByNavalUnit,
+      // Trade metadata
+      tradeRouteStartOwnerID: this._tradeRouteStartOwner
+        ? this._tradeRouteStartOwner.smallID()
+        : undefined,
+      tradeRouteEndOwnerID: this._tradeRouteEndOwner
+        ? this._tradeRouteEndOwner.smallID()
+        : undefined,
+      tradePhase: this._tradePhase ?? undefined,
+      dockedAtPortOwnerID: (() => {
+        if (this._type !== UnitType.TradeShip) return undefined;
+        const here = this._tile;
+        const portHere = this.mg
+          .unitsAt(here)
+          .find((u) => u.type() === UnitType.Port) as UnitImpl | undefined;
+        return portHere ? portHere.owner().smallID() : undefined;
+      })(),
+      pendingTradeShipDueTick:
+        this._type === UnitType.Port && this._pendingTradeShipDueTick !== null
+          ? this._pendingTradeShipDueTick
+          : undefined,
+      pendingTradeShipDueTicks:
+        this._type === UnitType.Port &&
+        this._pendingTradeShipDueTicks.length > 0
+          ? [...this._pendingTradeShipDueTicks]
+          : undefined,
     };
   }
 
@@ -221,6 +256,34 @@ export class UnitImpl implements Unit {
 
   level(): number {
     return this._level;
+  }
+
+  // Port-specific accessor/mutator for scheduled trade ship construction (single legacy)
+  setPendingTradeShipDueTick(due: Tick | null): void {
+    if (this._pendingTradeShipDueTick !== due) {
+      this._pendingTradeShipDueTick = due;
+      // Only emit update for ports
+      if (this._type === UnitType.Port) {
+        this.mg.addUpdate(this.toUpdate());
+      }
+    }
+  }
+  pendingTradeShipDueTick(): Tick | null {
+    return this._pendingTradeShipDueTick;
+  }
+  // Multi-build: replace entire set
+  setPendingTradeShipDueTicks(dueTicks: Tick[]): void {
+    // Normalize & sort ascending for UI consistency
+    const normalized = [...dueTicks].sort((a, b) => a - b);
+    const changed =
+      normalized.length !== this._pendingTradeShipDueTicks.length ||
+      normalized.some((v, i) => v !== this._pendingTradeShipDueTicks[i]);
+    if (!changed) return;
+    this._pendingTradeShipDueTicks = normalized;
+    if (this._type === UnitType.Port) this.mg.addUpdate(this.toUpdate());
+  }
+  pendingTradeShipDueTicks(): Tick[] {
+    return [...this._pendingTradeShipDueTicks];
   }
 
   /**
@@ -648,5 +711,34 @@ export class UnitImpl implements Unit {
       this.mg.ticks() - this._lastSetSafeFromPirates <
       this.mg.config().safeFromPiratesCooldownMax()
     );
+  }
+
+  // Trade route metadata API
+  setTradeRouteOwners(
+    startOwner: PlayerImpl | null,
+    endOwner: PlayerImpl | null,
+  ): void {
+    this._tradeRouteStartOwner = startOwner;
+    this._tradeRouteEndOwner = endOwner;
+  }
+  tradeRouteStartOwner(): PlayerImpl | null {
+    return this._tradeRouteStartOwner;
+  }
+  tradeRouteEndOwner(): PlayerImpl | null {
+    return this._tradeRouteEndOwner;
+  }
+
+  setTradePhase(phase: "toStart" | "toEnd" | null): void {
+    this._tradePhase = phase;
+  }
+  tradePhase(): "toStart" | "toEnd" | null {
+    return this._tradePhase;
+  }
+
+  setCargoGold(amount: bigint): void {
+    this._cargoGold = amount;
+  }
+  cargoGold(): bigint {
+    return this._cargoGold;
   }
 }

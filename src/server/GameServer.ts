@@ -129,6 +129,15 @@ export class GameServer {
   }
 
   public addClient(client: Client, lastTurn: number) {
+    // If this is a private lobby and no creator is set, assign the first joiner as creator
+    if (!this.isPublic() && this.LobbyCreatorID === undefined) {
+      this.LobbyCreatorID = client.clientID;
+      this.log.info("Assigned lobby creator to first joiner", {
+        gameID: this.id,
+        creatorID: this.LobbyCreatorID,
+      });
+    }
+
     // Authorization check
     if (this._hasStarted) {
       const isOriginalPlayer =
@@ -148,13 +157,17 @@ export class GameServer {
       }
     }
 
-    this.websockets.add(client.ws);
     if (this.kickedClients.has(client.clientID)) {
       this.log.warn(`cannot add client, already kicked`, {
         clientID: client.clientID,
       });
+      // Ensure the connection is closed so the client does not linger
+      if (client.ws.readyState === WebSocket.OPEN) {
+        client.ws.close(1008, "Kicked from lobby");
+      }
       return;
     }
+    this.websockets.add(client.ws);
     // Log when lobby creator joins private game
     if (client.clientID === this.LobbyCreatorID) {
       this.log.info("Lobby creator joined", {
@@ -774,7 +787,7 @@ export class GameServer {
 
     const lastHashTurn = this.turns.length - 10;
 
-    const { mostCommonHash, outOfSyncClients } =
+    const { mostCommonHash, outOfSyncClients, numClientsWithMostCommonHash } =
       this.findOutOfSyncClients(lastHashTurn);
 
     if (outOfSyncClients.length === 0) {
@@ -786,8 +799,7 @@ export class GameServer {
       type: "desync",
       turn: lastHashTurn,
       correctHash: mostCommonHash,
-      clientsWithCorrectHash:
-        this.activeClients.length - outOfSyncClients.length,
+      clientsWithCorrectHash: numClientsWithMostCommonHash,
       totalActiveClients: this.activeClients.length,
     });
     if (!serverDesync.success) {
@@ -817,6 +829,7 @@ export class GameServer {
   findOutOfSyncClients(turnNumber: number): {
     mostCommonHash: number | null;
     outOfSyncClients: Client[];
+    numClientsWithMostCommonHash: number;
   } {
     const counts = new Map<number, number>();
 
@@ -851,7 +864,8 @@ export class GameServer {
       }
     }
 
-    // If half clients out of sync assume all are out of sync.
+    // If half clients out of sync assume all are out of sync for remediation,
+    // but keep the true count of clients with most-common hash for reporting.
     if (outOfSyncClients.length >= Math.floor(this.activeClients.length / 2)) {
       outOfSyncClients = this.activeClients;
     }
@@ -859,6 +873,7 @@ export class GameServer {
     return {
       mostCommonHash,
       outOfSyncClients,
+      numClientsWithMostCommonHash: maxCount,
     };
   }
 }

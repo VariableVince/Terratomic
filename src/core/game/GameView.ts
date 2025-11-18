@@ -161,9 +161,46 @@ export class UnitView {
     return this.data.targetedBySAM ?? false;
   }
 
+  // Trade metadata (optional)
+  tradeRouteStartOwner(): PlayerView | null {
+    const id = (this.data as any).tradeRouteStartOwnerID as number | undefined;
+    return id !== undefined
+      ? (this.gameView.playerBySmallID(id) as PlayerView)
+      : null;
+  }
+  tradeRouteEndOwner(): PlayerView | null {
+    const id = (this.data as any).tradeRouteEndOwnerID as number | undefined;
+    return id !== undefined
+      ? (this.gameView.playerBySmallID(id) as PlayerView)
+      : null;
+  }
+  tradePhase(): "toStart" | "toEnd" | null {
+    const v = (this.data as any).tradePhase as "toStart" | "toEnd" | undefined;
+    return v ?? null;
+  }
+  dockedAtPortOwner(): PlayerView | null {
+    const id = (this.data as any).dockedAtPortOwnerID as number | undefined;
+    return id !== undefined
+      ? (this.gameView.playerBySmallID(id) as PlayerView)
+      : null;
+  }
+
   // Structure upgrade level (>=1). Defaults to 1 when undefined in updates.
   level(): number {
     return (this.data as any).level ?? 1;
+  }
+
+  // Port-specific: pending trade ship construction due tick (or null if none scheduled)
+  pendingTradeShipDueTick(): Tick | null {
+    const v = (this.data as any).pendingTradeShipDueTick as Tick | undefined;
+    return v ?? null;
+  }
+  // Port-specific: multiple pending trade ship construction due ticks
+  pendingTradeShipDueTicks(): Tick[] {
+    const arr = (this.data as any).pendingTradeShipDueTicks as
+      | Tick[]
+      | undefined;
+    return Array.isArray(arr) ? [...arr] : [];
   }
 }
 
@@ -329,6 +366,9 @@ export class PlayerView {
   gold(): Gold {
     return this.data.gold;
   }
+  gdp(): number {
+    return this.data.gdp;
+  }
   population(): number {
     return this.data.population;
   }
@@ -426,6 +466,10 @@ export class PlayerView {
   }
   isDisconnected(): boolean {
     return this.data.isDisconnected;
+  }
+  // Trade: global demand queue length (server-provided; default 0)
+  tradeDemandQueueLength(): number {
+    return (this.data as any).tradeDemandQueueLength ?? 0;
   }
 }
 

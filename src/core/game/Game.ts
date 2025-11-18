@@ -514,6 +514,18 @@ export interface Unit {
   setSafeFromPirates(): void; // Only for trade ships
   isSafeFromPirates(): boolean; // Only for trade ships
 
+  // Trade route metadata (used primarily by trade ships)
+  setTradeRouteOwners(startOwner: Player | null, endOwner: Player | null): void;
+  tradeRouteStartOwner(): Player | null;
+  tradeRouteEndOwner(): Player | null;
+  // Trade navigation phase (null when idle/returning or no active assignment)
+  setTradePhase(phase: "toStart" | "toEnd" | null): void;
+  tradePhase(): "toStart" | "toEnd" | null;
+
+  // Trade ship cargo (gold carried during a route; awarded on capture return)
+  setCargoGold(amount: Gold): void;
+  cargoGold(): Gold;
+
   // Construction
   constructionType(): UnitType | null;
   setConstructionType(type: UnitType): void;
@@ -568,6 +580,9 @@ export interface Player {
 
   lastTileChange(): Tick;
 
+  // Capital (geographic center) of the player's territory, if any
+  capital(): Cell | null;
+
   isDisconnected(): boolean;
   markDisconnected(isDisconnected: boolean): void;
 
@@ -595,6 +610,8 @@ export interface Player {
   removeProductivity(amount: number): void;
   investmentRate(): number; // Returns the investment rate (0 to 1)
   setInvestmentRate(rate: number): void;
+  // Economic: Gross Domestic Product proxy
+  gdp(): number; // Computed as config.gdpFactor() * maxPopulation(this)
   // Roads: investment ratio (0..1) of per-tick income allocated to roads
   roadInvestmentRate(): number;
   setRoadInvestmentRate(rate: number): void;
@@ -898,6 +915,11 @@ export enum MessageType {
   ALLIANCE_EXPIRED,
   WAR_DECLARED,
   PEACE_MADE,
+  // Trade ship lifecycle events (new)
+  TRADE_SHIP_CAPTURED,
+  TRADE_SHIP_SUNK,
+  TRADE_SHIP_TURNED_AROUND,
+  TRADE_SHIP_CAPTURED_ENEMY,
   SENT_GOLD_TO_PLAYER,
   RECEIVED_GOLD_FROM_PLAYER,
   RECEIVED_GOLD_FROM_TRADE,
@@ -943,6 +965,10 @@ export const MESSAGE_TYPE_CATEGORIES: Record<MessageType, MessageCategory> = {
   [MessageType.PEACE_MADE]: MessageCategory.ALLIANCE,
   [MessageType.WARN]: MessageCategory.ALLIANCE,
   [MessageType.PEACE_TIMER_BLOCKED]: MessageCategory.ATTACK,
+  [MessageType.TRADE_SHIP_CAPTURED]: MessageCategory.ATTACK,
+  [MessageType.TRADE_SHIP_SUNK]: MessageCategory.ATTACK,
+  [MessageType.TRADE_SHIP_TURNED_AROUND]: MessageCategory.TRADE,
+  [MessageType.TRADE_SHIP_CAPTURED_ENEMY]: MessageCategory.ATTACK,
   [MessageType.SENT_GOLD_TO_PLAYER]: MessageCategory.TRADE,
   [MessageType.RECEIVED_GOLD_FROM_PLAYER]: MessageCategory.TRADE,
   [MessageType.RECEIVED_GOLD_FROM_TRADE]: MessageCategory.TRADE,

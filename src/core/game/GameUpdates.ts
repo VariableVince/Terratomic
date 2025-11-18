@@ -3,6 +3,7 @@ import {
   EmojiMessage,
   GameUpdates,
   Gold,
+  MapPos,
   MessageType,
   NameViewData,
   PlayerID,
@@ -139,6 +140,15 @@ export interface UnitUpdate {
   ghostExpiresAt?: Tick;
   // Structure upgrade level (>=1). Cities increase level by 1 per upgrade.
   level?: number;
+  // Trade-ship specific, for precise UI without heuristics
+  tradeRouteStartOwnerID?: number; // smallID of start port owner
+  tradeRouteEndOwnerID?: number; // smallID of end port owner
+  tradePhase?: "toStart" | "toEnd"; // current navigation phase (returning is provided separately)
+  dockedAtPortOwnerID?: number; // smallID of the owner of the port the ship is currently docked at (if any)
+  // Port-specific: when a trade ship is scheduled from this port, its construction completion tick
+  pendingTradeShipDueTick?: Tick;
+  // Port-specific: support multiple concurrent trade ship constructions
+  pendingTradeShipDueTicks?: Tick[];
 }
 
 export interface AttackUpdate {
@@ -162,8 +172,12 @@ export interface PlayerUpdate {
   playerType: PlayerType;
   isAlive: boolean;
   isDisconnected: boolean;
+  // Geographic capital (center) of player's territory
+  capital?: MapPos;
   tilesOwned: number;
   gold: Gold;
+  // Economic: GDP proxy = config.gdpFactor() * maxPopulation(player)
+  gdp: number;
   population: number;
   totalPopulation: number;
   hospitalReturns: number;
@@ -171,6 +185,8 @@ export interface PlayerUpdate {
   productivity: number;
   productivityGrowthPerMinute: number;
   investmentRate: number;
+  // Trade: current global demand queue length (for UI indicators)
+  tradeDemandQueueLength?: number;
   // Road KPIs (percent values 0..100)
   roadNetworkQuality?: number;
   roadNetworkCompletion?: number;
