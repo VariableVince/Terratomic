@@ -176,8 +176,8 @@ export interface PlayerUpdate {
   capital?: MapPos;
   tilesOwned: number;
   gold: Gold;
-  // Economic: GDP proxy = config.gdpFactor() * maxPopulation(player)
-  gdp: number;
+  // Economic: Industrial Production proxy (formerly GDP) = config.industrialProductionFactor() * maxPopulation(player)
+  industrialProduction: number;
   population: number;
   totalPopulation: number;
   hospitalReturns: number;
@@ -185,6 +185,9 @@ export interface PlayerUpdate {
   productivity: number;
   productivityGrowthPerMinute: number;
   investmentRate: number;
+  // Investment sliders (fractions 0..1)
+  roadInvestmentRate?: number;
+  researchInvestmentRate?: number;
   // Trade: current global demand queue length (for UI indicators)
   tradeDemandQueueLength?: number;
   // Road KPIs (percent values 0..100)

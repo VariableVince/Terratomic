@@ -178,7 +178,7 @@ export class PlayerImpl implements Player {
           : undefined,
       tilesOwned: this.numTilesOwned(),
       gold: this._gold,
-      gdp: this.gdp(),
+      industrialProduction: this.industrialProduction(),
       population: this.population(),
       totalPopulation: this.totalPopulation(),
       hospitalReturns: this.hospitalReturns(),
@@ -196,6 +196,8 @@ export class PlayerImpl implements Player {
       productivity: this.productivity(),
       productivityGrowthPerMinute: this.productivityGrowthPerMinute(),
       investmentRate: this.investmentRate(),
+      roadInvestmentRate: this.roadInvestmentRate(),
+      researchInvestmentRate: this.researchInvestmentRate(),
       allies: this.alliances().map((a) => a.other(this).smallID()),
       wars: Array.from(this._wars).map((pid) => this.mg.player(pid).smallID()),
       embargoes: new Set([...this.embargoes.keys()].map((p) => p.toString())),
@@ -274,9 +276,9 @@ export class PlayerImpl implements Player {
     return this.playerInfo.playerType;
   }
 
-  // Economic: GDP proxy as parameter * max population
-  gdp(): number {
-    const factor = this.mg.config().gdpFactor();
+  // Economic: Industrial Production proxy (formerly GDP) as parameter * max population
+  industrialProduction(): number {
+    const factor = this.mg.config().industrialProductionFactor();
     const maxPop = this.mg.config().maxPopulation(this);
     const g = factor * maxPop;
     // Ensure finite, non-negative number
