@@ -65,6 +65,9 @@ export class UnitLayer implements Layer {
   private readonly SUBMARINE_SELECTION_RADIUS = 10;
   private readonly FIGHTER_JET_SELECTION_RADIUS = 10;
 
+  // Indicates we're in the base-canvas draw pass (used to suppress double-draw)
+  private drawingBasePass = false;
+
   // Unit types that should be interpolated between ticks
   private readonly interpolatedUnitTypes: UnitType[] = [
     UnitType.SAMMissile,
@@ -90,6 +93,9 @@ export class UnitLayer implements Layer {
 
   // Cache sprite sizes per UnitType to avoid repeated lookups when clearing
   private spriteSizeCache = new Map<UnitType, number>();
+
+  private renderedGhosts = new Map<number, TileRef>();
+  private renderedUnits = new Map<number, UnitView>();
 
   constructor(
     private game: GameView,
@@ -126,6 +132,7 @@ export class UnitLayer implements Layer {
       ?.[GameUpdateType.Unit]?.map((unit) => unit.id);
 
     this.updateUnitsSprites(unitIds ?? []);
+    this.updateGhosts();
   }
 
   init() {
@@ -344,31 +351,22 @@ export class UnitLayer implements Layer {
     this.interpolationCanvas.width = this.game.width();
     this.interpolationCanvas.height = this.game.height();
 
-    this.updateUnitsSprites(this.game.units().map((unit) => unit.id()));
+    this.renderedUnits.clear();
+    const units = this.game.units();
+    units.forEach((u) => this.renderedUnits.set(u.id(), u));
+    this.updateUnitsSprites(units.map((unit) => unit.id()));
 
     // After redrawing units, render submarine ghosts (last known positions)
+    this.renderedGhosts.clear();
     const ghosts = (this.game as any).submarineGhosts?.call(this.game) ?? [];
     for (const ghost of ghosts as Array<{
       id: number;
       pos: number;
       expiresAt: number;
+      ownerID: number;
     }>) {
-      // Draw a faint submarine sprite at ghost.pos
-      const x = this.game.x(ghost.pos);
-      const y = this.game.y(ghost.pos);
-      // Simple faint marker: paint a small translucent cell using enemy color as default
-      this.context.save();
-      this.context.globalAlpha = 0.3;
-      const dummyUnit = {
-        tile: () => ghost.pos,
-        type: () => UnitType.Submarine,
-        owner: () => this.game.myPlayer() ?? (this.game.players()[0] as any),
-        targetable: () => true,
-        isActive: () => false,
-        lastTile: () => ghost.pos,
-      } as unknown as UnitView;
-      this.drawSprite(dummyUnit as UnitView);
-      this.context.restore();
+      this.drawGhost(ghost);
+      this.renderedGhosts.set(ghost.id, ghost.pos);
     }
 
     this.unitToTrail.forEach((trail, unit) => {
@@ -386,13 +384,30 @@ export class UnitLayer implements Layer {
   }
 
   private updateUnitsSprites(unitIds: number[]) {
-    const unitsToUpdate = unitIds
-      ?.map((id) => this.game.unit(id))
-      .filter((unit) => unit !== undefined) as UnitView[] | undefined;
+    const unitsToUpdate: UnitView[] = [];
+    const unitsToRemove: UnitView[] = [];
 
-    if (unitsToUpdate && unitsToUpdate.length > 0) {
+    if (unitIds) {
+      for (const id of unitIds) {
+        const unit = this.game.unit(id);
+        if (unit) {
+          unitsToUpdate.push(unit);
+          this.renderedUnits.set(id, unit);
+        } else {
+          const removed = this.renderedUnits.get(id);
+          if (removed) {
+            unitsToRemove.push(removed);
+            this.renderedUnits.delete(id);
+          }
+        }
+      }
+    }
+
+    const allUnitsToClear = [...unitsToUpdate, ...unitsToRemove];
+
+    if (allUnitsToClear.length > 0) {
       const oldAngleByUnit = new Map<UnitView, number | null>();
-      for (const u of unitsToUpdate) {
+      for (const u of allUnitsToClear) {
         oldAngleByUnit.set(u, this.unitToLastAngle.get(u) ?? null);
       }
 
@@ -405,8 +420,13 @@ export class UnitLayer implements Layer {
 
       // the clearing and drawing of unit sprites need to be done in 2 passes
       // otherwise the sprite of a unit can be drawn on top of another unit
-      this.clearUnitsCells(unitsToUpdate, oldAngleByUnit);
+      this.clearUnitsCells(allUnitsToClear, oldAngleByUnit);
       this.drawUnitsCells(unitsToUpdate, angleByUnit);
+
+      // Handle deactivation for removed units
+      for (const u of unitsToRemove) {
+        this.handleUnitDeactivation(u);
+      }
     }
   }
 
@@ -459,8 +479,13 @@ export class UnitLayer implements Layer {
     unitViews: UnitView[],
     angleByUnit: Map<UnitView, number | null>,
   ) {
-    // Pass-through for now; angleByUnit helps avoid recomputation in drawSprite via an overload
-    unitViews.forEach((unitView) => this.onUnitEvent(unitView, angleByUnit));
+    // Suppress base-canvas sprites for units that are also drawn via interpolation overlay
+    this.drawingBasePass = true;
+    try {
+      unitViews.forEach((unitView) => this.onUnitEvent(unitView, angleByUnit));
+    } finally {
+      this.drawingBasePass = false;
+    }
   }
 
   private interpolatePosition(unit: UnitView, alpha: number) {
@@ -503,28 +528,30 @@ export class UnitLayer implements Layer {
         unit.type() === UnitType.Submarine &&
         unit.owner() !== this.game.myPlayer()
       ) {
-        const isAttacking = unit.isAttacking();
-        const isDetected = unit.isDetectedByNavalUnit();
-        const isOnCooldown = unit.isCooldown();
-        const shouldShow = isAttacking || isDetected || isOnCooldown;
-        if (!shouldShow) {
-          continue;
-        }
+        // Server handles visibility filtering.
       }
 
       const position = this.interpolatePosition(unit, alpha);
 
-      if (!isSpriteReady(unit.type())) {
-        continue;
+      switch (unit.type()) {
+        case UnitType.Shell:
+          this.renderShell(unit, position);
+          continue;
+        case UnitType.MIRVWarhead:
+          this.renderWarhead(unit, position);
+          continue;
+        default:
+          if (!isSpriteReady(unit.type())) {
+            continue;
+          }
+          this.drawSpriteAtPosition(
+            unit,
+            position,
+            this.getInterpolatedSpriteColor(unit),
+            this.interpolationContext,
+            false,
+          );
       }
-
-      this.drawSpriteAtPosition(
-        unit,
-        position,
-        this.getInterpolatedSpriteColor(unit),
-        this.interpolationContext,
-        false,
-      );
     }
   }
 
@@ -538,6 +565,95 @@ export class UnitLayer implements Layer {
       }
     }
     return undefined;
+  }
+
+  private renderShell(unit: UnitView, position: { x: number; y: number }) {
+    const rel = this.relationship(unit);
+    const color = this.theme.borderColor(unit.owner());
+    this.drawInterpolatedSquare(position, rel, color, 1, 1);
+    this.drawInterpolatedSquare(position, rel, color, 2, 0.4);
+
+    const last = {
+      x: this.game.x(unit.lastTile()),
+      y: this.game.y(unit.lastTile()),
+    };
+    if (last.x !== position.x || last.y !== position.y) {
+      this.drawInterpolatedSegment(last, position, rel, color, 0.7);
+    }
+  }
+
+  private renderWarhead(unit: UnitView, position: { x: number; y: number }) {
+    const rel = this.relationship(unit);
+    const color = this.theme.borderColor(unit.owner());
+    this.drawInterpolatedSquare(position, rel, color, 1, 1);
+    this.drawInterpolatedSquare(position, rel, color, 2, 0.35);
+
+    const last = {
+      x: this.game.x(unit.lastTile()),
+      y: this.game.y(unit.lastTile()),
+    };
+    if (last.x !== position.x || last.y !== position.y) {
+      this.drawInterpolatedSegment(last, position, rel, color, 0.5);
+    }
+  }
+
+  private drawInterpolatedSquare(
+    position: { x: number; y: number },
+    relationship: Relationship,
+    color: Colord,
+    size: number,
+    alpha: number,
+  ) {
+    if (!this.interpolationContext) {
+      return;
+    }
+    const ctx = this.interpolationContext;
+    ctx.fillStyle = this.resolveInterpolatedColor(relationship, color, alpha);
+    ctx.fillRect(position.x - size / 2, position.y - size / 2, size, size);
+  }
+
+  private drawInterpolatedSegment(
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+    relationship: Relationship,
+    color: Colord,
+    alpha: number,
+  ) {
+    if (!this.interpolationContext) {
+      return;
+    }
+    const ctx = this.interpolationContext;
+    ctx.strokeStyle = this.resolveInterpolatedColor(relationship, color, alpha);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+  }
+
+  private resolveInterpolatedColor(
+    relationship: Relationship,
+    color: Colord,
+    alpha: number,
+  ): string {
+    if (this.alternateView) {
+      return this.getAlternateViewColor(relationship)
+        .alpha(alpha)
+        .toRgbString();
+    }
+    return color.alpha(alpha).toRgbString();
+  }
+
+  private getAlternateViewColor(relationship: Relationship): Colord {
+    switch (relationship) {
+      case Relationship.Self:
+        return this.theme.selfColor();
+      case Relationship.Ally:
+        return this.theme.allyColor();
+      case Relationship.Enemy:
+      default:
+        return this.theme.enemyColor();
+    }
   }
 
   private relationship(unit: UnitView): Relationship {
@@ -564,13 +680,9 @@ export class UnitLayer implements Layer {
       unit.type() === UnitType.Submarine &&
       unit.owner() !== this.game.myPlayer()
     ) {
-      const isAttacking = unit.isAttacking();
-      const isDetected = unit.isDetectedByNavalUnit();
-      const isOnCooldown = unit.isCooldown();
-      const shouldShow = isAttacking || isDetected || isOnCooldown;
-      if (!shouldShow) {
-        return; // Hidden submarine (no ghost rendering here; ghosts handled separately)
-      }
+      // Server handles visibility filtering (including linger time).
+      // If we receive an update for an enemy sub, it should be visible.
+      // We trust the server's judgment here to avoid client-side lag when linger is active.
     }
 
     // START: Custom rendering for owner's submarine visibility
@@ -897,6 +1009,15 @@ export class UnitLayer implements Layer {
       angleByUnit = angleByUnitOrSizeMultiplier;
     }
 
+    // If we're in the base pass and this unit type is interpolated, skip drawing the sprite
+    // to avoid double images (the interpolation overlay will render it smoothly).
+    if (
+      this.drawingBasePass &&
+      this.interpolatedUnitTypes.includes(unit.type())
+    ) {
+      return;
+    }
+
     const x = this.game.x(unit.tile());
     const y = this.game.y(unit.tile());
 
@@ -969,24 +1090,32 @@ export class UnitLayer implements Layer {
       );
 
       // Draw a tiny top-right corner badge offset 1px outside the sprite
-      const level = unit.level ? unit.level() : 1;
-      // Tier color mapping: 1→bronze, 2→silver, 3→gold, 4+→platinum
-      const tierColor =
-        level >= 4
-          ? "#E5E4E2" /* platinum */
-          : level === 3
-            ? "#FFD700" /* gold */
-            : level === 2
-              ? "#C0C0C0" /* silver */
-              : "#CD7F32"; /* bronze */
-      // Badge size: crisp 2–3 px depending on sprite size
-      const badgeSize = Math.max(2, Math.min(3, Math.round(newWidth * 0.18)));
-      // Offset 1px to the right and 1px above the sprite's top-right corner
-      const offset = 1;
-      const badgeLeft = Math.round(cx + newWidth / 2 + offset);
-      const badgeTop = Math.round(cy - newHeight / 2 - badgeSize - offset);
-      this.context.fillStyle = tierColor;
-      this.context.fillRect(badgeLeft, badgeTop, badgeSize, badgeSize);
+      // Only for Warships, FighterJets, and Submarines
+      const type = unit.type();
+      if (
+        type === UnitType.Warship ||
+        type === UnitType.FighterJet ||
+        type === UnitType.Submarine
+      ) {
+        const level = unit.level ? unit.level() : 1;
+        // Tier color mapping: 1→bronze, 2→silver, 3→gold, 4+→platinum
+        const tierColor =
+          level >= 4
+            ? "#E5E4E2" /* platinum */
+            : level === 3
+              ? "#FFD700" /* gold */
+              : level === 2
+                ? "#C0C0C0" /* silver */
+                : "#CD7F32"; /* bronze */
+        // Badge size: crisp 2–3 px depending on sprite size
+        const badgeSize = Math.max(2, Math.min(3, Math.round(newWidth * 0.18)));
+        // Offset 1px to the right and 1px above the sprite's top-right corner
+        const offset = 1;
+        const badgeLeft = Math.round(cx + newWidth / 2 + offset);
+        const badgeTop = Math.round(cy - newHeight / 2 - badgeSize - offset);
+        this.context.fillStyle = tierColor;
+        this.context.fillRect(badgeLeft, badgeTop, badgeSize, badgeSize);
+      }
 
       if (angle !== null) {
         this.context.restore();
@@ -1059,7 +1188,59 @@ export class UnitLayer implements Layer {
         ? Math.round(position.y - sprite.width / 2)
         : position.y - sprite.width / 2;
 
+      // Apply rotation on interpolation overlay for aircraft
+      const isAircraft =
+        unit.type() === UnitType.Bomber ||
+        unit.type() === UnitType.FighterJet ||
+        unit.type() === UnitType.CargoPlane;
+      let rotated = false;
+      if (isAircraft) {
+        const angle = this.getUnitAngle(unit);
+        if (angle !== null) {
+          const cx = offsetX + sprite.width / 2;
+          const cy = offsetY + sprite.width / 2;
+          context.save();
+          context.translate(cx, cy);
+          context.rotate(angle);
+          context.translate(-cx, -cy);
+          rotated = true;
+        }
+      }
+
       context.drawImage(sprite, offsetX, offsetY, sprite.width, sprite.width);
+
+      // Draw the same tiny badge on interpolation overlay for select unit types
+      const type = unit.type();
+      if (
+        type === UnitType.Warship ||
+        type === UnitType.FighterJet ||
+        type === UnitType.Submarine
+      ) {
+        const level = (unit as any).level ? (unit as any).level() : 1;
+        const tierColor =
+          level >= 4
+            ? "#E5E4E2" /* platinum */
+            : level === 3
+              ? "#FFD700" /* gold */
+              : level === 2
+                ? "#C0C0C0" /* silver */
+                : "#CD7F32"; /* bronze */
+        const badgeSize = Math.max(
+          2,
+          Math.min(3, Math.round(sprite.width * 0.18)),
+        );
+        const offset = 1;
+        const cx = offsetX + sprite.width / 2;
+        const cy = offsetY + sprite.width / 2;
+        const badgeLeft = Math.round(cx + sprite.width / 2 + offset);
+        const badgeTop = Math.round(cy - sprite.width / 2 - badgeSize - offset);
+        context.fillStyle = tierColor;
+        context.fillRect(badgeLeft, badgeTop, badgeSize, badgeSize);
+      }
+
+      if (rotated) {
+        context.restore();
+      }
 
       if (!targetable) {
         context.restore();
@@ -1181,5 +1362,89 @@ export class UnitLayer implements Layer {
       return performance.now();
     }
     return Date.now();
+  }
+
+  private updateGhosts() {
+    const ghosts = (this.game as any).submarineGhosts?.call(this.game) ?? [];
+    const currentGhostIds = new Set<number>();
+
+    for (const ghost of ghosts as Array<{
+      id: number;
+      pos: number;
+      expiresAt: number;
+      ownerID: number;
+    }>) {
+      currentGhostIds.add(ghost.id);
+      if (!this.renderedGhosts.has(ghost.id)) {
+        this.drawGhost(ghost);
+        this.renderedGhosts.set(ghost.id, ghost.pos);
+      }
+    }
+
+    for (const [id, pos] of this.renderedGhosts) {
+      if (!currentGhostIds.has(id)) {
+        this.clearGhost({ pos, ownerID: 0 }); // ownerID not needed for clearing
+        this.renderedGhosts.delete(id);
+        // If a unit is currently at this position, redraw it so it doesn't disappear
+        const unitAtPos = this.game.units().find((u) => u.tile() === pos);
+        if (unitAtPos) {
+          this.drawSprite(unitAtPos);
+        }
+      }
+    }
+  }
+
+  private clearGhost(ghost: { pos: number; ownerID: number }) {
+    // Create a dummy unit to get the sprite size
+    // We need a valid owner for getColoredSprite, but for size it doesn't matter much
+    // as long as it returns a sprite.
+    const dummyUnit = {
+      tile: () => ghost.pos,
+      type: () => UnitType.Submarine,
+      owner: () =>
+        this.game.playerBySmallID(ghost.ownerID) || this.game.players()[0],
+      targetable: () => true,
+      isActive: () => true,
+      lastTile: () => ghost.pos,
+    } as unknown as UnitView;
+
+    const spriteSize = this.getSpriteSize(dummyUnit);
+    const newWidth = spriteSize; // Ghosts are drawn at 1.0 scale
+    const newHeight = spriteSize;
+
+    // Badge overlay parameters: badge sits 1px outside top-right
+    // Ghosts default to level 1 (bronze) badge
+    const badgeSize = Math.max(2, Math.min(3, Math.round(newWidth * 0.18)));
+    const offset = 1;
+    const overlayTop = badgeSize + offset; // extend upwards to cover outside badge
+    const extraRight = badgeSize + offset; // full right-side extension beyond sprite
+
+    const padding = 2; // small safety margin around computed bounds
+    const maxHalfWidth = newWidth / 2 + extraRight;
+
+    const cx = Math.round(this.game.x(ghost.pos));
+    const cy = Math.round(this.game.y(ghost.pos));
+
+    const left = cx - maxHalfWidth - padding;
+    const top = cy - newHeight / 2 - overlayTop - padding;
+    const width = maxHalfWidth * 2 + padding * 2;
+    const height = newHeight + overlayTop + padding * 2;
+
+    this.context.clearRect(left, top, width, height);
+  }
+
+  private drawGhost(ghost: { id: number; pos: number; ownerID: number }) {
+    this.context.save();
+    this.context.globalAlpha = 0.3;
+    const dummyUnit = {
+      tile: () => ghost.pos,
+      type: () => UnitType.Submarine,
+      owner: () => this.game.playerBySmallID(ghost.ownerID),
+      targetable: () => true,
+      isActive: () => true,
+      lastTile: () => ghost.pos,
+    } as unknown as UnitView;
+    this.drawSprite(dummyUnit as UnitView);
+    this.context.restore();
   }
 }
