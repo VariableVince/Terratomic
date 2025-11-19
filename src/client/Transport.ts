@@ -502,7 +502,16 @@ export class Transport {
     }
     this.stopPing();
     if (this.socket === null) return;
-    if (this.socket.readyState === WebSocket.OPEN) {
+    // Clear handlers to prevent further actions
+    this.socket.onopen = () => {};
+    this.socket.onmessage = () => {};
+    this.socket.onerror = () => {};
+    this.socket.onclose = () => {};
+
+    if (
+      this.socket.readyState === WebSocket.OPEN ||
+      this.socket.readyState === WebSocket.CONNECTING
+    ) {
       console.log("on stop: leaving game");
       this.socket.close();
     } else {
@@ -510,9 +519,7 @@ export class Transport {
         "WebSocket is not open. Current state:",
         this.socket.readyState,
       );
-      console.error("attempting reconnect");
     }
-    this.socket.onclose = (event: CloseEvent) => {};
   }
 
   private onSendAllianceRequest(event: SendAllianceRequestIntentEvent) {
