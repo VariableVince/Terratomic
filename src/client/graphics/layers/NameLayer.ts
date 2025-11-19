@@ -232,7 +232,7 @@ export class NameLayer implements Layer {
       flagImg.style.aspectRatio = "3/4";
       nameDiv.appendChild(flagImg);
     }
-    nameDiv.classList.add("player-name");
+    nameDiv.classList.add("name-layer__player-name");
     nameDiv.style.color = this.theme.textColor(player);
     nameDiv.style.fontFamily = this.theme.font();
     nameDiv.style.whiteSpace = "nowrap";
@@ -324,7 +324,7 @@ export class NameLayer implements Layer {
 
     // Update text sizes
     const nameDiv = render.element.querySelector(
-      ".player-name",
+      ".name-layer__player-name",
     ) as HTMLDivElement;
     const flagDiv = render.element.querySelector(
       ".player-flag",
