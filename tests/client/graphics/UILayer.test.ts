@@ -19,6 +19,9 @@ describe("UILayer", () => {
             lighten: () => ({ alpha: () => ({ toRgbString: () => "#fff" }) }),
           }),
         }),
+        fighterJetLevelMaxHealth: () => 100,
+        warshipLevelMaxHealth: () => 100,
+        submarineLevelMaxHealth: () => 100,
       }),
       x: () => 10,
       y: () => 10,
@@ -74,7 +77,7 @@ describe("UILayer", () => {
     expect((ui as any)["allHealthBars"].has(1)).toBe(true);
 
     // a full hp unit doesnt have a health bar
-    unit.health = () => 10;
+    unit.health = () => 100;
     ui.drawHealthBar(unit);
     expect((ui as any)["allHealthBars"].has(1)).toBe(false);
 

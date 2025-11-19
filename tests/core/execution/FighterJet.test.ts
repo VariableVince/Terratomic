@@ -45,6 +45,8 @@ describe("FighterJet Naval Targeting", () => {
     attacker = game.player("attacker_id");
     defender = game.player("defender_id");
 
+    attacker.setWarWith(defender);
+
     // Attacker and Defender need an airfield to use fighters and bombers
     attacker.buildUnit(UnitType.Airfield, game.ref(1, 1), {});
     defender.buildUnit(UnitType.Airfield, game.ref(10, 1), {});
