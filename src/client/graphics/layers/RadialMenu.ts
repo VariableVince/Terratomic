@@ -1,5 +1,6 @@
 import * as d3 from "d3";
 import doveIcon from "../../../../proprietary/images/dove.png";
+import warIcon from "../../../../proprietary/images/waricon.png";
 import airAttackIcon from "../../../../resources/images/AirAttackIconWhite.svg";
 import allianceIcon from "../../../../resources/images/AllianceIconWhite.svg";
 import boatIcon from "../../../../resources/images/BoatIconWhite.svg";
@@ -28,6 +29,7 @@ import {
   SendAttackIntentEvent,
   SendBoatAttackIntentEvent,
   SendBreakAllianceIntentEvent,
+  SendDeclareWarIntentEvent,
   SendParatrooperAttackIntentEvent,
   SendPeaceRequestIntentEvent,
   SendSpawnIntentEvent,
@@ -229,28 +231,32 @@ export class RadialMenu implements Layer {
       .append("image")
       .attr("xlink:href", (d) => d.data.icon)
       .attr("width", (d) =>
-        d.data.name === "peace"
+        d.data.name === "peace" && !d.data.disabled
           ? this.iconSize * this.peaceIconScale
           : this.iconSize,
       )
       .attr("height", (d) =>
-        d.data.name === "peace"
+        d.data.name === "peace" && !d.data.disabled
           ? this.iconSize * this.peaceIconScale
           : this.iconSize,
       )
       .attr("x", (d) => {
         const w =
-          d.data.name === "peace"
+          d.data.name === "peace" && !d.data.disabled
             ? this.iconSize * this.peaceIconScale
             : this.iconSize;
-        return arc.centroid(d)[0] - w / 2;
+        // Offset both peace and war icons when enabled
+        const offset = d.data.name === "peace" && !d.data.disabled ? 2 : 0;
+        return arc.centroid(d)[0] - w / 2 + offset;
       })
       .attr("y", (d) => {
         const h =
-          d.data.name === "peace"
+          d.data.name === "peace" && !d.data.disabled
             ? this.iconSize * this.peaceIconScale
             : this.iconSize;
-        return arc.centroid(d)[1] - h / 2;
+        // Offset both peace and war icons when enabled
+        const offset = d.data.name === "peace" && !d.data.disabled ? 2 : 0;
+        return arc.centroid(d)[1] - h / 2 + offset;
       })
       .style("pointer-events", "none")
       .attr("data-name", (d) => d.data.name);
@@ -406,6 +412,17 @@ export class RadialMenu implements Layer {
       this.activateMenuElement(Slot.Peace, "#e5e7eb", doveIcon, () => {
         this.eventBus.emit(
           new SendPeaceRequestIntentEvent(
+            myPlayer,
+            this.g.owner(tile) as PlayerView,
+          ),
+        );
+      });
+    }
+    if (actions?.interaction?.canDeclareWar) {
+      // Use dark red for war declaration
+      this.activateMenuElement(Slot.Peace, "#8B0000", warIcon, () => {
+        this.eventBus.emit(
+          new SendDeclareWarIntentEvent(
             myPlayer,
             this.g.owner(tile) as PlayerView,
           ),
