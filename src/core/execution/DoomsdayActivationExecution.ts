@@ -97,7 +97,7 @@ export class DoomsdayActivationExecution implements Execution {
     }
   }
 
-  // Radial (Euclidean) expansion with per-tile 50% probability for fallout
+  // Radial (Euclidean) expansion with per-tile 70% probability for fallout
   private spreadFallout(): void {
     const startRadiusSq = this.currentRadiusSq;
     const maxRadiusSq = startRadiusSq + this.radialSpeed;
@@ -128,8 +128,8 @@ export class DoomsdayActivationExecution implements Execution {
         // Skip fallout on this tile entirely to avoid double punishment.
         continue;
       }
-      // 50% chance for fallout first – only pay ownership costs if applying
-      if (this.random.next() >= 0.5) continue;
+      // 70% chance for fallout first – only pay ownership costs if applying
+      if (this.random.next() >= 0.7) continue;
       if (this.mg.hasOwner(tile)) {
         const owner = this.mg.owner(tile);
         if (owner.isPlayer()) {

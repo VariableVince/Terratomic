@@ -292,12 +292,22 @@ export class NukeExecution implements Execution {
     const toDestroy = this.tilesToDestroy();
     this.maybeBreakAlliances(toDestroy);
 
-    // Check for doomsday device activation
+    // Check for doomsday device activation and collect devices that will be activated
     const playersHit = new Set<Player>();
+    const doomsdayDevicesToActivate = new Set<Unit>();
     for (const tile of toDestroy) {
       const owner = this.mg.owner(tile);
       if (owner.isPlayer()) {
         playersHit.add(owner);
+      }
+    }
+
+    // Collect doomsday devices that will be activated (before destroying anything)
+    for (const player of playersHit) {
+      const doomsdayDevices = player.units(UnitType.DoomsdayDevice);
+      if (doomsdayDevices.length > 0) {
+        // Mark the first device for activation
+        doomsdayDevicesToActivate.add(doomsdayDevices[0]);
       }
     }
 
@@ -353,6 +363,11 @@ export class NukeExecution implements Execution {
         unit.type() !== UnitType.MIRVWarhead &&
         unit.type() !== UnitType.MIRV
       ) {
+        // Don't delete doomsday devices that are about to be activated
+        // (they will delete themselves in DoomsdayActivationExecution.init())
+        if (doomsdayDevicesToActivate.has(unit)) {
+          continue;
+        }
         if (this.mg.euclideanDistSquared(this.dst, unit.tile()) < outer2) {
           unit.delete(true, this.player);
         }
