@@ -167,6 +167,7 @@ export enum UnitType {
   Bomber = "Bomber",
   Paratrooper = "Paratrooper",
   FighterJet = "Fighter Jet", // Represents a Fighter Jet unit.
+  DoomsdayDevice = "Doomsday Device",
 }
 
 export enum UpgradeType {
@@ -213,6 +214,7 @@ const _structureTypes: ReadonlySet<UnitType> = new Set([
   UnitType.ResearchLab,
   UnitType.Academy,
   UnitType.Factory,
+  UnitType.DoomsdayDevice,
 ]);
 
 export function isStructureType(type: UnitType): boolean {
@@ -304,6 +306,8 @@ export interface UnitParamsMap {
   [UnitType.FighterJet]: {
     patrolTile: TileRef;
   };
+
+  [UnitType.DoomsdayDevice]: Record<string, never>;
 }
 
 // Type helper to get params type for a specific unit type
@@ -848,6 +852,7 @@ export interface Game extends GameMap {
   // Optional as it's not initialized before the end of spawn phase
   stats(): Stats;
   bomberExplosion(tile: TileRef, radius: number, owner: Player): void;
+  doomsdayExplosion(tile: TileRef, radius: number, owner: Player): void;
   conquer(newOwner: Player, tile: TileRef): void;
 }
 
@@ -931,6 +936,7 @@ export enum MessageType {
   INSURANCE_REFUND,
   WARN,
   PEACE_TIMER_BLOCKED,
+  DOOMSDAY_DEVICE_ACTIVATED,
 }
 
 // Message categories used for filtering events in the EventsDisplay
@@ -978,6 +984,7 @@ export const MESSAGE_TYPE_CATEGORIES: Record<MessageType, MessageCategory> = {
   [MessageType.RECEIVED_TROOPS_FROM_PLAYER]: MessageCategory.TRADE,
   [MessageType.CHAT]: MessageCategory.CHAT,
   [MessageType.INSURANCE_REFUND]: MessageCategory.FINANCIAL,
+  [MessageType.DOOMSDAY_DEVICE_ACTIVATED]: MessageCategory.ATTACK,
 } as const;
 
 /**
