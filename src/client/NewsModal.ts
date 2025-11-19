@@ -175,7 +175,7 @@ export class NewsModal extends LitElement {
                   <li>
                     <strong>Updated Unit Names:</strong> Several units have been
                     renamed to better fit the new theme (e.g., "City" is now
-                    "Industrial Complex", "Warship" is now "Destroyer").
+                    "Industrial Complex", "Warship" is now "Cruiser").
                   </li>
                   <li>
                     <strong>Improved Visuals:</strong> The game now features new

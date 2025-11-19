@@ -1976,7 +1976,7 @@ export class ControlPanel2 extends LitElement implements Layer {
         style="border-color: var(--ui-panel-border)"
       >
         <div class="mb-1 text-gray-300">
-          Trade Ship #${idx + 1} (Port #${port.id()}) constructing…
+          Cargo Ship #${idx + 1} (Port #${port.id()}) constructing…
         </div>
         <div class="progress-track" style="height:6px;">
           <div class="progress-fill" style="width:${pct}%;"></div>
@@ -2005,7 +2005,7 @@ export class ControlPanel2 extends LitElement implements Layer {
       `;
     });
 
-    // Compute demand indicator (global: all trade ships, not just mine)
+    // Compute demand indicator (global: all cargo ships, not just mine)
     const allTradeShips = this.game
       .units(UnitType.TradeShip)
       .filter((u) => u.isActive());
@@ -2043,7 +2043,7 @@ export class ControlPanel2 extends LitElement implements Layer {
     return html`
       <div class="w-full">
         <div class="flex items-center justify-between mb-2">
-          <h3 class="military-heading">Trade Ships</h3>
+          <h3 class="military-heading">Cargo Ships</h3>
           <div
             class="text-sm"
             title="Demand is based on queued routes vs total ships and available ships"
@@ -2094,7 +2094,7 @@ export class ControlPanel2 extends LitElement implements Layer {
         ${ships.length > 0
           ? html`<div class="divide-y">${rows}</div>`
           : ships.length === 0 && pendingRows.length === 0
-            ? html`<div class="text-gray-400">No active trade ships.</div>`
+            ? html`<div class="text-gray-400">No active cargo ships.</div>`
             : ""}
 
         <!-- Embargo Management Buttons -->

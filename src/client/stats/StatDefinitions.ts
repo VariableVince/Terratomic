@@ -25,7 +25,7 @@ export const AVAILABLE_STATS = [
   "Research Lab",
   "Factory",
   "Port",
-  "Warship",
+  "Cruiser",
   "Missile Silo",
   "SAM Launcher",
   "Air Field",
@@ -152,14 +152,14 @@ export function computeStatValue(
       const count = p.unitsOwned(t);
       return { sortValue: count, displayPrimary: String(count) };
     }
-    case "Warship":
+    case "Cruiser":
     case "Missile Silo":
     case "SAM Launcher":
     case "Air Field":
     case "Fighter Jet":
     case "Defense Post": {
       const map: Record<string, UnitType> = {
-        Warship: UnitType.Warship,
+        Cruiser: UnitType.Warship,
         "Missile Silo": UnitType.MissileSilo,
         "SAM Launcher": UnitType.SAMLauncher,
         "Air Field": UnitType.Airfield,
