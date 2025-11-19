@@ -24,6 +24,10 @@ const unitOptions: { type: UnitType; translationKey: string }[] = [
   { type: UnitType.Academy, translationKey: "unit_type.academy" },
   { type: UnitType.ResearchLab, translationKey: "unit_type.research_lab" },
   { type: UnitType.Factory, translationKey: "unit_type.factory" },
+  {
+    type: UnitType.DoomsdayDevice,
+    translationKey: "unit_type.doomsday_device",
+  },
 ];
 
 export function renderUnitTypeOptions({
