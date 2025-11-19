@@ -152,28 +152,8 @@ export class UILayer implements Layer {
         this.drawHealthBar(unit);
         break;
       }
-      case UnitType.MissileSilo:
-        if (
-          unit.isActive() &&
-          unit.isCooldown() &&
-          !this.allProgressBars.has(unit.id())
-        ) {
-          const totalCooldown =
-            unit.cooldownDuration() ?? this.game.config().SiloCooldown();
-          this.drawLoadingBar(unit, totalCooldown);
-        }
-        break;
-      case UnitType.SAMLauncher:
-        if (
-          unit.isActive() &&
-          unit.isCooldown() &&
-          !this.allProgressBars.has(unit.id())
-        ) {
-          const totalCooldown =
-            unit.cooldownDuration() ?? this.game.config().SAMNukeCooldown();
-          this.drawLoadingBar(unit, totalCooldown);
-        }
-        break;
+      // Note: Structure health bars and loading bars (MissileSilo, SAMLauncher, etc.)
+      // are now handled in StructureLayer for proper zoom/pan alignment
       default:
         return;
     }
@@ -298,26 +278,9 @@ export class UILayer implements Layer {
    * Draw health bar for a unit
    */
   public drawHealthBar(unit: UnitView) {
-    // Use effective max health for cities (may be upgraded) otherwise static info
-    let maxHealth = this.game.unitInfo(unit.type()).maxHealth;
-    if (unit.type() === UnitType.City) {
-      const lvl = unit.level();
-      // Base maxHealth from unitInfo applies to level 1; each upgrade adds +1000
-      if (typeof maxHealth === "number") {
-        maxHealth = maxHealth + (lvl - 1) * 1000;
-      }
-    } else if (unit.type() === UnitType.FighterJet) {
-      // Fighter Jet: per-level max health from config
-      const lvl = unit.level ? unit.level() : 1;
-      maxHealth = this.game.config().fighterJetLevelMaxHealth(lvl);
-    } else if (unit.type() === UnitType.Warship) {
-      const lvl = unit.level ? unit.level() : 1;
-      maxHealth = this.game.config().warshipLevelMaxHealth(lvl);
-    } else if (unit.type() === UnitType.Submarine) {
-      const lvl = unit.level ? unit.level() : 1;
-      maxHealth = this.game.config().submarineLevelMaxHealth(lvl);
-    }
-    if (maxHealth === undefined || this.context === null) {
+    // Use centralized effective max health calculation
+    const maxHealth = unit.effectiveMaxHealth();
+    if (maxHealth === 0 || this.context === null) {
       return;
     }
     if (
