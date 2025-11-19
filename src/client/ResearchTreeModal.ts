@@ -1288,11 +1288,7 @@ export class ResearchTreeModal extends LitElement {
             top: 50%;
             left: calc(100% + 12px);
             transform: translateY(-50%);
-            background: color-mix(
-              in srgb,
-              var(--ui-panel-shell-top) 75%,
-              transparent
-            );
+            background: rgba(11, 18, 32, 1);
             color: var(--ui-text-light);
             border: 1px solid
               color-mix(in srgb, var(--ui-border-muted) 70%, transparent);
@@ -1321,9 +1317,8 @@ export class ResearchTreeModal extends LitElement {
             transform: translateY(-50%);
             border-width: 6px;
             border-style: solid;
-            border-color: transparent
-              color-mix(in srgb, var(--ui-panel-shell-top) 75%, transparent)
-              transparent transparent;
+            border-color: transparent rgba(11, 18, 32, 1) transparent
+              transparent;
             filter: drop-shadow(
               -1px 0 0
                 color-mix(in srgb, var(--ui-border-muted) 90%, transparent)
