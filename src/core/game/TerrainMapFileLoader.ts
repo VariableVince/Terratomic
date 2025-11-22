@@ -49,6 +49,8 @@ const MAP_FILE_NAMES: Record<GameMapType, string> = {
   [GameMapType.Halkidiki]: "Halkidiki",
   [GameMapType.StraitOfGibraltar]: "StraitOfGibraltar",
   [GameMapType.Italia]: "Italia",
+  [GameMapType.Nukewars1024]: "Nukewars1024",
+  [GameMapType.NukeWars2]: "NukeWars2",
 };
 
 class GameMapLoader {
