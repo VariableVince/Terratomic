@@ -325,7 +325,6 @@ export class ClientGameRunner {
     requestAnimationFrame(keepWorkerAlive);
 
     const onconnect = () => {
-      console.log("Connected to game server!");
       this.transport.joinGame(this.turnsSeen);
     };
     const onmessage = (message: ServerMessage) => {
@@ -637,7 +636,7 @@ export class ClientGameRunner {
     }
     const now = Date.now();
     const timeSinceLastMessage = now - this.lastMessageTime;
-    if (timeSinceLastMessage > 5000) {
+    if (timeSinceLastMessage > 15000) {
       console.log(
         `No message from server for ${timeSinceLastMessage} ms, reconnecting`,
       );
