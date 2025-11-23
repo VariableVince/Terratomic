@@ -32,6 +32,7 @@ export class AttackExecution implements Execution {
 
   private attack: Attack | null = null;
   private isDeepStrike: boolean = false;
+  private tilesToProcessAccumulator: number = 0;
 
   constructor(
     private startTroops: number | null = null,
@@ -266,7 +267,7 @@ export class AttackExecution implements Execution {
     // PlayerImpl.setNeutralWith, which orders retreats on hostile actions.
 
     // Calculate tiles to process - divided by ATTACK_SUBTICKS_PER_TICK since this is called multiple times per game tick
-    let numTilesPerTick = Math.ceil(
+    this.tilesToProcessAccumulator +=
       this.mg
         .config()
         .attackTilesPerTick(
@@ -274,8 +275,10 @@ export class AttackExecution implements Execution {
           this._owner,
           this.target,
           this.attack.borderSize() + this.random.nextInt(0, 5),
-        ) / ATTACK_SUBTICKS_PER_TICK,
-    );
+        ) / ATTACK_SUBTICKS_PER_TICK;
+
+    let numTilesPerTick = Math.floor(this.tilesToProcessAccumulator + 1e-9);
+    this.tilesToProcessAccumulator -= numTilesPerTick;
 
     while (numTilesPerTick > 0) {
       if (troopCount < 1) {
