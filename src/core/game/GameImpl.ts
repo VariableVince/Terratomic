@@ -7,6 +7,7 @@ import { CargoManager } from "./CargoManager";
 import {
   Alliance,
   AllianceRequest,
+  ATTACK_SUBTICKS_PER_TICK,
   Cell,
   ColoredTeams,
   Duos,
@@ -406,13 +407,37 @@ export class GameImpl implements Game {
 
   executeNextTick(): GameUpdates {
     this.updates = this.createGameUpdatesMap();
+
+    // Process attack executions multiple times per tick for smoother territory changes
+    const attackExecs: Execution[] = [];
+    const otherExecs: Execution[] = [];
+
     this.execs.forEach((e) => {
       if (
         (!this.inSpawnPhase() || e.activeDuringSpawnPhase()) &&
         e.isActive()
       ) {
-        e.tick(this._ticks);
+        // Separate attack executions from others
+        if (e.constructor.name === "AttackExecution") {
+          attackExecs.push(e);
+        } else {
+          otherExecs.push(e);
+        }
       }
+    });
+
+    // Process attack executions multiple times per tick
+    for (let subtick = 0; subtick < ATTACK_SUBTICKS_PER_TICK; subtick++) {
+      attackExecs.forEach((e) => {
+        if (e.isActive()) {
+          e.tick(this._ticks);
+        }
+      });
+    }
+
+    // Process other executions once per tick
+    otherExecs.forEach((e) => {
+      e.tick(this._ticks);
     });
     const inited: Execution[] = [];
     const unInited: Execution[] = [];
