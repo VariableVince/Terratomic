@@ -290,19 +290,8 @@ describe("Bomber", () => {
 
   test("Bomber retargets when peace is declared", () => {
     const airfield = player1.buildUnit(UnitType.Airfield, game.ref(10, 10), {});
-    const city1 = player2.buildUnit(UnitType.City, game.ref(15, 15), {});
-
-    // Add third player for alternative target
-    const player3Info = new PlayerInfo(
-      "ru",
-      "third player",
-      PlayerType.Human,
-      null,
-      "p3",
-    );
-    const player3 = game.addPlayer(player3Info);
-    player1.setWarWith(player3);
-    const city2 = player3.buildUnit(UnitType.City, game.ref(14, 14), {});
+    // Use a farther target so bomber doesn't complete mission instantly
+    const city1 = player2.buildUnit(UnitType.City, game.ref(10, 30), {});
 
     player1.setBomberIntent({
       targetPlayerID: player2.id(),
@@ -314,19 +303,27 @@ describe("Bomber", () => {
     game.addExecution(bomberExec);
 
     game.executeNextTick();
-    executeTicks(game, 110);
 
     const bombers = player1.units(UnitType.Bomber);
+
+    // Bomber launches immediately and starts moving
+    executeTicks(game, 3);
+
+    // Verify bomber has launched and has target
     expect(bombers[0].targetTile?.()).toBe(city1.tile());
 
-    // Make peace with player2 by destroying the war (target becomes invalid)
-    // Since we can't directly set peace, just destroy the target
-    city1.delete(false);
+    // Bomber should be away from airfield now
+    expect(bombers[0].tile()).not.toBe(airfield.tile());
 
+    // Make peace with player2 - target becomes invalid due to peace
+    player1.setNeutralWith(player2);
+    player2.setNeutralWith(player1);
+
+    // Execute next tick to trigger retarget/abort logic
     game.executeNextTick();
 
-    // Target should now be invalid and bomber should retarget or return
-    expect(bombers[0].targetTile?.()).not.toBe(city1.tile());
+    // Since we're no longer at war with player2, bomber should be returning
+    expect(bombers[0].returning()).toBe(true);
   });
 
   test("Bomber load balancing formula (h/250+2 > n)", () => {
