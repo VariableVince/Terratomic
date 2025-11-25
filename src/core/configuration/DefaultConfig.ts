@@ -292,7 +292,7 @@ export class DefaultConfig implements Config {
     return 1;
   }
   samPlaneHittingChance(): number {
-    return 0.8;
+    return 1;
   }
   samWarheadHittingChance(): number {
     return 0.5;
@@ -441,20 +441,67 @@ export class DefaultConfig implements Config {
   bomberSpawnInterval(): number {
     return 20;
   }
+  bomberLaunchGapTicks(): number {
+    return 20; // Minimum ticks between bomber takeoffs from same airfield
+  }
+  bomberTakeoffHealthThreshold(): number {
+    return 0.5; // Bomber must reach 50% health before taking off
+  }
   bomberPayload(): number {
     return 1;
   }
   bomberDropCadence(): number {
     return 1;
   }
-  bomberTargetRange(): number {
-    return 250;
+  bomberTargetRange(level: number = 1): number {
+    switch (level) {
+      case 1:
+        return 250;
+      case 2:
+        return 350;
+      case 3:
+      default:
+        return 450;
+    }
   }
   bomberExplosionRadius(): number {
     return 4;
   }
-  bomberSpeed(): number {
-    return 2;
+  bomberSpeed(level: number = 1): number {
+    switch (level) {
+      case 1:
+        return 2;
+      case 2:
+        return 3;
+      case 3:
+      default:
+        return 4;
+    }
+  }
+  bomberMaxHealth(level: number = 1): number {
+    switch (level) {
+      case 1:
+        return 500;
+      case 2:
+        return 600;
+      case 3:
+      default:
+        return 700;
+    }
+  }
+  bomberDamage(level: number = 1): number {
+    switch (level) {
+      case 1:
+        return 250;
+      case 2:
+        return 300;
+      case 3:
+      default:
+        return 350;
+    }
+  }
+  bomberCooldownTicks(): number {
+    return 100; // Ticks before bomber can take off again after landing/respawn
   }
 
   // Fighter Jets
@@ -813,12 +860,7 @@ export class DefaultConfig implements Config {
           cost: (p: Player) =>
             p.type() === PlayerType.Human && this.infiniteGold()
               ? 0n
-              : BigInt(
-                  Math.min(
-                    2_000_000,
-                    Math.pow(2, p.unitsOwned(UnitType.Airfield)) * 400_000,
-                  ),
-                ),
+              : 1_000_000n,
           territoryBound: true,
           constructionDuration: this.instantBuild() ? 0 : 10 * 10,
           maxHealth: 1000,
@@ -832,7 +874,7 @@ export class DefaultConfig implements Config {
         return {
           cost: () => 0n,
           territoryBound: false,
-          maxHealth: 500,
+          maxHealth: this.bomberMaxHealth(), // Level 1 default; actual health set at spawn
         };
       case UnitType.FighterJet:
         return {
@@ -1471,6 +1513,7 @@ export class DefaultConfig implements Config {
       case UnitType.Academy:
       case UnitType.ResearchLab:
       case UnitType.Factory:
+      case UnitType.Airfield:
         return 0.8; // Default 80%
       case UnitType.MissileSilo:
         return 0.2; // Missile silo: 20%

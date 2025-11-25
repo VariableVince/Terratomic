@@ -129,8 +129,11 @@ export class PlayerImpl implements Player {
   private _hasSpawned = false;
   private _isDisconnected = false;
 
-  private bomberIntent: { targetPlayerID: string; structure: UnitType } | null =
-    null;
+  private bomberIntent: {
+    targetPlayerID: string;
+    structures: UnitType[];
+    preferClosest: boolean;
+  } | null = null;
   private _autoBombingEnabled: boolean = false;
   public bombersOnTarget = new Map<TileRef, number>();
 
@@ -340,7 +343,9 @@ export class PlayerImpl implements Player {
           type === UnitType.City ||
           type === UnitType.Port ||
           type === UnitType.Hospital ||
-          type === UnitType.Academy
+          type === UnitType.Academy ||
+          type === UnitType.ResearchLab ||
+          type === UnitType.Factory
         ) {
           // Upgraded cities, ports, hospitals, and academies count toward totals
           // (affects scaling like new build cost and display counts)
@@ -1240,9 +1245,8 @@ export class PlayerImpl implements Player {
       this.mg.config().forceCanBuildBomberInTests?.() &&
       unitType === UnitType.Bomber
     ) {
-      // Assuming game.ref(1,1) is a valid airfield tile for the attacker in tests
-      // This bypasses the normal canBuild checks for bombers in tests
-      return this.mg.ref(1, 1);
+      // Return the target tile (airfield location) for bomber spawn in tests
+      return targetTile;
     }
 
     if (this.mg.config().isUnitDisabled(unitType)) {
@@ -1661,13 +1665,18 @@ export class PlayerImpl implements Player {
     return airfields;
   }
   public setBomberIntent(
-    intent: { targetPlayerID: string; structure: UnitType } | null,
+    intent: {
+      targetPlayerID: string;
+      structures: UnitType[];
+      preferClosest: boolean;
+    } | null,
   ): void {
     this.bomberIntent = intent;
   }
   public getBomberIntent(): {
     targetPlayerID: string;
-    structure: UnitType;
+    structures: UnitType[];
+    preferClosest: boolean;
   } | null {
     return this.bomberIntent;
   }

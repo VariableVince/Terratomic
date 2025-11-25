@@ -20,7 +20,10 @@ import shieldIcon from "../../../../resources/images/ShieldIconWhite.svg";
 import submarineIcon from "../../../../resources/images/submarine.svg";
 import { translateText } from "../../../client/Utils";
 import { EventBus } from "../../../core/EventBus";
-import { aggregateStructureBuildCost } from "../../../core/game/Costs";
+import {
+  aggregateStructureBuildCost,
+  computeBomberUpgradeCost,
+} from "../../../core/game/Costs";
 import { Gold, UnitType, UpgradeType } from "../../../core/game/Game";
 import { GameView } from "../../../core/game/GameView";
 import {
@@ -29,6 +32,7 @@ import {
   maxStructureLevel,
   maxUnitLevel,
 } from "../../../core/game/Upgradeables";
+import { ToggleBomberUpgradeModeEvent } from "../../events/ToggleBomberUpgradeModeEvent";
 import { ToggleUpgradeModeEvent } from "../../events/ToggleUpgradeModeEvent";
 import { CloseViewEvent } from "../../InputHandler";
 import { displayKey, renderNumber } from "../../Utils";
@@ -538,17 +542,27 @@ export class BuildMenu extends LitElement {
     // Structures: use configured structure multiplier
     if (isUpgradeableStructure(item.unitType)) {
       const desired = this._desiredStructureLevel(item.unitType);
-      if (desired <= 1) return base;
-      const multiplier = this.game
-        .config()
-        .structureUpgradeCostMultiplier(item.unitType);
-      return aggregateStructureBuildCost(
-        this.game.config(),
-        this.game.myPlayer()!,
-        item.unitType,
-        desired,
-        multiplier,
-      );
+      let structureCost =
+        desired <= 1
+          ? base
+          : aggregateStructureBuildCost(
+              this.game.config(),
+              this.game.myPlayer()!,
+              item.unitType,
+              desired,
+              this.game.config().structureUpgradeCostMultiplier(item.unitType),
+            );
+      // Add bomber upgrade cost for airfields
+      if (item.unitType === UnitType.Airfield) {
+        const bomberLevel = this._desiredUnitLevel(UnitType.Bomber);
+        structureCost += computeBomberUpgradeCost(
+          this.game.config(),
+          this.game.myPlayer()!,
+          bomberLevel,
+          desired,
+        );
+      }
+      return structureCost;
     }
     // Units: apply configured per-step multiplier for upgradeable combat units
     if (isUpgradeableUnit(item.unitType)) {
@@ -609,6 +623,11 @@ export class BuildMenu extends LitElement {
     if (this.uiState?.upgradeMode) {
       this.uiState.upgradeMode = false;
       this.eventBus?.emit(new ToggleUpgradeModeEvent(false));
+    }
+    // Disable bomber upgrade mode on build action
+    if (this.uiState?.bomberUpgradeMode) {
+      this.uiState.bomberUpgradeMode = false;
+      this.eventBus?.emit(new ToggleBomberUpgradeModeEvent(false));
     }
     if (this.uiState.pendingBuildUnitType === item.unitType) {
       this.uiState.pendingBuildUnitType = null;

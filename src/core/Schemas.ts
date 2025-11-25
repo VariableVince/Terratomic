@@ -61,7 +61,8 @@ export type Intent =
   | MarkDisconnectedIntent
   | SetAutoBombingIntent
   | KickPlayerIntent
-  | UpgradeStructureIntent;
+  | UpgradeStructureIntent
+  | UpgradeBomberIntent;
 
 export type AttackIntent = z.infer<typeof AttackIntentSchema>;
 export type CancelAttackIntent = z.infer<typeof CancelAttackIntentSchema>;
@@ -114,6 +115,7 @@ export type KickPlayerIntent = z.infer<typeof KickPlayerIntentSchema>;
 export type UpgradeStructureIntent = z.infer<
   typeof UpgradeStructureIntentSchema
 >;
+export type UpgradeBomberIntent = z.infer<typeof UpgradeBomberIntentSchema>;
 
 export type Turn = z.infer<typeof TurnSchema>;
 export enum PeaceTimerDuration {
@@ -416,7 +418,10 @@ export const BuildUnitIntentSchema = BaseIntentSchema.extend({
   tile: z.number(),
   // Optional desired starting level for upgradeable structures.
   // Server will clamp based on type and game rules.
-  targetLevel: z.number().int().min(1).max(10).optional(),
+  targetLevel: z.number().int().min(1).max(99).optional(),
+  // Optional desired bomber upgrade level for airfields.
+  // Server will clamp based on maxUnitLevel(UnitType.Bomber).
+  bomberLevel: z.number().int().min(1).max(99).optional(),
 });
 
 export const PurchaseUpgradeIntentSchema = BaseIntentSchema.extend({
@@ -428,6 +433,11 @@ export const UpgradeStructureIntentSchema = BaseIntentSchema.extend({
   type: z.literal("upgrade_structure"),
   unitId: z.number(),
   unitType: z.enum(UnitType),
+});
+
+export const UpgradeBomberIntentSchema = BaseIntentSchema.extend({
+  type: z.literal("upgrade_bomber"),
+  airfieldId: z.number(),
 });
 
 export const ResearchTreeSelectIntentSchema = BaseIntentSchema.extend({
@@ -466,7 +476,8 @@ export const MoveFighterJetIntentSchema = BaseIntentSchema.extend({
 export const BomberIntentSchema = BaseIntentSchema.extend({
   type: z.literal("bomber_intent"),
   targetID: ID.nullable(), // who to attack
-  structure: z.enum(UnitType).nullable(), // what to bomb
+  structures: z.array(z.enum(UnitType)).nullable(), // what to bomb
+  preferClosest: z.boolean(), // target closest or furthest
 });
 
 export const ParatrooperAttackIntentSchema = BaseIntentSchema.extend({
@@ -526,6 +537,7 @@ const IntentSchema = z.discriminatedUnion("type", [
   BuildUnitIntentSchema,
   PurchaseUpgradeIntentSchema,
   UpgradeStructureIntentSchema,
+  UpgradeBomberIntentSchema,
   ResearchTreeSelectIntentSchema,
   EmbargoIntentSchema,
   MoveWarshipIntentSchema,

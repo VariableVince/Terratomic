@@ -303,6 +303,7 @@ export interface UnitParamsMap {
 
   [UnitType.Bomber]: {
     targetTile: TileRef;
+    sourceAirfield?: Unit;
   };
 
   [UnitType.Paratrooper]: {
@@ -509,11 +510,25 @@ export interface Unit {
   retreating(): boolean;
   orderBoatRetreat(): void;
   health(): number;
+  setHealth(health: bigint): void;
   modifyHealth(delta: number, attacker?: Player): void;
 
   // Troops
   setTroops(troops: number): void;
   troops(): number;
+
+  // Bomber-specific
+  sourceAirfield(): Unit | undefined;
+  setSourceAirfield(airfield: Unit | undefined): void;
+  /** Returns true if this bomber is at its source airfield (not targetable by SAMs/fighters) */
+  isAtSourceAirfield(): boolean;
+
+  // Airfield-specific
+  lastBomberTakeoffTick(): number;
+  setLastBomberTakeoffTick(tick: number): void;
+  bomberLevel(): number;
+  setBomberLevel(level: number): void;
+
   // --- UNIT SPECIFIC ---
 
   // SAMs & Missile Silos
@@ -753,9 +768,17 @@ export interface Player {
   tradingPorts(port: Unit): Unit[];
   airfields(airfield: Unit): Unit[];
   setBomberIntent(
-    intent: { targetPlayerID: string; structure: UnitType } | null,
+    intent: {
+      targetPlayerID: string;
+      structures: UnitType[];
+      preferClosest: boolean;
+    } | null,
   ): void;
-  getBomberIntent(): { targetPlayerID: string; structure: UnitType } | null;
+  getBomberIntent(): {
+    targetPlayerID: string;
+    structures: UnitType[];
+    preferClosest: boolean;
+  } | null;
   bombersOnTarget: Map<TileRef, number>;
 
   setAutoBombingEnabled(enabled: boolean): void;
@@ -859,7 +882,12 @@ export interface Game extends GameMap {
   numTilesWithFallout(): number;
   // Optional as it's not initialized before the end of spawn phase
   stats(): Stats;
-  bomberExplosion(tile: TileRef, radius: number, owner: Player): void;
+  bomberExplosion(
+    tile: TileRef,
+    radius: number,
+    damage: number,
+    owner: Player,
+  ): void;
   doomsdayExplosion(tile: TileRef, radius: number, owner: Player): void;
   conquer(newOwner: Player, tile: TileRef): void;
 }

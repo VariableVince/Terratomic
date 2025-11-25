@@ -58,6 +58,10 @@ export class SendUpgradeStructureIntentEvent implements GameEvent {
   ) {}
 }
 
+export class SendUpgradeBomberIntentEvent implements GameEvent {
+  constructor(public readonly airfieldId: number) {}
+}
+
 export class SendAllianceReplyIntentEvent implements GameEvent {
   constructor(
     // The original alliance requestor
@@ -234,7 +238,8 @@ export class MoveFighterJetIntentEvent implements GameEvent {
 export class SendBomberIntentEvent implements GameEvent {
   constructor(
     public readonly targetID: PlayerID | null, // who to attack
-    public readonly structure: UnitType | null, // what to bomb
+    public readonly structures: UnitType[] | null, // what to bomb
+    public readonly preferClosest: boolean, // target closest or furthest
   ) {}
 }
 
@@ -331,6 +336,9 @@ export class Transport {
     );
     this.eventBus.on(SendUpgradeStructureIntentEvent, (e) =>
       this.onSendUpgradeStructureIntent(e),
+    );
+    this.eventBus.on(SendUpgradeBomberIntentEvent, (e) =>
+      this.onSendUpgradeBomberIntent(e),
     );
     this.eventBus.on(SendParatrooperAttackIntentEvent, (e) =>
       this.onSendParatrooperAttackIntent(e),
@@ -734,6 +742,7 @@ export class Transport {
     // Compute desired starting level for upgradeable structures from local settings.
     // Compute desired starting level for upgradeable structures or units from local settings.
     let targetLevel: number | undefined;
+    let bomberLevel: number | undefined;
     try {
       const key = String(event.unit);
       if (isUpgradeableUnit(event.unit)) {
@@ -755,9 +764,21 @@ export class Transport {
           }
         }
       }
+      // For airfields, also get bomber upgrade level from unit upgrade settings
+      if (event.unit === UnitType.Airfield) {
+        const rawUnits = localStorage.getItem("unitUpgradeSettings.levels");
+        if (rawUnits) {
+          const obj = JSON.parse(rawUnits) as Record<string, number>;
+          const val = obj?.[String(UnitType.Bomber)];
+          if (typeof val === "number" && val > 1) {
+            bomberLevel = Math.min(maxUnitLevel(UnitType.Bomber), val);
+          }
+        }
+      }
     } catch {
       // Ignore malformed local storage.
       targetLevel = undefined;
+      bomberLevel = undefined;
     }
 
     this.sendIntent({
@@ -766,6 +787,7 @@ export class Transport {
       unit: event.unit,
       tile: event.tile,
       targetLevel,
+      bomberLevel,
     });
   }
 
@@ -784,6 +806,14 @@ export class Transport {
       clientID: this.lobbyConfig.clientID,
       unitId: event.unitId,
       unitType: event.unitType,
+    });
+  }
+
+  private onSendUpgradeBomberIntent(event: SendUpgradeBomberIntentEvent) {
+    this.sendIntent({
+      type: "upgrade_bomber",
+      clientID: this.lobbyConfig.clientID,
+      airfieldId: event.airfieldId,
     });
   }
 
@@ -896,7 +926,8 @@ export class Transport {
       type: "bomber_intent",
       clientID: this.lobbyConfig.clientID,
       targetID: event.targetID ?? null,
-      structure: event.structure ?? null,
+      structures: event.structures ?? null,
+      preferClosest: event.preferClosest,
     });
   }
 
