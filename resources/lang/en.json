@@ -11,6 +11,7 @@
   "main": {
     "title": "Terratomic (ALPHA)",
     "join_discord": "Join the Discord!",
+    "join_discord_tooltip": "Join our Discord community",
     "login_discord": "Login with Discord",
     "checking_login": "Checking login...",
     "logged_in": "Logged in!",
@@ -26,7 +27,8 @@
     "terms_of_service": "Terms of Service"
   },
   "news": {
-    "title": "Version 23 released!"
+    "title": "News and Updates",
+    "tooltip": "View latest news and updates"
   },
   "help_modal": {
     "hotkeys": "Hotkeys",
@@ -123,13 +125,20 @@
     "allow_alliances": "Allow alliances",
     "options_title": "Options",
     "bots": "Bots: ",
+    "bots_tooltip": "Number of bots in the game",
     "bots_disabled": "Disabled",
     "disable_nations": "Disable Nations",
+    "disable_nations_tooltip": "Disables smart AI nations, leaving only basic bots",
     "instant_build": "Instant Build",
+    "instant_build_tooltip": "Buildings and units are constructed instantly",
     "instant_research": "Instant Research",
+    "instant_research_tooltip": "Click on research for instant completion",
     "research_all_techs": "Research All Techs",
+    "research_all_techs_tooltip": "Unlock all technologies at the start of the game",
     "infinite_gold": "Infinite Gold",
+    "infinite_gold_tooltip": "Never run out of gold",
     "infinite_troops": "Infinite Troops",
+    "infinite_troops_tooltip": "Unlimited troop capacity",
     "disable_nukes": "Disable Nukes",
     "enables_title": "Enable Settings",
     "start": "Start Game"
@@ -173,11 +182,13 @@
   },
   "starting_gold": {
     "label": "Starting Gold",
+    "tooltip": "Amount of gold each player starts with",
     "default": "0 (default)",
     "millions": "{amount}M"
   },
   "gold_multiplier": {
-    "label": "Gold Multiplier"
+    "label": "Gold Multiplier",
+    "tooltip": "Multiplies gold generation rate for all players"
   },
   "private_lobby": {
     "title": "Join Private Lobby",
@@ -192,6 +203,7 @@
   },
   "public_lobby": {
     "join": "Join next Game",
+    "join_tooltip": "Click to join the upcoming match",
     "waiting": "players waiting",
     "teams_Duos": "Duos (teams of 2)",
     "teams_Trios": "Trios (teams of 3)",
@@ -211,14 +223,22 @@
     "team_count": "Number of Teams",
     "options_title": "Options",
     "bots": "Bots: ",
+    "bots_tooltip": "Number of bots in the game",
     "bots_disabled": "Disabled",
     "disable_nations": "Disable Nations",
+    "disable_nations_tooltip": "Disables smart AI nations, leaving only basic bots",
     "instant_build": "Instant Build",
+    "instant_build_tooltip": "Buildings and units are constructed instantly",
     "instant_research": "Instant Research",
+    "instant_research_tooltip": "Click on research for instant completion",
     "research_all_techs": "Research All Techs",
+    "research_all_techs_tooltip": "Unlock all technologies at the start of the game",
     "infinite_gold": "Infinite Gold",
+    "infinite_gold_tooltip": "Never run out of gold",
     "infinite_troops": "Infinite Troops",
+    "infinite_troops_tooltip": "Unlimited troop capacity",
     "peace_timer": "Protected Start",
+    "peace_timer_tooltip": "Players cannot attack each other for this duration at game start",
     "peace_timer_none": "None",
     "peace_timer_minutes": "{minutes} minutes",
     "enables_title": "Enable Settings",
@@ -257,7 +277,31 @@
     "teams": "Teams"
   },
   "select_lang": {
-    "title": "Select Language"
+    "title": "Select Language",
+    "tooltip": "Select your language",
+    "settings": "Settings"
+  },
+  "build_menu": {
+    "desc": {
+      "atom_bomb": "Small explosive bomb that destroys territory, buildings, ships and boats. Spawns from the nearest Missile Silo.",
+      "hydrogen_bomb": "Large explosive bomb. Spawns from the nearest Missile Silo.",
+      "mirv": "The most powerful bomb in the game. Splits up into smaller bombs that will cover a huge range of territory.",
+      "fighter_jet": "Fast air unit for intercepting bombers and scouting.",
+      "warship": "Patrols in an area, capturing enemy cargo ships and destroying their Boats and Cruisers.",
+      "submarine": "Stealthy naval unit. Can launch nukes if researched. Invisible to enemies unless they have detection.",
+      "city": "Increases your max population. Useful when you can't expand your territory.",
+      "port": "Allows building Cruisers and Submarines. Automatically sends cargo ships to trade with other players.",
+      "airfield": "Automatically deploys bombers that fly out to strike enemy structures then return to base.",
+      "hospital": "Heals injured troops and increases population growth rate.",
+      "research_lab": "Generates research points to unlock new technologies. Build more to research faster.",
+      "factory": "Increases production speed of units and structures. Essential for scaling your military.",
+      "academy": "Trains troops faster and provides experience bonuses.",
+      "missile_silo": "Allows launching missiles (Atom Bomb, Hydrogen Bomb, MIRV).",
+      "sam_launcher": "Can intercept enemy missiles and planes. Essential for defense against nuclear attacks.",
+      "defense_post": "Increases defenses around nearby borders. Attacks from enemies are slower and have more casualties.",
+      "doomsday_device": "The ultimate weapon. Constructing this starts a countdown to global victory."
+    },
+    "not_enough_money": "Not enough money"
   },
   "unit_type": {
     "city": "City",
@@ -281,6 +325,7 @@
   },
   "user_setting": {
     "title": "User Settings",
+    "tooltip": "Configure game settings",
     "tab_basic": "Basic Settings",
     "tab_keybinds": "Keybinds",
     "dark_mode_label": "🌙 Dark Mode",
@@ -479,26 +524,6 @@
       "stop_trading": "Stop trading with [P1]!"
     }
   },
-  "build_menu": {
-    "desc": {
-      "atom_bomb": "Small explosion",
-      "hydrogen_bomb": "Large explosion",
-      "mirv": "Huge explosion, only targets selected player",
-      "missile_silo": "Used to launch nukes",
-      "sam_launcher": "Defends against incoming nukes and planes",
-      "warship": "Captures cargo ships, destroys ships and boats",
-      "submarine": "Stealth unit that destroys ships and boats",
-      "port": "Sends cargo ships to generate gold",
-      "defense_post": "Increase defenses of nearby borders",
-      "city": "Increase max population",
-      "hospital": "Lowers troop casualties from combat",
-      "academy": "Increases troop speed and enemy losses in combat",
-      "airfield": "Send bombers, fighterjets and paratroopers",
-      "fighter_jet": "Destroys bombers and fighters jets",
-      "doomsday_device": "A mysterious device with unknown effects"
-    },
-    "not_enough_money": "Not enough money"
-  },
   "win_modal": {
     "died": "You died",
     "your_team": "Your team won!",
@@ -512,6 +537,7 @@
   "leaderboard": {
     "title": "Leaderboard",
     "hide": "Hide",
+    "show": "Show leaderboard",
     "rank": "Rank",
     "player": "Player",
     "team": "Team",
@@ -565,7 +591,11 @@
     "paratrooper_sent": "Paratrooper",
     "doomsday_triggered": "{player}'s Doomsday Device has been Triggered!",
     "max_paratrooper_units_reached": "Maximum number of paratrooper planes reached.",
-    "incoming_paratrooper_attack": "Incoming Paratrooper Attack from {attackerName}"
+    "incoming_paratrooper_attack": "Incoming Paratrooper Attack from {attackerName}",
+    "filter_attack": "Filter Attack Events",
+    "filter_trade": "Filter Trade Events",
+    "filter_alliance": "Filter Alliance Events",
+    "filter_chat": "Filter Chat Events"
   },
   "unit_info_modal": {
     "structure_info": "Structure Info",
@@ -587,7 +617,24 @@
     "gold": "Gold",
     "troops": "Troops",
     "workers": "Workers",
-    "attack_ratio": "Attack Ratio"
+    "attack_ratio": "Attack Ratio",
+    "pop_tooltip": "Your current population (troops + workers) out of maximum capacity. The green number shows population growth per second. Build Cities to increase max population.",
+    "gold_tooltip": "Your current gold treasury. The number in parentheses shows your net gold income per second (after all investments). Workers generate gold - the more workers you have, the more gold you earn!",
+    "troops_workers_tooltip": "Balance your population between Troops (for combat) and Workers (for gold generation). More troops = stronger military but less income. More workers = more gold but weaker defense. Adjust based on your strategy!",
+    "attack_ratio_tooltip": "Percentage of your troops to send when attacking. Higher ratio = more troops per attack = faster conquest but leaves you vulnerable. Lower ratio = slower expansion but better defense. Tip: Use 30-50% for balanced play."
+  },
+  "control_panel2": {
+    "build_tab_tooltip": "Construct defensive and economic structures like Cities, Ports, and Research Labs to strengthen your nation",
+    "attack_tab_tooltip": "Build military units (Warships, Fighter Jets, Submarines) to expand your territory and defend against enemies",
+    "economy_tab_tooltip": "Manage your gold investments in production (faster building), roads (faster troops), and research (faster tech unlocks)",
+    "trade_tab_tooltip": "View your cargo ships and manage trade embargos. Cargo ships generate passive gold by trading between ports",
+    "diplomacy_tab_tooltip": "See your diplomatic relations: who you're at war with, allied with, or neutral towards",
+    "bombers_tab_tooltip": "Control bomber aircraft from your Airfields to destroy enemy structures. Set auto-bombing or manual targets",
+    "production_investment_tooltip": "Invest gold to boost productivity. Higher productivity = faster construction and cheaper maintenance. This compounds over time - early investment pays off big!",
+    "road_investment_tooltip": "Invest gold to build and maintain roads between your cities. Roads dramatically speed up troop movement. The white marker shows break-even point (covers maintenance cost). Requires 'Post-War Reconstruction' research",
+    "research_investment_tooltip": "Invest gold to speed up research progress. Higher investment = faster technology unlocks. Balance with production and roads based on your strategy!",
+    "embargo_all_tooltip": "Stop all your cargo ships from trading with other players. Use this to cut off enemies from trade benefits and gold income",
+    "remove_all_embargos_tooltip": "Allow your cargo ships to trade with all players again. Removes all trade restrictions and maximizes your trade income"
   },
   "player_panel": {
     "gold": "Gold",
@@ -639,7 +686,22 @@
     "insurance_refund_conquest": "Insurance refund {amount} gold for conquered structure."
   },
   "research_tree": {
-    "title": "Research Tree"
+    "title": "Research Tree",
+    "toggle_tooltip": "Open the Research Tree",
+    "tab_tooltip": {
+      "overview": "View all research categories",
+      "land": "Land-based warfare technologies",
+      "sea": "Naval and amphibious technologies",
+      "air": "Air power technologies",
+      "nuclear": "Nuclear and missile technologies",
+      "economy": "Economic and infrastructure technologies"
+    },
+    "investment": {
+      "slider_locked": "Slider is locked. Double-click to unlock.",
+      "slider_unlocked": "Double-click slider to lock.",
+      "road_disabled": "Research Post-War Reconstruction to enable road investment.",
+      "research_goal": "Increase research investment to unlock technologies faster."
+    }
   },
   "unit_upgrade_settings": {
     "title": "Unit Upgrade Settings",
