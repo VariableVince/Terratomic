@@ -1,4 +1,5 @@
 import { Config } from "../configuration/Config";
+import { AttackExecution } from "../execution/AttackExecution";
 import { AllPlayersStats, ClientID, Winner } from "../Schemas";
 import { simpleHash } from "../Util";
 import { AllianceImpl } from "./AllianceImpl";
@@ -417,8 +418,8 @@ export class GameImpl implements Game {
         (!this.inSpawnPhase() || e.activeDuringSpawnPhase()) &&
         e.isActive()
       ) {
-        // Separate attack executions from others
-        if (e.constructor.name === "AttackExecution") {
+        // Separate attack executions from others - use instanceof to survive minification
+        if (e instanceof AttackExecution) {
           attackExecs.push(e);
         } else {
           otherExecs.push(e);
