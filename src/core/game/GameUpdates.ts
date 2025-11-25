@@ -136,6 +136,7 @@ export interface UnitUpdate {
   health?: number;
   maxHealth?: number; // Effective max health (base + bonuses)
   constructionType?: UnitType;
+  constructionTargetLevel?: number; // Target level for construction units
   // Deprecated: ticksLeftInCooldown is replaced by cooldownEndsAt
   ticksLeftInCooldown?: Tick;
   // Unified cooldown end tick; client derives remaining as (endsAt - currentTick)

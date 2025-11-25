@@ -357,7 +357,19 @@ export class PlayerImpl implements Player {
       }
       if (unit.type() !== UnitType.Construction) continue;
       if (unit.constructionType() !== type) continue;
-      total++;
+      // For upgradeable structures, count the target level instead of just 1
+      if (
+        type === UnitType.City ||
+        type === UnitType.Port ||
+        type === UnitType.Hospital ||
+        type === UnitType.Academy ||
+        type === UnitType.ResearchLab ||
+        type === UnitType.Factory
+      ) {
+        total += unit.constructionTargetLevel();
+      } else {
+        total++;
+      }
     }
     return total;
   }

@@ -117,6 +117,9 @@ export class UnitView {
   constructionType(): UnitType | undefined {
     return this.data.constructionType;
   }
+  constructionTargetLevel(): number {
+    return this.data.constructionTargetLevel ?? 1;
+  }
   targetUnitId(): number | undefined {
     return this.data.targetUnitId;
   }

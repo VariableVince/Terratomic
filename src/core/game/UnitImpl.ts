@@ -29,6 +29,7 @@ export class UnitImpl implements Unit {
   private _reachedTarget = false;
   private _lastSetSafeFromPirates: number; // Only for trade ships
   private _constructionType: UnitType | undefined;
+  private _constructionTargetLevel: number = 1; // Target level for construction units
   private _lastOwner: PlayerImpl | null = null;
   private _troops: number;
   private _cooldownStartTick: Tick | null = null;
@@ -176,6 +177,11 @@ export class UnitImpl implements Unit {
       maxHealth: this.hasHealth() ? this.effectiveMaxHealth() : undefined,
       level: this._level > 1 ? this._level : undefined,
       constructionType: this._constructionType,
+      constructionTargetLevel:
+        this._type === UnitType.Construction &&
+        this._constructionTargetLevel > 1
+          ? this._constructionTargetLevel
+          : undefined,
       targetUnitId: this._targetUnit?.id() ?? undefined,
       targetTile: this.targetTile() ?? undefined,
       // Provide both for transition; cooldownEndsAt is the unified field
@@ -601,6 +607,21 @@ export class UnitImpl implements Unit {
       throw new Error(`Cannot set construction type on ${this.type()}`);
     }
     this._constructionType = type;
+    this.mg.addUpdate(this.toUpdate());
+  }
+
+  constructionTargetLevel(): number {
+    if (this.type() !== UnitType.Construction) {
+      throw new Error(`Cannot get construction target level on ${this.type()}`);
+    }
+    return this._constructionTargetLevel;
+  }
+
+  setConstructionTargetLevel(level: number): void {
+    if (this.type() !== UnitType.Construction) {
+      throw new Error(`Cannot set construction target level on ${this.type()}`);
+    }
+    this._constructionTargetLevel = level;
     this.mg.addUpdate(this.toUpdate());
   }
 

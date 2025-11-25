@@ -177,6 +177,7 @@ export class ConstructionExecution implements Execution {
       // Reserve total aggregated cost upfront so funds are locked during construction
       this.player.removeGold(this.reservedTotalCost);
       this.construction.setConstructionType(this.constructionType);
+      this.construction.setConstructionTargetLevel(this.desiredLevel);
       this.ticksUntilComplete = info.constructionDuration!;
       return;
     }

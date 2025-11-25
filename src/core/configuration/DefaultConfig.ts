@@ -657,12 +657,7 @@ export class DefaultConfig implements Config {
           cost: (p: Player) =>
             p.type() === PlayerType.Human && this.infiniteGold()
               ? 0n
-              : BigInt(
-                  Math.min(
-                    1_000_000,
-                    (p.unitsOwned(UnitType.Warship) + 1) * 250_000,
-                  ),
-                ),
+              : 500_000n,
           territoryBound: false,
           maxHealth: 1000,
         };
@@ -671,7 +666,7 @@ export class DefaultConfig implements Config {
           cost: (p: Player) =>
             p.type() === PlayerType.Human && this.infiniteGold()
               ? 0n
-              : 1_000_000n,
+              : 500_000n,
           territoryBound: false,
           maxHealth: 1000,
         };
@@ -765,12 +760,7 @@ export class DefaultConfig implements Config {
           cost: (p: Player) =>
             p.type() === PlayerType.Human && this.infiniteGold()
               ? 0n
-              : BigInt(
-                  Math.min(
-                    3_000_000,
-                    (p.unitsOwned(UnitType.SAMLauncher) + 1) * 1_500_000,
-                  ),
-                ),
+              : 1_500_000n,
           territoryBound: true,
           constructionDuration: this.instantBuild() ? 0 : 30 * 10,
           maxHealth: 1000,
@@ -800,12 +790,7 @@ export class DefaultConfig implements Config {
           cost: (p: Player) =>
             p.type() === PlayerType.Human && this.infiniteGold()
               ? 0n
-              : BigInt(
-                  Math.min(
-                    3_000_000,
-                    Math.pow(2, p.unitsOwned(UnitType.Hospital)) * 1_500_000,
-                  ),
-                ),
+              : 1_500_000n,
           territoryBound: true,
           constructionDuration: this.instantBuild() ? 0 : 2 * 10,
           maxHealth: 1000,
@@ -815,12 +800,7 @@ export class DefaultConfig implements Config {
           cost: (p: Player) =>
             p.type() === PlayerType.Human && this.infiniteGold()
               ? 0n
-              : BigInt(
-                  Math.min(
-                    3_000_000,
-                    Math.pow(2, p.unitsOwned(UnitType.ResearchLab)) * 1_500_000,
-                  ),
-                ),
+              : 1_500_000n,
           territoryBound: true,
           constructionDuration: this.instantBuild() ? 0 : 2 * 10,
           maxHealth: 1000,
@@ -830,12 +810,7 @@ export class DefaultConfig implements Config {
           cost: (p: Player) =>
             p.type() === PlayerType.Human && this.infiniteGold()
               ? 0n
-              : BigInt(
-                  Math.min(
-                    3_000_000,
-                    Math.pow(2, p.unitsOwned(UnitType.Academy)) * 1_500_000,
-                  ),
-                ),
+              : 1_500_000n,
           territoryBound: true,
           constructionDuration: this.instantBuild() ? 0 : 2 * 10,
           maxHealth: 1000,
@@ -881,12 +856,7 @@ export class DefaultConfig implements Config {
           cost: (p: Player) =>
             p.type() === PlayerType.Human && this.infiniteGold()
               ? 0n
-              : BigInt(
-                  Math.min(
-                    1_000_000,
-                    (p.unitsOwned(UnitType.FighterJet) + 1) * 250_000,
-                  ),
-                ),
+              : 500_000n,
           territoryBound: false,
           maxHealth: 750,
         };

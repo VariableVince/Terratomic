@@ -555,6 +555,8 @@ export interface Unit {
   // Construction
   constructionType(): UnitType | null;
   setConstructionType(type: UnitType): void;
+  constructionTargetLevel(): number;
+  setConstructionTargetLevel(level: number): void;
 
   // Warships
   setPatrolTile(tile: TileRef): void;
