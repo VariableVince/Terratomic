@@ -823,7 +823,7 @@ export class DefaultConfig implements Config {
               : BigInt(
                   Math.min(
                     1_000_000,
-                    Math.pow(2, p.unitsOwned(UnitType.Factory)) * 500_000,
+                    Math.pow(2, p.unitsOwned(UnitType.Factory)) * 250_000,
                   ),
                 ),
           territoryBound: true,
