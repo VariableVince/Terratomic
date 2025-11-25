@@ -343,6 +343,7 @@ export class UnitLayer implements Layer {
     if (interpolationContext === null)
       throw new Error("2d context not supported");
     this.interpolationContext = interpolationContext;
+    this.interpolationContext.imageSmoothingEnabled = false;
 
     this.canvas.width = this.game.width();
     this.canvas.height = this.game.height();
@@ -564,7 +565,7 @@ export class UnitLayer implements Layer {
             position,
             this.getInterpolatedSpriteColor(unit),
             this.interpolationContext,
-            false,
+            true,
           );
       }
     }
