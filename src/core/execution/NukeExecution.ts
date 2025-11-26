@@ -361,7 +361,8 @@ export class NukeExecution implements Execution {
         unit.type() !== UnitType.AtomBomb &&
         unit.type() !== UnitType.HydrogenBomb &&
         unit.type() !== UnitType.MIRVWarhead &&
-        unit.type() !== UnitType.MIRV
+        unit.type() !== UnitType.MIRV &&
+        unit.type() !== UnitType.Submarine
       ) {
         // Don't delete doomsday devices that are about to be activated
         // (they will delete themselves in DoomsdayActivationExecution.init())
