@@ -8,7 +8,6 @@ import {
   PlayerType,
   Tick,
   UnitType,
-  UpgradeType,
 } from "../core/game/Game";
 import { TileRef } from "../core/game/GameMap";
 import { PlayerView } from "../core/game/GameView";
@@ -124,9 +123,7 @@ export class BuildUnitIntentEvent implements GameEvent {
   ) {}
 }
 
-export class SendPurchaseUpgradeIntentEvent implements GameEvent {
-  constructor(public readonly upgrade: UpgradeType) {}
-}
+export class SendScorchedEarthIntentEvent implements GameEvent {}
 
 export class SendResearchTreeSelectIntentEvent implements GameEvent {
   constructor(public readonly techId: string) {}
@@ -341,8 +338,8 @@ export class Transport {
       this.onSendSetAutoBombingEvent(e),
     );
 
-    this.eventBus.on(SendPurchaseUpgradeIntentEvent, (e) =>
-      this.onSendPurchaseUpgradeIntent(e),
+    this.eventBus.on(SendScorchedEarthIntentEvent, () =>
+      this.onSendScorchedEarthIntent(),
     );
     this.eventBus.on(SendUpgradeStructureIntentEvent, (e) =>
       this.onSendUpgradeStructureIntent(e),
@@ -749,7 +746,6 @@ export class Transport {
     this._lastBuildUnit = event.unit;
     this._lastBuildAt = now;
 
-    // Compute desired starting level for upgradeable structures from local settings.
     // Compute desired starting level for upgradeable structures or units from local settings.
     let targetLevel: number | undefined;
     let bomberLevel: number | undefined;
@@ -761,6 +757,7 @@ export class Transport {
           const obj = JSON.parse(rawUnits) as Record<string, number>;
           const val = obj?.[key];
           if (typeof val === "number" && val > 1) {
+            // Server will clamp to player's researched max level
             targetLevel = Math.min(maxUnitLevel(event.unit), val);
           }
         }
@@ -801,11 +798,10 @@ export class Transport {
     });
   }
 
-  private onSendPurchaseUpgradeIntent(event: SendPurchaseUpgradeIntentEvent) {
+  private onSendScorchedEarthIntent() {
     this.sendIntent({
-      type: "purchase_upgrade",
+      type: "activate_scorched_earth",
       clientID: this.lobbyConfig.clientID,
-      upgrade: event.upgrade,
     });
   }
 

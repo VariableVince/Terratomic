@@ -1,5 +1,6 @@
-import { Execution, Game, Player, Unit, UnitType } from "../game/Game";
-import { TileRef } from "../game/GameMap";
+import type { Execution, Game, Player, Unit } from "../game/Game";
+import { UnitType } from "../game/Game";
+import type { TileRef } from "../game/GameMap";
 import { StraightPathFinder } from "../pathfinding/PathFinding";
 
 export class BomberExecution implements Execution {
@@ -55,9 +56,6 @@ export class BomberExecution implements Execution {
     const baseHealth = this.mg.unitInfo(UnitType.Bomber).maxHealth ?? 500;
     const levelHealth = this.getMaxHealth();
     const bonus = levelHealth - baseHealth;
-    console.log(
-      `applyBomberLevelStats: baseHealth=${baseHealth}, levelHealth=${levelHealth}, bonus=${bonus}, bomberLevel=${this.getBomberLevel()}`,
-    );
     if (bonus > 0) {
       (this.bomber as any)._bonusMaxHealth = bonus;
     }
@@ -93,15 +91,11 @@ export class BomberExecution implements Execution {
       this.bomber.isActive() &&
       ticks - this.lastHealthLogTick >= 50
     ) {
-      const bonusHealth = (this.bomber as any)._bonusMaxHealth ?? 0;
-      console.log(
-        `[tick ${ticks}] Bomber id=${this.bomber.id()} health: ${this.bomber.health()}/${this.bomber.effectiveMaxHealth()} (bonusHealth=${bonusHealth}, level=${this.getBomberLevel()}, airfield bomberLevel=${this.sourceAirfield.bomberLevel?.()})`,
-      );
       this.lastHealthLogTick = ticks;
     }
 
     // Respawn bomber if destroyed
-    if (!this.bomber || !this.bomber.isActive()) {
+    if (!this.bomber?.isActive()) {
       // Decrement bomber count for the target we were attacking (if any)
       if (this.currentTargetUnit) {
         this.decrementBomberCount(this.currentTargetUnit);
@@ -411,7 +405,7 @@ export class BomberExecution implements Execution {
 
     // Try with SAM avoidance first, then fall back to direct paths
     return (
-      this.trySelectTarget(sortedEnemies, true) ||
+      this.trySelectTarget(sortedEnemies, true) ??
       this.trySelectTarget(sortedEnemies, false)
     );
   }
@@ -449,7 +443,7 @@ export class BomberExecution implements Execution {
 
     // Try with SAM avoidance first, then fall back to direct paths
     return (
-      this.trySelectTarget(allTargets, true) ||
+      this.trySelectTarget(allTargets, true) ??
       this.trySelectTarget(allTargets, false)
     );
   }

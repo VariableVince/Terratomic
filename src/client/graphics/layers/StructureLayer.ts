@@ -23,7 +23,7 @@ import { GameUpdateType } from "../../../core/game/GameUpdates";
 import { GameView, UnitView } from "../../../core/game/GameView";
 import {
   isUpgradeableStructure,
-  maxStructureLevel,
+  playerMaxStructureLevel,
 } from "../../../core/game/Upgradeables";
 import { ToggleBomberUpgradeModeEvent } from "../../events/ToggleBomberUpgradeModeEvent";
 import { ToggleUpgradeModeEvent } from "../../events/ToggleUpgradeModeEvent";
@@ -371,8 +371,10 @@ export class StructureLayer implements Layer {
 
   private isUpgradeableStructure(unit: UnitView): boolean {
     if (!isUpgradeableStructure(unit.type())) return false;
-    // Check if at max level
-    const maxLevel = maxStructureLevel(unit.type());
+    // Check if at max level for this player (based on researched techs)
+    const me = this.game.myPlayer();
+    if (!me) return false;
+    const maxLevel = playerMaxStructureLevel(me, unit.type());
     if (unit.level() >= maxLevel) return false;
     return true;
   }
@@ -404,25 +406,13 @@ export class StructureLayer implements Layer {
     return me.gold() >= upgradeCost;
   }
 
-  // Check if the airfield has any bombers that can be upgraded (not at max level 3)
+  // Check if the airfield has bombers (server enforces max level)
   private hasBombersToUpgrade(airfield: UnitView): boolean {
     const me = this.game.myPlayer();
     if (!me) return false;
-    // Get bombers for this airfield
-    const bombers = this.game
-      .units(UnitType.Bomber)
-      .filter(
-        (b) =>
-          b.owner() === me &&
-          (b as any).data?.sourceAirfieldId === airfield.id(),
-      );
-    // For now, check if airfield has any bombers based on its level (number of bombers = level)
-    // Since we can't easily get sourceAirfield from client view, check if airfield level > 0
-    // and at least one bomber could be below max level
+    // Check if airfield has any bombers (level > 0 means at least one bomber)
     const airfieldLevel = airfield.level?.() ?? 1;
     if (airfieldLevel === 0) return false;
-    // We assume bombers can be upgraded if player has bombers
-    // The actual check happens on the server
     return true;
   }
 

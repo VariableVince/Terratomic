@@ -19,7 +19,6 @@ import {
   Trios,
   UnitInfo,
   UnitType,
-  UpgradeType,
 } from "../game/Game";
 import { TileRef } from "../game/GameMap";
 import { PlayerView } from "../game/GameView";
@@ -33,7 +32,9 @@ import {
 } from "../Schemas";
 import {
   attackCasualtyModifiers,
+  attackSpeedModifiers,
   defenseCasualtyModifiers,
+  incomeModifiers,
 } from "../tech/TechEffects";
 import { assertNever, simpleHash, within } from "../Util";
 import { Config, GameEnv, NukeMagnitude, ServerConfig, Theme } from "./Config";
@@ -898,72 +899,11 @@ export class DefaultConfig implements Config {
         assertNever(type);
     }
   }
-  upgradeInfo(type: UpgradeType): {
-    cost: (player: Player) => Gold;
-    prerequisite?: (player: Player) => boolean;
-  } {
-    const costForPlayer = (cost: bigint) => (p: Player) => {
-      if (p.type() === PlayerType.Human && this.infiniteGold()) {
-        return 0n;
-      }
-      return cost;
-    };
-
-    switch (type) {
-      case UpgradeType.Roads:
-        return { cost: costForPlayer(1_000_000n) };
-
-      // Land
-      case UpgradeType.InternationalTrade:
-        return { cost: costForPlayer(2_000_000n) };
-      case UpgradeType.UrbanPlanning:
-        return { cost: costForPlayer(1_000_000n) };
-      case UpgradeType.ScorchedEarth:
-        return { cost: costForPlayer(3_000_000n) };
-
-      // Water
-      case UpgradeType.SubmarineResearch:
-        return { cost: costForPlayer(1_000_000n) };
-      case UpgradeType.NuclearSubmarineResearch:
-        return {
-          cost: costForPlayer(3_000_000n),
-          prerequisite: (p: Player) =>
-            p.hasUpgrade(UpgradeType.SubmarineResearch),
-        };
-      case UpgradeType.WaterUpgrade1:
-        return { cost: costForPlayer(1_000_000n) };
-      case UpgradeType.WarshipAntiAir:
-        return { cost: costForPlayer(2_000_000n) };
-      case UpgradeType.WaterUpgrade2:
-        return { cost: costForPlayer(2_000_000n) };
-      case UpgradeType.WaterUpgrade3:
-        return { cost: costForPlayer(3_000_000n) };
-
-      // Air
-      case UpgradeType.AirUpgrade1:
-        return { cost: costForPlayer(1_000_000n) };
-      case UpgradeType.CityAntiAir:
-        return { cost: costForPlayer(2_000_000n) };
-      case UpgradeType.FighterJetNavalTargeting:
-        return { cost: costForPlayer(3_000_000n) };
-      case UpgradeType.AirUpgrade3:
-        return { cost: costForPlayer(3_000_000n) };
-
-      // Economy
-      case UpgradeType.EconomyUpgrade1:
-        return { cost: costForPlayer(1_000_000n) };
-      case UpgradeType.EconomyUpgrade2:
-        return { cost: costForPlayer(2_000_000n) };
-      case UpgradeType.StructureInsurance:
-        return { cost: costForPlayer(2_000_000n) };
-      case UpgradeType.Automation:
-        return { cost: costForPlayer(3_000_000n) };
-      case UpgradeType.EconomyUpgrade3:
-        return { cost: costForPlayer(3_000_000n) };
-
-      default:
-        assertNever(type);
+  scorchedEarthActivationCost(player: Player | PlayerView): Gold {
+    if (player.type() === PlayerType.Human && this.infiniteGold()) {
+      return 0n;
     }
+    return 3_000_000n;
   }
   defaultDonationAmount(sender: Player): number {
     return Math.floor(sender.troops() / 3);
@@ -1166,11 +1106,12 @@ export class DefaultConfig implements Config {
     defender: Player | TerraNullius,
     numAdjacentTilesWithEnemy: number,
   ): number {
-    if (defender.isPlayer()) {
-      return 10 * numAdjacentTilesWithEnemy;
-    } else {
-      return 12 * numAdjacentTilesWithEnemy;
-    }
+    // Get tech-based speed modifier
+    const speedMods = attackSpeedModifiers(attacker);
+    const baseTiles = defender.isPlayer()
+      ? 10 * numAdjacentTilesWithEnemy
+      : 12 * numAdjacentTilesWithEnemy;
+    return baseTiles * speedMods.speedMul;
   }
 
   boatAttackAmount(attacker: Player, defender: Player | TerraNullius): number {
@@ -1221,17 +1162,11 @@ export class DefaultConfig implements Config {
   }
 
   maxPopulation(player: Player | PlayerView): number {
-    let maxPop =
+    const maxPop =
       player.type() === PlayerType.Human && this.infiniteTroops()
         ? 1_000_000_000
         : 1 * (player.numTilesOwned() * 30 + 50000) +
           player.effectiveUnits(UnitType.City) * this.cityPopulationIncrease();
-
-    if (player.hasUpgrade(UpgradeType.UrbanPlanning)) {
-      const num = this.urbanPlanningPopulationBonusNum();
-      const den = this.urbanPlanningPopulationBonusDen();
-      maxPop = Math.floor((maxPop * num) / den);
-    }
 
     if (player.type() === PlayerType.Bot) {
       return maxPop / 2;
@@ -1270,12 +1205,6 @@ export class DefaultConfig implements Config {
     const ratio = Math.max(1 - totalPop / max, 0);
     toAdd *= ratio ** 1.222;
 
-    if (player.hasUpgrade(UpgradeType.Automation)) {
-      const num = this.automationTroopRegenMultiplierNum();
-      const den = this.automationTroopRegenMultiplierDen();
-      toAdd = (toAdd * num) / den;
-    }
-
     if (player.type() === PlayerType.Bot) {
       toAdd *= 0.7;
     }
@@ -1307,7 +1236,10 @@ export class DefaultConfig implements Config {
     const k = player.effectiveUnits(UnitType.Factory);
     const factoryFactor = Math.pow(1 + k, 0.35);
     const multiplier = this._gameConfig.goldMultiplier ?? 1;
-    const grossGold = base * productivity * factoryFactor * multiplier;
+    // Apply tech-based income multiplier
+    const incomeMods = incomeModifiers(player);
+    const grossGold =
+      base * productivity * factoryFactor * multiplier * incomeMods.incomeMul;
     return Number.isFinite(grossGold) && grossGold >= 0 ? grossGold : 0;
   }
 

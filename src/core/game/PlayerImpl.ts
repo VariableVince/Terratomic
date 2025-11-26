@@ -1252,6 +1252,72 @@ export class PlayerImpl implements Player {
       }
     }
 
+    // Nuclear tech requirements
+    if (unitType === UnitType.AtomBomb) {
+      if (!this.hasUpgrade(UpgradeType.NuclearFission)) {
+        return false;
+      }
+    }
+    if (unitType === UnitType.MissileSilo) {
+      if (!this.hasUpgrade(UpgradeType.NuclearFission)) {
+        return false;
+      }
+    }
+    if (unitType === UnitType.HydrogenBomb) {
+      if (!this.hasUpgrade(UpgradeType.ThermonuclearStaging)) {
+        return false;
+      }
+    }
+    if (unitType === UnitType.MIRV) {
+      if (!this.hasUpgrade(UpgradeType.MIRVTechnology)) {
+        return false;
+      }
+    }
+    if (unitType === UnitType.DoomsdayDevice) {
+      if (!this.hasUpgrade(UpgradeType.DoomsdayDeviceResearch)) {
+        return false;
+      }
+    }
+
+    // Warship tech requirement (Early Cold War Cruisers)
+    if (unitType === UnitType.Warship) {
+      if (!this.hasUpgrade(UpgradeType.WarshipLevel1)) {
+        return false;
+      }
+    }
+
+    // Submarine tech requirement (Diesel-Electric Subs)
+    if (unitType === UnitType.Submarine) {
+      if (!this.hasUpgrade(UpgradeType.SubmarineLevel1)) {
+        return false;
+      }
+    }
+
+    // Air tech requirements (Jet Engines)
+    if (
+      unitType === UnitType.Airfield ||
+      unitType === UnitType.FighterJet ||
+      unitType === UnitType.Bomber
+    ) {
+      if (!this.hasUpgrade(UpgradeType.JetEngines)) {
+        return false;
+      }
+    }
+
+    // SAM Launcher tech requirement (Surface-to-Air Missiles)
+    if (unitType === UnitType.SAMLauncher) {
+      if (!this.hasUpgrade(UpgradeType.SAMLevel1)) {
+        return false;
+      }
+    }
+
+    // Military Academy tech requirement (WWII Lessons Learned)
+    if (unitType === UnitType.Academy) {
+      if (!this.hasUpgrade(UpgradeType.MilitaryAcademy)) {
+        return false;
+      }
+    }
+
     // Test-specific override: Force canBuild for bombers if enabled in TestConfig
     if (
       this.mg.config().forceCanBuildBomberInTests?.() &&

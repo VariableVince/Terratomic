@@ -16,9 +16,10 @@ import {
 import { TileRef } from "../game/GameMap";
 import {
   isUpgradeableUnit,
-  maxStructureLevel,
-  maxUnitLevel,
+  playerMaxStructureLevel,
+  playerMaxUnitLevel,
 } from "../game/Upgradeables";
+import { constructionSpeedModifiers } from "../tech/TechEffects";
 import { AirfieldExecution } from "./AirfieldExecution";
 import { DefensePostExecution } from "./DefensePostExecution";
 import { FighterJetExecution } from "./FighterJetExecution";
@@ -178,7 +179,13 @@ export class ConstructionExecution implements Execution {
       this.player.removeGold(this.reservedTotalCost);
       this.construction.setConstructionType(this.constructionType);
       this.construction.setConstructionTargetLevel(this.desiredLevel);
-      this.ticksUntilComplete = info.constructionDuration!;
+      // Apply construction speed modifier from tech effects
+      const speedMods = constructionSpeedModifiers(this.player);
+      this.ticksUntilComplete = Math.ceil(
+        info.constructionDuration! / speedMods.speedMul,
+      );
+      // Set up cooldown on the unit for UI progress bar display
+      this.construction.launch(this.ticksUntilComplete);
       return;
     }
 
@@ -324,9 +331,11 @@ export class ConstructionExecution implements Execution {
 
   private computeDesiredLevel(type: UnitType, target?: number): number {
     if (target === undefined || target < 1) return 1;
+    // For units, use player-specific max level based on researched techs
+    // For structures, use player-specific max (e.g., SAM launchers depend on SAM tech level)
     const cap = isUpgradeableUnit(type)
-      ? maxUnitLevel(type)
-      : maxStructureLevel(type);
+      ? playerMaxUnitLevel(this.player, type)
+      : playerMaxStructureLevel(this.player, type);
     return Math.max(1, Math.min(cap, target));
   }
 

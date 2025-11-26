@@ -182,13 +182,13 @@ export enum UpgradeType {
   Roads = "Roads",
 
   // Land Upgrades
-  InternationalTrade = "InternationalTrade",
-  UrbanPlanning = "UrbanPlanning",
   ScorchedEarth = "ScorchedEarth",
 
   // Economy Upgrades
+  InternationalTrade = "InternationalTrade",
   StructureInsurance = "StructureInsurance",
-  Automation = "Automation",
+  HospitalResearch = "HospitalResearch",
+  ResearchLabResearch = "ResearchLabResearch",
 
   // Water Upgrades
   SubmarineResearch = "SubmarineResearch",
@@ -197,12 +197,41 @@ export enum UpgradeType {
   WaterUpgrade2 = "WaterUpgrade2",
   WarshipAntiAir = "WarshipAntiAir",
   WaterUpgrade3 = "WaterUpgrade3",
+  // Warship level upgrades (Early Cold War Cruisers gives level 1)
+  WarshipLevel1 = "WarshipLevel1",
+  WarshipLevel2 = "WarshipLevel2",
+  WarshipLevel3 = "WarshipLevel3",
+  // Submarine level upgrades (Diesel-Electric Subs gives level 1)
+  SubmarineLevel1 = "SubmarineLevel1",
+  SubmarineLevel2 = "SubmarineLevel2",
+  SubmarineLevel3 = "SubmarineLevel3",
 
   // Air Upgrades
+  JetEngines = "JetEngines",
   AirUpgrade1 = "AirUpgrade1",
   CityAntiAir = "CityAntiAir",
   AirUpgrade3 = "AirUpgrade3",
   FighterJetNavalTargeting = "FighterJetNavalTargeting",
+  // Fighter level upgrades (Jet Engines gives level 1 by default)
+  FighterLevel2 = "FighterLevel2",
+  FighterLevel3 = "FighterLevel3",
+  FighterLevel4 = "FighterLevel4",
+  // SAM level upgrades (Surface-to-Air Missiles gives level 1)
+  SAMLevel1 = "SAMLevel1",
+  SAMLevel2 = "SAMLevel2",
+  SAMLevel3 = "SAMLevel3",
+  // Bomber level upgrades (Jet Engines gives level 1 by default)
+  BomberLevel2 = "BomberLevel2",
+  BomberLevel3 = "BomberLevel3",
+
+  // Land Upgrades
+  MilitaryAcademy = "MilitaryAcademy",
+
+  // Nuclear Upgrades
+  NuclearFission = "NuclearFission",
+  ThermonuclearStaging = "ThermonuclearStaging",
+  MIRVTechnology = "MIRVTechnology",
+  DoomsdayDeviceResearch = "DoomsdayDeviceResearch",
 
   // Dummy Economy Upgrades
   EconomyUpgrade1 = "EconomyUpgrade1",
