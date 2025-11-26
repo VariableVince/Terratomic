@@ -76,6 +76,7 @@ export class UnitLayer implements Layer {
     UnitType.MIRV,
     UnitType.MIRVWarhead,
     UnitType.Shell,
+    // AABullet is rendered by AABulletLayer using PIXI
     UnitType.Warship,
     UnitType.TransportShip,
     UnitType.TradeShip,
@@ -547,6 +548,11 @@ export class UnitLayer implements Layer {
         // Server handles visibility filtering.
       }
 
+      // Skip AABullets - they're rendered by AABulletLayer
+      if (unit.type() === UnitType.AABullet) {
+        continue;
+      }
+
       const position = this.interpolatePosition(unit, alpha);
 
       switch (unit.type()) {
@@ -744,6 +750,7 @@ export class UnitLayer implements Layer {
       case UnitType.Shell:
         this.handleShellEvent(unit);
         break;
+      // AABullet is handled by AABulletLayer
       case UnitType.SAMMissile:
         this.handleMissileEvent(unit);
         break;
