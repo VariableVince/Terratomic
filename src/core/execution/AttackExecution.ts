@@ -390,6 +390,8 @@ export class AttackExecution implements Execution {
         case TerrainType.Mountain:
           mag = 2;
           break;
+        case TerrainType.Barrier:
+          return; // Impassable
       }
 
       const priority =

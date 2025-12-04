@@ -8,7 +8,7 @@ import {
   UpgradeType,
 } from "../game/Game";
 
-import { TileRef } from "../game/GameMap";
+import { TerrainType, TileRef } from "../game/GameMap";
 import { StraightPathFinder } from "../pathfinding/PathFinding";
 import { AttackExecution } from "./AttackExecution";
 
@@ -98,6 +98,17 @@ export class ParatrooperAttackExecution implements Execution {
 
     if (minDistance > game.config().paratrooperMaxRange()) {
       console.warn("Destination is out of range for paratrooper attack.");
+      return;
+    }
+
+    // Check if destination is valid land (not water or barrier)
+    if (game.isWater(this.dst)) {
+      console.warn("Cannot send paratroopers to water tiles.");
+      return;
+    }
+
+    if (game.terrainType(this.dst) === TerrainType.Barrier) {
+      console.warn("Cannot send paratroopers to barrier terrain.");
       return;
     }
 

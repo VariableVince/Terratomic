@@ -1,7 +1,8 @@
 import { Config } from "../configuration/Config";
 import { AllPlayersStats, ClientID } from "../Schemas";
 import { Category } from "../tech/ResearchTree";
-import { GameMap, TileRef } from "./GameMap";
+import { Cell, GameMap, MapPos, TerrainType, TileRef } from "./GameMap";
+
 import {
   GameUpdate,
   GameUpdateType,
@@ -31,10 +32,7 @@ export type GameUpdates = {
   [K in GameUpdateType]: UpdateTypeMap<K>[];
 };
 
-export interface MapPos {
-  x: number;
-  y: number;
-}
+export { Cell, MapPos, TerrainType };
 
 export enum Difficulty {
   Easy = "Easy",
@@ -89,6 +87,8 @@ export enum GameMapType {
   Italia = "Italia",
   Nukewars1024 = "Nukewars 1024",
   NukeWars2 = "NukeWars 2",
+  NukeWars2000 = "NukeWars 2000",
+  NukeWarsQuad = "NukeWars Quad",
 }
 
 export type GameMapName = keyof typeof GameMapType;
@@ -123,8 +123,8 @@ export const mapCategories: Record<string, GameMapType[]> = {
     GameMapType.Pangaea,
     GameMapType.Mars,
     GameMapType.DeglaciatedAntarctica,
-    GameMapType.Nukewars1024,
-    GameMapType.NukeWars2,
+    GameMapType.NukeWars2000,
+    GameMapType.NukeWarsQuad,
   ],
 };
 
@@ -375,38 +375,6 @@ export class Nation {
     public readonly strength: number,
     public readonly playerInfo: PlayerInfo,
   ) {}
-}
-
-export class Cell {
-  public index: number;
-
-  private strRepr: string;
-
-  constructor(
-    public readonly x: number,
-    public readonly y: number,
-  ) {
-    this.strRepr = `Cell[${this.x},${this.y}]`;
-  }
-
-  pos(): MapPos {
-    return {
-      x: this.x,
-      y: this.y,
-    };
-  }
-
-  toString(): string {
-    return this.strRepr;
-  }
-}
-
-export enum TerrainType {
-  Plains,
-  Highland,
-  Mountain,
-  Lake,
-  Ocean,
 }
 
 export enum PlayerType {
