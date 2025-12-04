@@ -4,6 +4,7 @@ import { GameStartingModal } from "../GameStartingModal";
 import { RefreshGraphicsEvent as RedrawGraphicsEvent } from "../InputHandler";
 import { TransformHandler } from "./TransformHandler";
 import { UIState } from "./UIState";
+import { AttackWarningOverlay } from "./layers/AttackWarningOverlay";
 import { AABulletLayer } from "./layers/AABulletLayer";
 import { BuildMenu } from "./layers/BuildMenu";
 import { CargoTruckLayer } from "./layers/CargoTruckLayer";
@@ -237,6 +238,15 @@ export function createRenderer(
   }
   headsUpMessage.game = game;
 
+  const attackWarningOverlay = document.querySelector(
+    "attack-warning-overlay",
+  ) as AttackWarningOverlay;
+  if (!(attackWarningOverlay instanceof AttackWarningOverlay)) {
+    console.error("attack-warning-overlay not found");
+  }
+  attackWarningOverlay.eventBus = eventBus;
+  attackWarningOverlay.game = game;
+
   // Provide a lightweight teardown hook to restore page scroll if needed
 
   const cleanup = () => {
@@ -266,6 +276,7 @@ export function createRenderer(
       : []),
     eventsDisplay,
     chatDisplay,
+    attackWarningOverlay,
     new RadialMenu(
       eventBus,
       game,
