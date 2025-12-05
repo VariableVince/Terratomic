@@ -39,8 +39,12 @@ export class ScorchedEarthExecution implements Execution {
       return;
     }
 
-    // Must have researched the Scorched Earth tech first
-    if (!this.player.hasResearchedTech(RESEARCH_TECH_IDS.SCORCHED_EARTH)) {
+    // Must have researched Mechanized Warfare Doctrine to unlock Scorched Earth
+    if (
+      !this.player.hasResearchedTech(
+        RESEARCH_TECH_IDS.MECHANIZED_WARFARE_DOCTRINE,
+      )
+    ) {
       this._isActive = false;
       return;
     }
@@ -56,12 +60,9 @@ export class ScorchedEarthExecution implements Execution {
     this.player.removeGold(cost);
     this.player.addUpgrade(UpgradeType.ScorchedEarth);
 
-    // Destroy roads and reset economy
+    // Destroy roads only (keep techs and upgrades)
     this.mg.destroyPlayerRoads(this.player);
     this.player.setRoadInvestmentRate(0);
-    this.player.removeUpgrade(UpgradeType.Roads);
-    this.player.removeUpgrade(UpgradeType.InternationalTrade);
-    this.player.removeResearchedTechsByCategory("Economy");
     this.mg.markPlayerNodesForReconnection(this.player);
 
     this._isActive = false;

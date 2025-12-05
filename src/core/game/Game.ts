@@ -186,7 +186,7 @@ export enum UpgradeType {
 
   // Economy Upgrades
   InternationalTrade = "InternationalTrade",
-  StructureInsurance = "StructureInsurance",
+  // TEMPORARILY DISABLED: StructureInsurance = "StructureInsurance",
   HospitalResearch = "HospitalResearch",
   ResearchLabResearch = "ResearchLabResearch",
 
@@ -693,6 +693,13 @@ export interface Player {
   hasResearchedTech(techId: string): boolean;
   addResearchedTech(techId: string): void;
   removeResearchedTechsByCategory(category: Category): void;
+
+  // Policy Directives (player choices linked to research)
+  getPolicyChoice(directiveId: string): string | null;
+  setPolicyChoice(directiveId: string, optionId: string): void;
+  getAllPolicyChoices(): ReadonlyMap<string, string>;
+  hasUnseenPolicyDirectives(): boolean;
+  markPolicyDirectivesSeen(): void;
 
   captureUnit(unit: Unit): void;
 

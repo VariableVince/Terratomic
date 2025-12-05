@@ -26,7 +26,6 @@ import { FighterJetExecution } from "./FighterJetExecution";
 import { MirvExecution } from "./MIRVExecution";
 import { MissileSiloExecution } from "./MissileSiloExecution";
 import { NukeExecution } from "./NukeExecution";
-import { PortExecution } from "./PortExecution";
 import { SAMLauncherExecution } from "./SAMLauncherExecution";
 import { SubmarineExecution } from "./SubmarineExecution";
 import { WarshipExecution } from "./WarshipExecution";
@@ -97,13 +96,10 @@ export class ConstructionExecution implements Execution {
             this.player,
             this.constructionType,
             this.desiredLevel,
-            isUpgradeableUnit(this.constructionType)
-              ? this.mg
-                  .config()
-                  .unitUpgradeCostMultiplier(this.constructionType)
-              : this.mg
-                  .config()
-                  .structureUpgradeCostMultiplier(this.constructionType),
+            // For upgradeable units, aggregateStructureBuildCost ignores multiplier
+            this.mg
+              .config()
+              .structureUpgradeCostMultiplier(this.constructionType),
           ) +
           (this.constructionType === UnitType.Airfield
             ? computeBomberUpgradeCost(
@@ -142,11 +138,10 @@ export class ConstructionExecution implements Execution {
           this.player,
           this.constructionType,
           this.desiredLevel,
-          isUpgradeableUnit(this.constructionType)
-            ? this.mg.config().unitUpgradeCostMultiplier(this.constructionType)
-            : this.mg
-                .config()
-                .structureUpgradeCostMultiplier(this.constructionType),
+          // For upgradeable units, aggregateStructureBuildCost ignores multiplier
+          this.mg
+            .config()
+            .structureUpgradeCostMultiplier(this.constructionType),
         ) +
         (this.constructionType === UnitType.Airfield
           ? computeBomberUpgradeCost(
@@ -250,9 +245,22 @@ export class ConstructionExecution implements Execution {
         );
         break;
       case UnitType.Port:
-        this.mg.addExecution(
-          new PortExecution(player, this.tile, this.desiredLevel),
-        );
+        {
+          const canSpawn = this.player.canBuild(
+            this.constructionType,
+            this.tile,
+          );
+          if (canSpawn === false) {
+            console.warn(`cannot build ${this.constructionType}`);
+            return;
+          }
+          const built = this.player.buildUnit(
+            this.constructionType,
+            canSpawn,
+            {},
+          );
+          this.applyUpgradesIfNeeded(built, this.desiredLevel);
+        }
         break;
       case UnitType.MissileSilo:
         this.mg.addExecution(
@@ -297,7 +305,12 @@ export class ConstructionExecution implements Execution {
         break;
       case UnitType.Airfield:
         this.mg.addExecution(
-          new AirfieldExecution(player, this.tile, this.bomberLevel),
+          new AirfieldExecution(
+            player,
+            this.tile,
+            this.bomberLevel,
+            this.desiredLevel,
+          ),
         );
         break;
       default:

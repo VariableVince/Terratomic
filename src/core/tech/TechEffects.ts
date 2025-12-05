@@ -1,78 +1,13 @@
 import { CityAAExecution } from "../execution/CityAAExecution";
 import { Game, Player, UpgradeType } from "../game/Game";
-
-// Central tech IDs for research tree items that have gameplay effects.
-// Keep IDs aligned with ResearchTreeModal generation (e.g., "Land-1").
-export const RESEARCH_TECH_IDS = {
-  // Air techs - Level 1
-  JET_ENGINES: "Air-0",
-  ANTI_AIR_GUNS: "Air-1",
-  // Air techs - Level 2
-  SUPERSONIC_FLIGHT: "Air-2A",
-  TURBOJET_BOMBERS: "Air-2B",
-  AIRBORNE_OPERATIONS: "Air-2C",
-  SURFACE_TO_AIR_MISSILES: "Air-2D",
-  // Air techs - Level 3
-  PULSE_DOPPLER_RADAR: "Air-3A",
-  NAVAL_STRIKE_TARGETING: "Air-3B",
-  SUPERSONIC_BOMBERS: "Air-3C",
-  RADAR_GUIDED_SAMS: "Air-3D",
-  // Air techs - Level 4
-  FLY_BY_WIRE_SYSTEMS: "Air-4A",
-  PRECISION_GUIDED_MUNITIONS: "Air-4B",
-  STRATEGIC_SAM_SYSTEMS: "Air-4C",
-  // Sea techs - Level 1
-  EARLY_COLD_WAR_CRUISERS: "Sea-0",
-  DIESEL_ELECTRIC_SUBS: "Sea-1",
-  // Sea techs - Level 2
-  FIRST_MISSILE_CRUISERS: "Sea-2A",
-  NUCLEAR_ATTACK_SUBMARINES: "Sea-2B",
-  BALLISTIC_MISSILE_SUBMARINES: "Sea-2C",
-  // Sea techs - Level 3
-  ADVANCED_MISSILE_CRUISERS: "Sea-3A",
-  ADVANCED_NUCLEAR_ATTACK_SUBS: "Sea-3B",
-  NAVAL_SAM_SYSTEMS: "Sea-3C",
-  // Sea techs - Level 4
-  AEGIS_WARSHIP_SYSTEMS: "Sea-4A",
-  QUIETING_ACOUSTIC_STEALTH: "Sea-4B",
-  // Land techs - Level 1
-  POST_WW2_MODERNIZATION: "Land-1",
-  // Land techs - Level 2
-  EARLY_MECHANIZATION: "Land-2A",
-  IMPROVED_ARTILLERY_SYSTEMS: "Land-2B",
-  INTEGRATED_LOGISTICS_CORPS: "Land-2C",
-  // Land techs - Level 3
-  MAIN_BATTLE_TANK_STANDARDIZATION: "Land-3A",
-  COMPOSITE_ARMOR_HEAT_MUNITIONS: "Land-3B",
-  SELF_PROPELLED_ARTILLERY: "Land-3C",
-  // Land techs - Level 4
-  NIGHT_VISION_BATTLEFIELD_SENSORS: "Land-4A",
-  PRECISION_GUIDED_MUNITIONS_LAND: "Land-4B",
-  C3I_SYSTEMS: "Land-4C",
-  // Economy techs - Level 1
-  POST_WAR_RECONSTRUCTION: "Economy-1",
-  // Economy techs - Level 2
-  NATIONAL_HIGHWAY_EXPANSION: "Economy-2A",
-  PORT_TRANSPORT_MODERNIZATION: "Economy-2B",
-  CIVIL_DEFENSE_MEASURES: "Economy-2C",
-  INFRASTRUCTURE_RECOVERY_FUND: "Economy-2D",
-  // Economy techs - Level 3
-  SCIENTIFIC_RESEARCH_NETWORK: "Economy-3A",
-  ADVANCED_MACHINE_TOOLS_AUTOMATION: "Economy-3B",
-  ENERGY_INFRASTRUCTURE_EXPANSION: "Economy-3C",
-  NATIONAL_HEALTH_SYSTEM: "Economy-3D",
-  // Economy techs - Level 4
-  COMPUTING_DATA_SYSTEMS: "Economy-4A",
-  TELECOMMUNICATIONS_INTEGRATION: "Economy-4B",
-  ECONOMIC_COORDINATION_SYSTEMS: "Economy-4C",
-  // Special Economy actions (not research nodes)
-  SCORCHED_EARTH: "Economy-Action-ScorchedEarth",
-  // Nuclear techs
-  NUCLEAR_FISSION: "Nuclear-1",
-  THERMONUCLEAR_STAGING: "Nuclear-2",
-  MIRV_TECHNOLOGY: "Nuclear-3",
-  DOOMSDAY_DEVICE: "Nuclear-4",
-} as const;
+import {
+  getAllPolicyDirectives,
+  getPolicyOption,
+  type PolicyDirectiveId,
+} from "./PolicyDirectives";
+import { RESEARCH_TECH_IDS } from "./TechIds";
+// Re-export for backward compatibility with existing imports
+export { RESEARCH_TECH_IDS } from "./TechIds";
 
 export interface TechMeta {
   name: string;
@@ -102,8 +37,8 @@ export interface ResearchEffectivenessModifiers {
 }
 
 export interface IncomeModifiers {
-  // Multiplier to apply to gross gold income
-  incomeMul: number;
+  // Multiplier for domestic income (non-trade income from population/industry)
+  domesticIncomeMul: number;
 }
 
 export interface InfrastructureEffectivenessModifiers {
@@ -112,16 +47,21 @@ export interface InfrastructureEffectivenessModifiers {
 }
 
 export interface TradeIncomeModifiers {
-  // Multiplier to apply to trade income
+  // Multiplier to apply to trade income (from roads and trade ships)
   incomeMul: number;
+  // Additional multiplier for trade ship income specifically (stacks with incomeMul)
+  tradeShipIncomeMul: number;
+}
+
+export interface RoadEffectModifiers {
+  // Multiplier to apply to road effects (higher = stronger road bonuses)
+  effectMul: number;
 }
 
 // Central registry shape for tech effects: on-complete side-effects and battle modifiers
 export type TechEffect = {
   // Runs once when the tech is completed
   onComplete?: (player: Player, game: Game) => void;
-  // Runs when the tech is revoked (e.g., via category reset)
-  onRevoke?: (player: Player, game: Game) => void;
   // Applied each time casualty modifiers are computed while defending
   defense?: (mods: DefenseCasualtyModifiers) => void;
   // Applied each time casualty modifiers are computed while attacking
@@ -140,6 +80,8 @@ export type TechEffect = {
   ) => void;
   // Applied to modify trade income
   tradeIncome?: (mods: TradeIncomeModifiers) => void;
+  // Applied to modify road effects (bonuses from roads)
+  roadEffect?: (mods: RoadEffectModifiers) => void;
 };
 
 export type TechDefinition = {
@@ -162,11 +104,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.WarshipLevel1);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.WarshipLevel1)) {
-          player.removeUpgrade?.(UpgradeType.WarshipLevel1);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.DIESEL_ELECTRIC_SUBS]: {
@@ -179,11 +116,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.SubmarineLevel1)) {
           player.addUpgrade?.(UpgradeType.SubmarineLevel1);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.SubmarineLevel1)) {
-          player.removeUpgrade?.(UpgradeType.SubmarineLevel1);
         }
       },
     },
@@ -201,11 +133,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.WarshipLevel2);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.WarshipLevel2)) {
-          player.removeUpgrade?.(UpgradeType.WarshipLevel2);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.NUCLEAR_ATTACK_SUBMARINES]: {
@@ -220,11 +147,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.SubmarineLevel2);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.SubmarineLevel2)) {
-          player.removeUpgrade?.(UpgradeType.SubmarineLevel2);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.BALLISTIC_MISSILE_SUBMARINES]: {
@@ -237,11 +159,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.NuclearSubmarineResearch)) {
           player.addUpgrade?.(UpgradeType.NuclearSubmarineResearch);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.NuclearSubmarineResearch)) {
-          player.removeUpgrade?.(UpgradeType.NuclearSubmarineResearch);
         }
       },
     },
@@ -259,11 +176,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.WarshipLevel3);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.WarshipLevel3)) {
-          player.removeUpgrade?.(UpgradeType.WarshipLevel3);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.ADVANCED_NUCLEAR_ATTACK_SUBS]: {
@@ -278,11 +190,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.SubmarineLevel3);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.SubmarineLevel3)) {
-          player.removeUpgrade?.(UpgradeType.SubmarineLevel3);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.NAVAL_SAM_SYSTEMS]: {
@@ -295,11 +202,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.WarshipAntiAir)) {
           player.addUpgrade?.(UpgradeType.WarshipAntiAir);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.WarshipAntiAir)) {
-          player.removeUpgrade?.(UpgradeType.WarshipAntiAir);
         }
       },
     },
@@ -329,17 +231,17 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
     meta: {
       name: "Post-WW2 Modernization",
       description:
-        "Doctrine refined by hard-won experience improves offensive capabilities and tactical efficiency. Effects: Enables Military Academy. Enemy takes +5% more losses when you attack them. Your offensive speed +5%.",
+        "Doctrine refined by hard-won experience improves offensive capabilities and tactical efficiency. Effects: Enables Military Academy, City AA. Enemy takes +5% more losses when you attack them. Your offensive speed +5%.",
     },
     effects: {
-      onComplete: (player) => {
+      onComplete: (player, game) => {
         if (!player.hasUpgrade?.(UpgradeType.MilitaryAcademy)) {
           player.addUpgrade?.(UpgradeType.MilitaryAcademy);
         }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.MilitaryAcademy)) {
-          player.removeUpgrade?.(UpgradeType.MilitaryAcademy);
+        if (!player.hasUpgrade?.(UpgradeType.CityAntiAir)) {
+          player.addUpgrade?.(UpgradeType.CityAntiAir);
+          // Start the city AA execution to fire bullets at planes
+          game.addExecution(new CityAAExecution(player));
         }
       },
       attack: (mods) => {
@@ -350,11 +252,11 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       },
     },
   },
-  [RESEARCH_TECH_IDS.POST_WAR_RECONSTRUCTION]: {
+  [RESEARCH_TECH_IDS.NATIONAL_RECONSTRUCTION_PROGRAM]: {
     meta: {
-      name: "Post-War Reconstruction",
+      name: "National Reconstruction Program",
       description:
-        "Revitalize infrastructure and industry by mobilizing civilian labor and resources to rebuild the national economy. Effects: Unlocks Roads investment and enables construction/expansion of your road network.",
+        "Revitalize infrastructure and industry by mobilizing civilian labor and resources to rebuild the national economy. Effects: Enables Roads, +5% infrastructure spending effectiveness.",
     },
     effects: {
       onComplete: (player, game) => {
@@ -367,90 +269,30 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.removeUpgrade?.(UpgradeType.ScorchedEarth);
         }
       },
-      onRevoke: (player, game) => {
-        if (player.hasUpgrade?.(UpgradeType.Roads)) {
-          player.removeUpgrade?.(UpgradeType.Roads);
-          game.markPlayerNodesForReconnection?.(player);
-        }
+      infrastructureEffectiveness: (mods) => {
+        mods.effectivenessMul *= 1.05; // +5% infrastructure spending effectiveness
       },
     },
   },
   // Economy Level 2 techs
-  [RESEARCH_TECH_IDS.NATIONAL_HIGHWAY_EXPANSION]: {
+  [RESEARCH_TECH_IDS.INDUSTRIAL_DEVELOPMENT_STRATEGY]: {
     meta: {
-      name: "National Highway Expansion",
+      name: "Industrial Development Strategy",
       description:
-        "Expand national highway networks for improved logistics and troop movement. Effects: Construction speed +10%.",
+        "Prioritize industrial capacity and manufacturing output to strengthen the national economy.",
     },
     effects: {
-      constructionSpeed: (mods) => {
-        mods.speedMul *= 1.1; // 10% faster construction
-      },
-      // TODO: Stronger road effects +5% (roads boost structure output more effectively)
+      // Effects to be added later
     },
   },
-  [RESEARCH_TECH_IDS.PORT_TRANSPORT_MODERNIZATION]: {
+  [RESEARCH_TECH_IDS.TRADE_POLICY_FRAMEWORK]: {
     meta: {
-      name: "Port & Transport Modernization",
+      name: "Trade Policy Framework",
       description:
-        "Modernize ports and transport infrastructure. Effects: Unlocks International Trade income from cargo trucks.",
+        "Establish trade agreements and commercial policies to boost economic growth.",
     },
     effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.InternationalTrade)) {
-          player.addUpgrade?.(UpgradeType.InternationalTrade);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.InternationalTrade)) {
-          player.removeUpgrade?.(UpgradeType.InternationalTrade);
-        }
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.CIVIL_DEFENSE_MEASURES]: {
-    meta: {
-      name: "Civil Defense Measures",
-      description:
-        "Establish civil defense protocols. Effects: Enables the Scorched Earth decision.",
-    },
-    effects: {
-      // TODO: Maintenance cost reduction +5%
-    },
-  },
-  [RESEARCH_TECH_IDS.INFRASTRUCTURE_RECOVERY_FUND]: {
-    meta: {
-      name: "Infrastructure Recovery Fund",
-      description:
-        "Establish state-backed recovery funds. Effects: Unlocks Structure Insurance, refunding 33% of construction costs when self-constructed buildings are lost.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.StructureInsurance)) {
-          player.addUpgrade?.(UpgradeType.StructureInsurance);
-        }
-        try {
-          const units = player.units?.() ?? [];
-          for (const unit of units) {
-            (unit as any).insure?.(player);
-          }
-        } catch {
-          // Some player implementations may not expose units(); ignore.
-        }
-      },
-      onRevoke: (player) => {
-        try {
-          const units = player.units?.() ?? [];
-          for (const unit of units) {
-            (unit as any).insure?.(null);
-          }
-        } catch {
-          // ignore
-        }
-        if (player.hasUpgrade?.(UpgradeType.StructureInsurance)) {
-          player.removeUpgrade?.(UpgradeType.StructureInsurance);
-        }
-      },
+      // Effects to be added later
     },
   },
   // Economy Level 3 techs
@@ -458,62 +300,25 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
     meta: {
       name: "Scientific Research Network",
       description:
-        "Establish national research networks for scientific advancement. Effects: Unlocks Research Lab structures.",
+        "Establish national research networks for scientific advancement. Effects: Enables Research Labs.",
     },
     effects: {
       onComplete: (player) => {
         player.addUpgrade?.(UpgradeType.ResearchLabResearch);
       },
-      onRevoke: (player) => {
-        player.removeUpgrade?.(UpgradeType.ResearchLabResearch);
-      },
     },
   },
-  [RESEARCH_TECH_IDS.ADVANCED_MACHINE_TOOLS_AUTOMATION]: {
+  [RESEARCH_TECH_IDS.INFRASTRUCTURE_PRIORITIZATION]: {
     meta: {
-      name: "Advanced Machine Tools & Automation",
+      name: "Infrastructure Prioritization",
       description:
-        "Develop advanced manufacturing and automation systems. Effects: Construction speed +10%.",
-    },
-    effects: {
-      constructionSpeed: (mods) => {
-        mods.speedMul *= 1.1; // 10% faster construction
-      },
-      // TODO: Infrastructure spending effectiveness +30%
-    },
-  },
-  [RESEARCH_TECH_IDS.ENERGY_INFRASTRUCTURE_EXPANSION]: {
-    meta: {
-      name: "Energy Infrastructure Expansion",
-      description:
-        "Expand power generation and distribution networks. Effects: Income +10%.",
-    },
-    effects: {
-      income: (mods) => {
-        mods.incomeMul *= 1.1; // 10% more income
-      },
-      // TODO: Maintenance cost reduction +5%
-    },
-  },
-  [RESEARCH_TECH_IDS.NATIONAL_HEALTH_SYSTEM]: {
-    meta: {
-      name: "National Health System",
-      description:
-        "Establish a comprehensive national health system. Effects: Enables Hospital construction. Income +5%.",
+        "Focus national resources on critical infrastructure development. Effects: Enables Hospitals.",
     },
     effects: {
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.HospitalResearch)) {
           player.addUpgrade?.(UpgradeType.HospitalResearch);
         }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.HospitalResearch)) {
-          player.removeUpgrade?.(UpgradeType.HospitalResearch);
-        }
-      },
-      income: (mods) => {
-        mods.incomeMul *= 1.05; // 5% more income
       },
     },
   },
@@ -522,93 +327,48 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
     meta: {
       name: "Computing & Data Systems",
       description:
-        "Develop computing infrastructure and data processing systems. Effects: Research spending effectiveness +20%. Infrastructure spending effectiveness +20%.",
+        "Develop computing infrastructure and data processing systems. Effects: +5% research spending effectiveness, +5% infrastructure spending effectiveness.",
     },
     effects: {
       researchEffectiveness: (mods) => {
-        mods.effectivenessMul *= 1.2; // 20% more effective research
+        mods.effectivenessMul *= 1.05; // +5% research spending effectiveness
       },
       infrastructureEffectiveness: (mods) => {
-        mods.effectivenessMul *= 1.2; // 20% more effective infrastructure spending
+        mods.effectivenessMul *= 1.05; // +5% infrastructure spending effectiveness
       },
     },
   },
-  [RESEARCH_TECH_IDS.TELECOMMUNICATIONS_INTEGRATION]: {
+  [RESEARCH_TECH_IDS.NATIONAL_ECONOMIC_COORDINATION]: {
     meta: {
-      name: "Telecommunications Integration",
-      description:
-        "Integrate telecommunications networks nationally. Effects: Trade income +20%.",
+      name: "National Economic Coordination Systems",
+      description: "National systems for economic planning and coordination.",
     },
     effects: {
-      tradeIncome: (mods) => {
-        mods.incomeMul *= 1.2; // 20% more trade income
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.ECONOMIC_COORDINATION_SYSTEMS]: {
-    meta: {
-      name: "Economic Coordination Systems",
-      description:
-        "National systems for economic planning and coordination. Better allocation of resources reduces waste. Effects: Income +10%.",
-    },
-    effects: {
-      income: (mods) => {
-        mods.incomeMul *= 1.1; // 10% more income
-      },
-      // TODO: Maintenance cost reduction +10%
-    },
-  },
-  [RESEARCH_TECH_IDS.SCORCHED_EARTH]: {
-    meta: {
-      name: "Scorched Earth",
-      description:
-        "Unleash a scorched earth campaign: raze your road network and reset economic research to deny enemy logistics.",
+      // Effects to be added later
     },
   },
   // Land Level 2 techs
-  [RESEARCH_TECH_IDS.EARLY_MECHANIZATION]: {
+  [RESEARCH_TECH_IDS.MECHANIZED_WARFARE_DOCTRINE]: {
     meta: {
-      name: "Early Mechanization",
+      name: "Mechanized Warfare Doctrine",
       description:
-        "Introduce mechanized infantry and motorized transport to increase battlefield mobility. Effects: Your offensive speed +10%. Your army takes 10% fewer losses when you attack.",
+        "Develop doctrine for mechanized infantry and armored operations. Effects: Unlocks Scorched Earth. Policy Directive: Mobile Infantry Emphasis (+10% offensive speed) or Armored Breakthrough Emphasis (-10% losses when attacking).",
     },
     effects: {
-      attack: (mods) => {
-        mods.attackerLossMul *= 0.9; // our army takes 10% fewer losses when attacking
-      },
-      attackSpeed: (mods) => {
-        mods.speedMul *= 1.1; // 10% faster offensive speed
-      },
+      // Policy directive effects are applied via getPolicyChoice
     },
   },
-  [RESEARCH_TECH_IDS.IMPROVED_ARTILLERY_SYSTEMS]: {
+  [RESEARCH_TECH_IDS.SAM_DEPLOYMENT]: {
     meta: {
-      name: "Improved Artillery Systems",
+      name: "Surface-to-Air Missile Deployment",
       description:
-        "Develop more accurate and powerful artillery pieces with improved range and fire rates. Effects: Enemy takes +10% more losses when they attack you. Your army takes 10% fewer losses when defending.",
+        "Deploy first-generation SAM systems (SA-2 Guideline, Nike Hercules, S-75). Effects: Enables SAM Level 1.",
     },
     effects: {
-      defense: (mods) => {
-        mods.attackerLossMul *= 1.1; // enemy (attacker) takes 10% more losses
-        mods.defenderLossMul *= 0.9; // our army takes 10% fewer losses when defending
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.INTEGRATED_LOGISTICS_CORPS]: {
-    meta: {
-      name: "Integrated Logistics Corps",
-      description:
-        "Establish unified supply chains and logistics networks for efficient resource distribution. Effects: Your offensive speed +10%. Your army takes 5% fewer losses when you attack. Your army takes 5% fewer losses when defending.",
-    },
-    effects: {
-      attack: (mods) => {
-        mods.attackerLossMul *= 0.95; // our army takes 5% fewer losses when attacking
-      },
-      defense: (mods) => {
-        mods.defenderLossMul *= 0.95; // our army takes 5% fewer losses when defending
-      },
-      attackSpeed: (mods) => {
-        mods.speedMul *= 1.1; // 10% faster offensive speed
+      onComplete: (player) => {
+        if (!player.hasUpgrade?.(UpgradeType.SAMLevel1)) {
+          player.addUpgrade?.(UpgradeType.SAMLevel1);
+        }
       },
     },
   },
@@ -617,42 +377,23 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
     meta: {
       name: "Main Battle Tank Standardization",
       description:
-        "Adopt standardized tank designs for improved maintenance and battlefield coordination. Effects: Your army takes 10% fewer losses when you attack. Your army takes 10% fewer losses when defending.",
+        "Adopt standardized MBT designs (T-62, T-72, M60, Leopard 1) for improved maintenance and battlefield coordination. Policy Directive: Survivability Focus (-10% losses defending) or Offensive Armor Focus (-10% losses attacking).",
     },
     effects: {
-      attack: (mods) => {
-        mods.attackerLossMul *= 0.9; // our army takes 10% fewer losses when attacking
-      },
-      defense: (mods) => {
-        mods.defenderLossMul *= 0.9; // our army takes 10% fewer losses when defending
-      },
+      // Policy directive effects are applied via getPolicyChoice
     },
   },
-  [RESEARCH_TECH_IDS.COMPOSITE_ARMOR_HEAT_MUNITIONS]: {
+  [RESEARCH_TECH_IDS.ADVANCED_SAM_SYSTEMS]: {
     meta: {
-      name: "Composite Armor & HEAT Munitions",
+      name: "Advanced SAM Systems",
       description:
-        "Develop advanced armor materials and high-explosive anti-tank warheads. Effects: Enemy takes +10% more losses when you attack them. Your army takes 5% fewer losses when you attack.",
+        "Deploy mobile SAM batteries (SA-6, Hawk, early TELARs). Effects: Enables SAM Level 2.",
     },
     effects: {
-      attack: (mods) => {
-        mods.defenderLossMul *= 1.1; // enemy (defender) takes 10% more losses when we attack
-        mods.attackerLossMul *= 0.95; // our army takes 5% fewer losses when attacking
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.SELF_PROPELLED_ARTILLERY]: {
-    meta: {
-      name: "Self-Propelled Artillery",
-      description:
-        "Mount artillery on mobile platforms for rapid deployment and shoot-and-scoot tactics. Effects: Enemy takes +10% more losses when you attack them. Your offensive speed +10%.",
-    },
-    effects: {
-      attack: (mods) => {
-        mods.defenderLossMul *= 1.1; // enemy (defender) takes 10% more losses when we attack
-      },
-      attackSpeed: (mods) => {
-        mods.speedMul *= 1.1; // 10% faster offensive speed
+      onComplete: (player) => {
+        if (!player.hasUpgrade?.(UpgradeType.SAMLevel2)) {
+          player.addUpgrade?.(UpgradeType.SAMLevel2);
+        }
       },
     },
   },
@@ -661,66 +402,29 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
     meta: {
       name: "Night Vision & Battlefield Sensors",
       description:
-        "Equip forces with infrared and thermal imaging for 24-hour combat capability. Effects: Your offensive speed +10%. Enemy takes +10% more losses when you attack them.",
+        "Equip forces with infrared and thermal imaging for 24-hour combat capability. Policy Directive: High-Speed Night Maneuvers (+10% offensive speed) or Precision Night Engagements (+10% enemy losses when attacking).",
     },
     effects: {
-      attack: (mods) => {
-        mods.defenderLossMul *= 1.1; // enemy (defender) takes 10% more losses when we attack
-      },
-      attackSpeed: (mods) => {
-        mods.speedMul *= 1.1; // 10% faster offensive speed
-      },
+      // Policy directive effects are applied via getPolicyChoice
     },
   },
-  [RESEARCH_TECH_IDS.PRECISION_GUIDED_MUNITIONS_LAND]: {
+  [RESEARCH_TECH_IDS.INTEGRATED_C3I_SAM_NETWORKS]: {
     meta: {
-      name: "Precision-Guided Munitions (Land)",
+      name: "Integrated C3I & Advanced SAM Networks",
       description:
-        "Develop laser and GPS-guided artillery shells and missiles for pinpoint accuracy. Effects: Enemy takes +15% more losses when they attack you. Enemy takes +15% more losses when you attack them.",
+        "Integrate SA-10, Patriot-era SAM platforms with C3I systems. Effects: Enables SAM Level 3, +5% enemy losses when you attack, +5% enemy losses when they attack you.",
     },
     effects: {
-      attack: (mods) => {
-        mods.defenderLossMul *= 1.15; // enemy (defender) takes 15% more losses when we attack
-      },
-      defense: (mods) => {
-        mods.attackerLossMul *= 1.15; // enemy (attacker) takes 15% more losses when they attack us
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.C3I_SYSTEMS]: {
-    meta: {
-      name: "C3I Systems",
-      description:
-        "Command, Control, Communications, and Intelligence systems for integrated battlefield awareness. Effects: Your army takes 10% fewer losses when you attack. Your army takes 10% fewer losses when defending.",
-    },
-    effects: {
-      attack: (mods) => {
-        mods.attackerLossMul *= 0.9; // our army takes 10% fewer losses when attacking
-      },
-      defense: (mods) => {
-        mods.defenderLossMul *= 0.9; // our army takes 10% fewer losses when defending
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.ANTI_AIR_GUNS]: {
-    meta: {
-      name: "Anti-Air Guns",
-      description:
-        "Allows cities to defend themselves against aerial threats with rapid-fire AA guns. Does not defend against MIRVs.",
-    },
-    effects: {
-      onComplete: (player, game) => {
-        if (!player.hasUpgrade?.(UpgradeType.CityAntiAir)) {
-          player.addUpgrade?.(UpgradeType.CityAntiAir);
-          // Start the city AA execution to fire bullets at planes
-          game.addExecution(new CityAAExecution(player));
+      onComplete: (player) => {
+        if (!player.hasUpgrade?.(UpgradeType.SAMLevel3)) {
+          player.addUpgrade?.(UpgradeType.SAMLevel3);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.CityAntiAir)) {
-          player.removeUpgrade?.(UpgradeType.CityAntiAir);
-          // Note: CityAAExecution will deactivate itself when upgrade is removed
-        }
+      attack: (mods) => {
+        mods.defenderLossMul *= 1.05; // enemy takes 5% more losses when we attack
+      },
+      defense: (mods) => {
+        mods.attackerLossMul *= 1.05; // enemy takes 5% more losses when they attack us
       },
     },
   },
@@ -733,11 +437,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.JetEngines)) {
           player.addUpgrade?.(UpgradeType.JetEngines);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.JetEngines)) {
-          player.removeUpgrade?.(UpgradeType.JetEngines);
         }
       },
     },
@@ -754,11 +453,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.FighterLevel2);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.FighterLevel2)) {
-          player.removeUpgrade?.(UpgradeType.FighterLevel2);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.TURBOJET_BOMBERS]: {
@@ -773,11 +467,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.BomberLevel2);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.BomberLevel2)) {
-          player.removeUpgrade?.(UpgradeType.BomberLevel2);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.AIRBORNE_OPERATIONS]: {
@@ -790,30 +479,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.AirUpgrade1)) {
           player.addUpgrade?.(UpgradeType.AirUpgrade1);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.AirUpgrade1)) {
-          player.removeUpgrade?.(UpgradeType.AirUpgrade1);
-        }
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.SURFACE_TO_AIR_MISSILES]: {
-    meta: {
-      name: "Surface-to-Air Missiles",
-      description:
-        "Enables Level 1 SAM Launchers. Advanced SAM technology for enhanced air defense capabilities.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.SAMLevel1)) {
-          player.addUpgrade?.(UpgradeType.SAMLevel1);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.SAMLevel1)) {
-          player.removeUpgrade?.(UpgradeType.SAMLevel1);
         }
       },
     },
@@ -831,11 +496,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.FighterLevel3);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.FighterLevel3)) {
-          player.removeUpgrade?.(UpgradeType.FighterLevel3);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.NAVAL_STRIKE_TARGETING]: {
@@ -850,11 +510,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.FighterJetNavalTargeting);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.FighterJetNavalTargeting)) {
-          player.removeUpgrade?.(UpgradeType.FighterJetNavalTargeting);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.SUPERSONIC_BOMBERS]: {
@@ -867,30 +522,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.BomberLevel3)) {
           player.addUpgrade?.(UpgradeType.BomberLevel3);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.BomberLevel3)) {
-          player.removeUpgrade?.(UpgradeType.BomberLevel3);
-        }
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.RADAR_GUIDED_SAMS]: {
-    meta: {
-      name: "Radar-Guided SAMs",
-      description:
-        "Enables Level 2 SAM Launchers. Advanced radar-guided surface-to-air missiles with improved accuracy.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.SAMLevel2)) {
-          player.addUpgrade?.(UpgradeType.SAMLevel2);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.SAMLevel2)) {
-          player.removeUpgrade?.(UpgradeType.SAMLevel2);
         }
       },
     },
@@ -908,11 +539,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.FighterLevel4);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.FighterLevel4)) {
-          player.removeUpgrade?.(UpgradeType.FighterLevel4);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.PRECISION_GUIDED_MUNITIONS]: {
@@ -925,25 +551,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       // Placeholder - add specific upgrade when needed
     },
   },
-  [RESEARCH_TECH_IDS.STRATEGIC_SAM_SYSTEMS]: {
-    meta: {
-      name: "Strategic SAM Systems",
-      description:
-        "Enables Level 3 SAM Launchers. Long-range surface-to-air missile systems for area denial and strategic defense.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.SAMLevel3)) {
-          player.addUpgrade?.(UpgradeType.SAMLevel3);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.SAMLevel3)) {
-          player.removeUpgrade?.(UpgradeType.SAMLevel3);
-        }
-      },
-    },
-  },
   [RESEARCH_TECH_IDS.NUCLEAR_FISSION]: {
     meta: {
       name: "Nuclear Fission",
@@ -953,11 +560,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.NuclearFission)) {
           player.addUpgrade?.(UpgradeType.NuclearFission);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.NuclearFission)) {
-          player.removeUpgrade?.(UpgradeType.NuclearFission);
         }
       },
     },
@@ -973,11 +575,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.ThermonuclearStaging);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.ThermonuclearStaging)) {
-          player.removeUpgrade?.(UpgradeType.ThermonuclearStaging);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.MIRV_TECHNOLOGY]: {
@@ -991,11 +588,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.MIRVTechnology);
         }
       },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.MIRVTechnology)) {
-          player.removeUpgrade?.(UpgradeType.MIRVTechnology);
-        }
-      },
     },
   },
   [RESEARCH_TECH_IDS.DOOMSDAY_DEVICE]: {
@@ -1007,11 +599,6 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.DoomsdayDeviceResearch)) {
           player.addUpgrade?.(UpgradeType.DoomsdayDeviceResearch);
-        }
-      },
-      onRevoke: (player) => {
-        if (player.hasUpgrade?.(UpgradeType.DoomsdayDeviceResearch)) {
-          player.removeUpgrade?.(UpgradeType.DoomsdayDeviceResearch);
         }
       },
     },
@@ -1076,23 +663,15 @@ export function applyTechCompletionEffects(
   entry?.onComplete?.(player, game);
 }
 
-export function revokeTechEffects(
-  player: Player,
-  game: Game,
-  techId: string,
-): void {
-  const entry = TECHS[techId]?.effects;
-  entry?.onRevoke?.(player, game);
-}
-
 /**
- * Compute casualty multipliers when a player is defending, based on researched techs.
+ * Compute casualty multipliers when a player is defending, based on researched techs and policy directives.
  * - attackerLossMul > 1 increases enemy losses
  * - defenderLossMul < 1 reduces own losses
  */
-export function defenseCasualtyModifiers(
-  defender: Player,
-): DefenseCasualtyModifiers {
+export function defenseCasualtyModifiers(defender: {
+  hasResearchedTech?(techId: string): boolean;
+  getPolicyChoice?(directiveId: string): string | null;
+}): DefenseCasualtyModifiers {
   const mods: DefenseCasualtyModifiers = {
     attackerLossMul: 1.0,
     defenderLossMul: 1.0,
@@ -1102,19 +681,32 @@ export function defenseCasualtyModifiers(
       def.effects?.defense?.(mods);
     }
   }
+  // Apply policy directive effects
+  for (const directive of getAllPolicyDirectives()) {
+    const chosenOptionId = defender.getPolicyChoice?.(directive.id);
+    if (chosenOptionId) {
+      const option = getPolicyOption(
+        directive.id as PolicyDirectiveId,
+        chosenOptionId,
+      );
+      if (option?.effects.defenderLossMul) {
+        mods.defenderLossMul *= option.effects.defenderLossMul;
+      }
+    }
+  }
   return mods;
 }
 
 /**
- * Compute casualty multipliers when a player is attacking, based on researched techs.
+ * Compute casualty multipliers when a player is attacking, based on researched techs and policy directives.
  * Returned multipliers stack multiplicatively with defender-side modifiers.
  * - attackerLossMul < 1 reduces own losses
  * - defenderLossMul > 1 increases enemy losses
- * Currently no attacker-side techs are defined; this is ready for future use.
  */
-export function attackCasualtyModifiers(
-  attacker: Player,
-): DefenseCasualtyModifiers {
+export function attackCasualtyModifiers(attacker: {
+  hasResearchedTech?(techId: string): boolean;
+  getPolicyChoice?(directiveId: string): string | null;
+}): DefenseCasualtyModifiers {
   const mods: DefenseCasualtyModifiers = {
     attackerLossMul: 1.0,
     defenderLossMul: 1.0,
@@ -1124,14 +716,33 @@ export function attackCasualtyModifiers(
       def.effects?.attack?.(mods);
     }
   }
+  // Apply policy directive effects
+  for (const directive of getAllPolicyDirectives()) {
+    const chosenOptionId = attacker.getPolicyChoice?.(directive.id);
+    if (chosenOptionId) {
+      const option = getPolicyOption(
+        directive.id as PolicyDirectiveId,
+        chosenOptionId,
+      );
+      if (option?.effects.attackerLossMul) {
+        mods.attackerLossMul *= option.effects.attackerLossMul;
+      }
+      if (option?.effects.enemyLossMulOnAttack) {
+        mods.defenderLossMul *= option.effects.enemyLossMulOnAttack;
+      }
+    }
+  }
   return mods;
 }
 
 /**
- * Compute attack speed multiplier based on researched techs.
+ * Compute attack speed multiplier based on researched techs and policy directives.
  * speedMul > 1 increases tiles conquered per tick (faster attacks).
  */
-export function attackSpeedModifiers(attacker: Player): AttackSpeedModifiers {
+export function attackSpeedModifiers(attacker: {
+  hasResearchedTech?(techId: string): boolean;
+  getPolicyChoice?(directiveId: string): string | null;
+}): AttackSpeedModifiers {
   const mods: AttackSpeedModifiers = {
     speedMul: 1.0,
   };
@@ -1140,22 +751,50 @@ export function attackSpeedModifiers(attacker: Player): AttackSpeedModifiers {
       def.effects?.attackSpeed?.(mods);
     }
   }
+  // Apply policy directive effects
+  for (const directive of getAllPolicyDirectives()) {
+    const chosenOptionId = attacker.getPolicyChoice?.(directive.id);
+    if (chosenOptionId) {
+      const option = getPolicyOption(
+        directive.id as PolicyDirectiveId,
+        chosenOptionId,
+      );
+      if (option?.effects.attackSpeedMul) {
+        mods.speedMul *= option.effects.attackSpeedMul;
+      }
+    }
+  }
   return mods;
 }
 
 /**
- * Compute construction speed multiplier based on researched techs.
+ * Compute construction speed multiplier based on researched techs and policy directives.
  * speedMul > 1 means construction completes faster (fewer ticks).
  */
-export function constructionSpeedModifiers(
-  player: Player,
-): ConstructionSpeedModifiers {
+export function constructionSpeedModifiers(player: {
+  hasResearchedTech?(techId: string): boolean;
+  getPolicyChoice?(directiveId: string): string | null;
+}): ConstructionSpeedModifiers {
   const mods: ConstructionSpeedModifiers = {
     speedMul: 1.0,
   };
+  // Apply tech effects
   for (const [techId, def] of Object.entries(TECHS)) {
     if (player.hasResearchedTech?.(techId)) {
       def.effects?.constructionSpeed?.(mods);
+    }
+  }
+  // Apply policy directive effects
+  for (const directive of getAllPolicyDirectives()) {
+    const chosenOptionId = player.getPolicyChoice?.(directive.id);
+    if (chosenOptionId) {
+      const option = getPolicyOption(
+        directive.id as PolicyDirectiveId,
+        chosenOptionId,
+      );
+      if (option?.effects.constructionSpeedMul) {
+        mods.speedMul *= option.effects.constructionSpeedMul;
+      }
     }
   }
   return mods;
@@ -1180,29 +819,46 @@ export function researchEffectivenessModifiers(
 }
 
 /**
- * Compute income multiplier based on researched techs.
+ * Compute income multiplier based on researched techs and policy directives.
  * incomeMul > 1 means higher gross gold income.
+ * domesticIncomeMul > 1 means higher domestic (non-trade) income.
  */
 export function incomeModifiers(player: {
   hasResearchedTech?(techId: string): boolean;
+  getPolicyChoice?(directiveId: string): string | null;
 }): IncomeModifiers {
   const mods: IncomeModifiers = {
-    incomeMul: 1.0,
+    domesticIncomeMul: 1.0,
   };
+  // Apply tech effects
   for (const [techId, def] of Object.entries(TECHS)) {
     if (player.hasResearchedTech?.(techId)) {
       def.effects?.income?.(mods);
+    }
+  }
+  // Apply policy directive effects
+  for (const directive of getAllPolicyDirectives()) {
+    const chosenOptionId = player.getPolicyChoice?.(directive.id);
+    if (chosenOptionId) {
+      const option = getPolicyOption(
+        directive.id as PolicyDirectiveId,
+        chosenOptionId,
+      );
+      if (option?.effects.domesticIncomeMul) {
+        mods.domesticIncomeMul *= option.effects.domesticIncomeMul;
+      }
     }
   }
   return mods;
 }
 
 /**
- * Compute infrastructure spending effectiveness multiplier based on researched techs.
+ * Compute infrastructure spending effectiveness multiplier based on researched techs and policy directives.
  * effectivenessMul > 1 means more roads per gold spent.
  */
 export function infrastructureEffectivenessModifiers(player: {
   hasResearchedTech?(techId: string): boolean;
+  getPolicyChoice?(directiveId: string): string | null;
 }): InfrastructureEffectivenessModifiers {
   const mods: InfrastructureEffectivenessModifiers = {
     effectivenessMul: 1.0,
@@ -1212,22 +868,88 @@ export function infrastructureEffectivenessModifiers(player: {
       def.effects?.infrastructureEffectiveness?.(mods);
     }
   }
+  // Apply policy directive effects
+  for (const directive of getAllPolicyDirectives()) {
+    const chosenOptionId = player.getPolicyChoice?.(directive.id);
+    if (chosenOptionId) {
+      const option = getPolicyOption(
+        directive.id as PolicyDirectiveId,
+        chosenOptionId,
+      );
+      if (option?.effects.infrastructureSpendingEffectivenessMul) {
+        mods.effectivenessMul *=
+          option.effects.infrastructureSpendingEffectivenessMul;
+      }
+    }
+  }
   return mods;
 }
 
 /**
- * Compute trade income multiplier based on researched techs.
+ * Compute trade income multiplier based on researched techs and policy directives.
  * incomeMul > 1 means higher trade income.
+ * tradeShipIncomeMul > 1 means higher income for trade ship owners.
  */
 export function tradeIncomeModifiers(player: {
   hasResearchedTech?(techId: string): boolean;
+  getPolicyChoice?(directiveId: string): string | null;
 }): TradeIncomeModifiers {
   const mods: TradeIncomeModifiers = {
     incomeMul: 1.0,
+    tradeShipIncomeMul: 1.0,
   };
   for (const [techId, def] of Object.entries(TECHS)) {
     if (player.hasResearchedTech?.(techId)) {
       def.effects?.tradeIncome?.(mods);
+    }
+  }
+  // Apply policy directive effects
+  for (const directive of getAllPolicyDirectives()) {
+    const chosenOptionId = player.getPolicyChoice?.(directive.id);
+    if (chosenOptionId) {
+      const option = getPolicyOption(
+        directive.id as PolicyDirectiveId,
+        chosenOptionId,
+      );
+      if (option?.effects.tradeIncomeMul) {
+        mods.incomeMul *= option.effects.tradeIncomeMul;
+      }
+      if (option?.effects.tradeShipIncomeMul) {
+        mods.tradeShipIncomeMul *= option.effects.tradeShipIncomeMul;
+      }
+    }
+  }
+  return mods;
+}
+
+/**
+ * Compute road effect multiplier based on researched techs and policy directives.
+ * effectMul > 1 means roads provide stronger bonuses.
+ */
+export function roadEffectModifiers(player: {
+  hasResearchedTech?(techId: string): boolean;
+  getPolicyChoice?(directiveId: string): string | null;
+}): RoadEffectModifiers {
+  const mods: RoadEffectModifiers = {
+    effectMul: 1.0,
+  };
+  // Apply tech effects
+  for (const [techId, def] of Object.entries(TECHS)) {
+    if (player.hasResearchedTech?.(techId)) {
+      def.effects?.roadEffect?.(mods);
+    }
+  }
+  // Apply policy directive effects
+  for (const directive of getAllPolicyDirectives()) {
+    const chosenOptionId = player.getPolicyChoice?.(directive.id);
+    if (chosenOptionId) {
+      const option = getPolicyOption(
+        directive.id as PolicyDirectiveId,
+        chosenOptionId,
+      );
+      if (option?.effects.roadEffectMul) {
+        mods.effectMul *= option.effects.roadEffectMul;
+      }
     }
   }
   return mods;

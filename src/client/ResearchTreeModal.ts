@@ -5,6 +5,11 @@ import { EventBus } from "../core/EventBus";
 import { UpgradeType } from "../core/game/Game";
 import { GameView, PlayerView } from "../core/game/GameView";
 import {
+  getAllPolicyDirectives,
+  getUnlockedDirectives,
+  type PolicyDirective,
+} from "../core/tech/PolicyDirectives";
+import {
   getTechNodes,
   isTechAvailable as serverIsTechAvailable,
   type Category,
@@ -21,12 +26,14 @@ import {
 } from "./events/InvestmentEvents";
 import { CloseViewEvent } from "./InputHandler";
 import {
+  SendMarkPolicyDirectivesSeenIntentEvent,
+  SendPolicyDirectiveSelectIntentEvent,
   SendResearchTreeSelectIntentEvent,
   SendScorchedEarthIntentEvent,
 } from "./Transport";
 import { renderNumber, translateText } from "./Utils";
 
-type ResearchTab = Category | "Overview";
+type ResearchTab = Category | "Overview" | "Policy Directives";
 
 /** Helper to get display name/description from TechEffects */
 function getTechDisplay(tech: TechNode): {
@@ -64,6 +71,7 @@ export class ResearchTreeModal extends LitElement {
     "Air",
     "Nuclear",
     "Economy",
+    "Policy Directives",
     "Overview",
   ];
 
@@ -170,7 +178,12 @@ export class ResearchTreeModal extends LitElement {
     me: PlayerView | null,
     isResearched: boolean,
   ) {
-    if (tech.id !== RESEARCH_TECH_IDS.SCORCHED_EARTH || !me || !isResearched) {
+    // Show Scorched Earth button on Mechanized Warfare Doctrine (Land-2A) when researched
+    if (
+      tech.id !== RESEARCH_TECH_IDS.MECHANIZED_WARFARE_DOCTRINE ||
+      !me ||
+      !isResearched
+    ) {
       return "";
     }
     const config = this.game?.config?.();
@@ -184,7 +197,7 @@ export class ResearchTreeModal extends LitElement {
       ? "Scorched Earth already active."
       : gold < activationCost
         ? "Earn more gold to activate Scorched Earth."
-        : "Activate to raze your road network and reset Economy techs.";
+        : "Activate to raze your road network.";
     return html`
       <button
         class="tech-action"
@@ -193,8 +206,8 @@ export class ResearchTreeModal extends LitElement {
         title=${tooltip}
       >
         ${hasUpgrade
-          ? "Activated"
-          : `Activate (${renderNumber(activationCost)} gold)`}
+          ? "Scorched Earth Active"
+          : `Scorched Earth (${renderNumber(activationCost)} gold)`}
       </button>
     `;
   }
@@ -213,7 +226,7 @@ export class ResearchTreeModal extends LitElement {
   private getOrderedTabs(): ResearchTab[] {
     const available = new Set(this.categories);
     const ordered = this.tabOrder.filter((cat) => {
-      if (cat === "Overview") return true;
+      if (cat === "Overview" || cat === "Policy Directives") return true;
       return available.has(cat);
     });
     if (!ordered.includes("Overview") && available.size > 0)
@@ -233,6 +246,14 @@ export class ResearchTreeModal extends LitElement {
   private onTabClick(cat: ResearchTab) {
     if (cat === this.activeTab) return;
     this.activeTab = cat;
+
+    // Mark policy directives as seen when viewing the tab
+    if (cat === "Policy Directives" && this.eventBus) {
+      const me = this.game?.myPlayer?.();
+      if (me?.hasUnseenPolicyDirectives?.()) {
+        this.eventBus.emit(new SendMarkPolicyDirectivesSeenIntentEvent());
+      }
+    }
   }
 
   private handleInvestmentSync = (event: Event) => {
@@ -538,6 +559,136 @@ export class ResearchTreeModal extends LitElement {
     `;
   }
 
+  private renderPolicyDirectivesView() {
+    const me = this.game?.myPlayer?.();
+    if (!me) {
+      return html`
+        <div class="policy-directives-view">
+          <div class="empty-state">Loading...</div>
+        </div>
+      `;
+    }
+
+    // Get all policy directives, filter out those where a choice has already been made
+    const allDirectives = getAllPolicyDirectives();
+    const pendingDirectives = allDirectives.filter(
+      (d) => me.getPolicyChoice?.(d.id) === null,
+    );
+    const unlockedDirectives = getUnlockedDirectives((techId) =>
+      me.hasResearchedTech(techId),
+    );
+
+    // Sort so unlocked (available) directives appear first
+    const sortedDirectives = [...pendingDirectives].sort((a, b) => {
+      const aUnlocked = unlockedDirectives.some((d) => d.id === a.id);
+      const bUnlocked = unlockedDirectives.some((d) => d.id === b.id);
+      if (aUnlocked && !bUnlocked) return -1;
+      if (!aUnlocked && bUnlocked) return 1;
+      return 0;
+    });
+
+    if (pendingDirectives.length === 0) {
+      return html`
+        <div class="policy-directives-view">
+          <div class="empty-state">
+            No pending policy directives. New directives will appear here when
+            you research certain technologies.
+          </div>
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="policy-directives-view">
+        <div class="policy-directives-intro">
+          <p>
+            Policy Directives become available when you research certain
+            technologies. Choose a policy to receive additional bonuses.
+          </p>
+        </div>
+        <div class="policy-directives-list">
+          ${sortedDirectives.map((directive) => {
+            const isUnlocked = unlockedDirectives.some(
+              (d) => d.id === directive.id,
+            );
+            const currentChoice = me.getPolicyChoice?.(directive.id) ?? null;
+            return this.renderPolicyDirective(
+              directive,
+              isUnlocked,
+              currentChoice,
+            );
+          })}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderPolicyDirective(
+    directive: PolicyDirective,
+    isUnlocked: boolean,
+    currentChoice: string | null,
+  ) {
+    return html`
+      <div class="policy-directive ${isUnlocked ? "" : "locked"}">
+        <div class="policy-directive-header">
+          <h3 class="policy-directive-name">${directive.name}</h3>
+          ${!isUnlocked
+            ? html`<span class="policy-directive-locked-badge">
+                🔒 Requires:
+                ${getTechMeta(directive.unlockedByTech, { strict: false })
+                  ?.name ?? directive.unlockedByTech}
+              </span>`
+            : ""}
+        </div>
+        <p class="policy-directive-description">${directive.description}</p>
+        <div class="policy-options">
+          ${directive.options.map((option) => {
+            const isSelected = currentChoice === option.id;
+            // Disable if not unlocked OR if a choice has already been made (one-time selection)
+            const hasChoiceMade = currentChoice !== null;
+            const isDisabled = !isUnlocked || hasChoiceMade;
+            return html`
+              <button
+                class="policy-option ${isSelected
+                  ? "selected"
+                  : ""} ${isDisabled ? "disabled" : ""}"
+                ?disabled=${isDisabled}
+                @click=${() =>
+                  this.onPolicyOptionClick(directive.id, option.id)}
+              >
+                <div class="policy-option-name">${option.name}</div>
+                <div class="policy-option-description">
+                  ${option.description}
+                </div>
+                ${isSelected
+                  ? html`<span class="policy-option-selected-badge"
+                      >✓ Locked In</span
+                    >`
+                  : ""}
+              </button>
+            `;
+          })}
+        </div>
+      </div>
+    `;
+  }
+
+  private onPolicyOptionClick(directiveId: string, optionId: string) {
+    if (!this.game || !this.eventBus) return;
+    const me = this.game.myPlayer?.();
+    if (!me) return;
+
+    // Don't allow selection if any choice has already been made (one-time selection)
+    const currentChoice = me.getPolicyChoice?.(directiveId);
+    if (currentChoice !== null && currentChoice !== undefined) return;
+
+    // Emit the intent to select this policy
+    this.eventBus.emit(
+      new SendPolicyDirectiveSelectIntentEvent(directiveId, optionId),
+    );
+    this.requestUpdate();
+  }
+
   private drawEdges() {
     const container = this.renderRoot.querySelector(
       ".line-layer",
@@ -697,6 +848,7 @@ export class ResearchTreeModal extends LitElement {
     const priority = me?.researchPriorityTech?.() ?? null;
     const tabs = this.getOrderedTabs();
     const isAllView = this.activeTab === "Overview";
+    const isPolicyDirectivesView = this.activeTab === "Policy Directives";
     const activeCategory = this.getActiveCategory();
     const activeTechs = activeCategory
       ? this.techs.filter((t) => t.category === activeCategory)
@@ -1527,6 +1679,146 @@ export class ResearchTreeModal extends LitElement {
               0 0 4px color-mix(in srgb, var(--ui-info) 45%, transparent)
             );
           }
+          /* Policy Directives styles */
+          .policy-directives-view {
+            padding: 16px;
+          }
+          .policy-directives-intro {
+            margin-bottom: 20px;
+            color: var(--ui-text-accent);
+            font-size: 13px;
+            line-height: 1.5;
+          }
+          .policy-directives-list {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+          }
+          .policy-directive {
+            background: color-mix(
+              in srgb,
+              var(--ui-panel-shell-bottom) 95%,
+              transparent
+            );
+            border: 1px solid
+              color-mix(in srgb, var(--ui-panel-border) 85%, transparent);
+            border-radius: 12px;
+            padding: 16px;
+            transition: opacity 0.2s;
+          }
+          .policy-directive.locked {
+            opacity: 0.6;
+          }
+          .policy-directive-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+          }
+          .policy-directive-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--ui-text-light);
+            margin: 0;
+          }
+          .policy-directive-locked-badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--ui-warning) 20%, transparent);
+            color: var(--ui-warning);
+            border: 1px solid
+              color-mix(in srgb, var(--ui-warning) 40%, transparent);
+          }
+          .policy-directive-description {
+            font-size: 13px;
+            color: var(--ui-text-accent);
+            margin: 0 0 16px 0;
+            line-height: 1.4;
+          }
+          .policy-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+          }
+          .policy-option {
+            flex: 1;
+            min-width: 200px;
+            max-width: 350px;
+            background: color-mix(
+              in srgb,
+              var(--ui-panel-shell-top) 90%,
+              transparent
+            );
+            border: 2px solid
+              color-mix(in srgb, var(--ui-border-muted) 50%, transparent);
+            border-radius: 10px;
+            padding: 14px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s ease;
+            position: relative;
+          }
+          .policy-option:hover:not(.disabled) {
+            border-color: color-mix(in srgb, var(--ui-info) 60%, transparent);
+            background: color-mix(in srgb, var(--ui-info) 8%, transparent);
+          }
+          .policy-option.selected {
+            border-color: var(--ui-success);
+            background: color-mix(in srgb, var(--ui-success) 15%, transparent);
+            box-shadow: 0 0 12px
+              color-mix(in srgb, var(--ui-success) 25%, transparent);
+          }
+          .policy-option.disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+          }
+          .policy-option-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ui-text-light);
+            margin-bottom: 6px;
+          }
+          .policy-option-description {
+            font-size: 12px;
+            color: var(--ui-text-accent);
+            line-height: 1.4;
+          }
+          .policy-option-selected-badge {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--ui-success);
+          }
+          .tab-notification-badge {
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 14px;
+            height: 14px;
+            background: #ffc107;
+            border: 1px solid #000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: #000;
+            padding-left: 1px;
+            animation: pulse-tab-badge 1.5s ease-in-out infinite;
+          }
+          @keyframes pulse-tab-badge {
+            0%,
+            100% {
+              transform: scale(1);
+            }
+            50% {
+              transform: scale(1.1);
+            }
+          }
         </style>
         ${this.renderLegend()}
         <div class="tab-shell">
@@ -1534,10 +1826,17 @@ export class ResearchTreeModal extends LitElement {
             <div class="tab-buttons" role="tablist">
               ${tabs.map((cat) => {
                 const isAllTab = cat === "Overview";
-                const isActive = isAllTab ? isAllView : cat === activeCategory;
+                const isPolicyTab = cat === "Policy Directives";
+                const isActive = isAllTab
+                  ? isAllView
+                  : isPolicyTab
+                    ? isPolicyDirectivesView
+                    : cat === activeCategory;
                 const tabTooltip = translateText(
-                  `research_tree.tab_tooltip.${cat.toLowerCase()}`,
+                  `research_tree.tab_tooltip.${cat.toLowerCase().replace(" ", "_")}`,
                 );
+                const showPolicyBadge =
+                  isPolicyTab && me?.hasUnseenPolicyDirectives?.();
                 return html`<button
                   type="button"
                   class="tab-button ${isActive ? "active" : ""}"
@@ -1545,216 +1844,236 @@ export class ResearchTreeModal extends LitElement {
                   aria-selected=${String(isActive)}
                   aria-label=${tabTooltip}
                   title=${tabTooltip}
-                  style=${isActive
-                    ? `--tab-accent:${isAllTab ? "color-mix(in srgb, var(--ui-border-muted) 25%, transparent)" : (categoryColors[cat as Category] ?? "transparent")}`
-                    : ""}
+                  style=${`position: relative; ${
+                    isActive
+                      ? `--tab-accent:${isAllTab ? "color-mix(in srgb, var(--ui-border-muted) 25%, transparent)" : (categoryColors[cat as Category] ?? "transparent")}`
+                      : ""
+                  }`}
                   @click=${() => this.onTabClick(cat)}
                 >
                   ${cat}
+                  ${showPolicyBadge
+                    ? html`<span class="tab-notification-badge">!</span>`
+                    : ""}
                 </button>`;
               })}
             </div>
             <div class="investment-cluster">${this.renderResearchSlider()}</div>
           </div>
           <div class="tab-panel" role="tabpanel">
-            <div class="tree-container ${isAllView ? "all-view" : ""}">
-              ${isAllView
-                ? this.renderAllView(
-                    levels,
-                    researched,
-                    categoryColors,
-                    percentByTechId,
-                  )
-                : activeCategory
-                  ? html`<div
-                      class="level-strip"
-                      style=${`--level-accent:${categoryColors[activeCategory] ?? "transparent"}`}
-                    >
-                      ${levels.map((lvl) => {
-                        const techsForLevel = this.techs.filter(
-                          (t) =>
-                            t.level === lvl && t.category === activeCategory,
-                        );
-                        return html`<div class="level-column">
-                          <div class="level-label">Tech Level ${lvl}</div>
-                          <div class="tech-stack">
-                            ${techsForLevel.length
-                              ? techsForLevel.map((tech) => {
-                                  const available = this.isAvailable(
-                                    tech.id,
-                                    researched,
-                                  );
-                                  const isResearched = researched.has(tech.id);
-                                  const clickable = !isResearched;
-                                  const inHighlight = highlightTrail.has(
-                                    tech.id,
-                                  );
-                                  const classes = [
-                                    "tech",
-                                    available ? "" : "locked",
-                                    isResearched ? "researched" : "",
-                                    inHighlight ? "priority" : "",
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" ");
-                                  const action = this.renderScorchedEarthAction(
-                                    tech,
-                                    me ?? null,
-                                    isResearched,
-                                  );
-                                  return html`<div class="tech-wrapper">
-                                    ${(() => {
-                                      const display = getTechDisplay(tech);
-                                      return html`<button
-                                        class=${classes}
-                                        data-id=${tech.id}
-                                        @click=${() =>
-                                          this.onTechClick(tech.id)}
-                                        @mouseenter=${(ev: Event) =>
-                                          this.adjustTooltipPosition(
-                                            ev.currentTarget as HTMLElement,
-                                          )}
-                                        @focus=${(ev: Event) =>
-                                          this.adjustTooltipPosition(
-                                            ev.currentTarget as HTMLElement,
-                                          )}
-                                        title=${""}
-                                        ?disabled=${!clickable}
-                                      >
-                                        <div class="tooltip">
-                                          <div
-                                            style="font-weight:600;margin-bottom:4px;"
-                                          >
-                                            ${display.name}
-                                          </div>
-                                          ${display.description
-                                            ? html`<div
-                                                style="opacity:.9;margin-bottom:6px;"
-                                              >
-                                                ${display.description}
-                                              </div>`
-                                            : ""}
-                                          ${(() => {
-                                            const meLocal =
-                                              this.game?.myPlayer?.();
-                                            const b =
-                                              meLocal?.researchBeakers?.(
-                                                tech.id,
-                                              ) ?? 0;
-                                            const pct = Math.min(
-                                              100,
-                                              Math.floor(
-                                                (b / (tech.cost || 1)) * 100,
-                                              ),
-                                            );
-                                            return html`<div
-                                              style="font-size:11px;opacity:.9;"
-                                            >
-                                              <div
-                                                class="cost-inline"
-                                                translate="no"
-                                              >
-                                                <span
-                                                  >Cost:
-                                                  ${tech.cost.toLocaleString()}</span
-                                                >
-                                                <img
-                                                  src=${flaskIcon}
-                                                  alt="research cost"
-                                                />
-                                              </div>
-                                              ${isResearched
-                                                ? html`<div>
-                                                    Status: Completed
-                                                  </div>`
-                                                : html`<div>
-                                                    Progress:
-                                                    ${b.toLocaleString()} /
-                                                    ${tech.cost.toLocaleString()}
-                                                    (${pct}%)
-                                                  </div>`}
-                                            </div>`;
-                                          })()}
-                                        </div>
-                                        <div
-                                          style="font-weight:600; margin-bottom:6px;"
+            <div
+              class="tree-container ${isAllView || isPolicyDirectivesView
+                ? "all-view"
+                : ""}"
+            >
+              ${isPolicyDirectivesView
+                ? this.renderPolicyDirectivesView()
+                : isAllView
+                  ? this.renderAllView(
+                      levels,
+                      researched,
+                      categoryColors,
+                      percentByTechId,
+                    )
+                  : activeCategory
+                    ? html`<div
+                        class="level-strip"
+                        style=${`--level-accent:${categoryColors[activeCategory] ?? "transparent"}`}
+                      >
+                        ${levels.map((lvl) => {
+                          const techsForLevel = this.techs.filter(
+                            (t) =>
+                              t.level === lvl && t.category === activeCategory,
+                          );
+                          return html`<div class="level-column">
+                            <div class="level-label">Tech Level ${lvl}</div>
+                            <div class="tech-stack">
+                              ${techsForLevel.length
+                                ? techsForLevel.map((tech) => {
+                                    const available = this.isAvailable(
+                                      tech.id,
+                                      researched,
+                                    );
+                                    const isResearched = researched.has(
+                                      tech.id,
+                                    );
+                                    const clickable = !isResearched;
+                                    const inHighlight = highlightTrail.has(
+                                      tech.id,
+                                    );
+                                    const classes = [
+                                      "tech",
+                                      available ? "" : "locked",
+                                      isResearched ? "researched" : "",
+                                      inHighlight ? "priority" : "",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" ");
+                                    const action =
+                                      this.renderScorchedEarthAction(
+                                        tech,
+                                        me ?? null,
+                                        isResearched,
+                                      );
+                                    return html`<div class="tech-wrapper">
+                                      ${(() => {
+                                        const display = getTechDisplay(tech);
+                                        return html`<button
+                                          class=${classes}
+                                          data-id=${tech.id}
+                                          @click=${() =>
+                                            this.onTechClick(tech.id)}
+                                          @mouseenter=${(ev: Event) =>
+                                            this.adjustTooltipPosition(
+                                              ev.currentTarget as HTMLElement,
+                                            )}
+                                          @focus=${(ev: Event) =>
+                                            this.adjustTooltipPosition(
+                                              ev.currentTarget as HTMLElement,
+                                            )}
+                                          title=${""}
+                                          ?disabled=${!clickable}
                                         >
-                                          ${display.name}
-                                        </div>
-                                        <div class="cost-inline" translate="no">
-                                          <span
-                                            >${tech.cost.toLocaleString()}</span
-                                          >
-                                          <img
-                                            src=${flaskIcon}
-                                            alt="research cost"
-                                          />
-                                        </div>
-                                        ${!isResearched && me
-                                          ? (() => {
+                                          <div class="tooltip">
+                                            <div
+                                              style="font-weight:600;margin-bottom:4px;"
+                                            >
+                                              ${display.name}
+                                            </div>
+                                            ${display.description
+                                              ? html`<div
+                                                  style="opacity:.9;margin-bottom:6px;"
+                                                >
+                                                  ${display.description}
+                                                </div>`
+                                              : ""}
+                                            ${(() => {
+                                              const meLocal =
+                                                this.game?.myPlayer?.();
                                               const b =
-                                                me.researchBeakers?.(tech.id) ??
-                                                0;
+                                                meLocal?.researchBeakers?.(
+                                                  tech.id,
+                                                ) ?? 0;
                                               const pct = Math.min(
                                                 100,
                                                 Math.floor(
                                                   (b / (tech.cost || 1)) * 100,
                                                 ),
                                               );
-                                              return b > 0
-                                                ? html`<div
-                                                    class="progress-track"
+                                              return html`<div
+                                                style="font-size:11px;opacity:.9;"
+                                              >
+                                                <div
+                                                  class="cost-inline"
+                                                  translate="no"
+                                                >
+                                                  <span
+                                                    >Cost:
+                                                    ${tech.cost.toLocaleString()}</span
                                                   >
-                                                    <div
-                                                      class="progress-fill ${priority ===
-                                                      tech.id
-                                                        ? "priority"
-                                                        : ""}"
-                                                      style="width:${pct}%"
-                                                    ></div>
-                                                  </div>`
-                                                : "";
-                                            })()
-                                          : ""}
-                                        <div>
-                                          ${tech.requiresAllOf?.length
-                                            ? html`<span class="pill pill-req"
-                                                >Requires:
-                                                ${tech.requiresAllOf
-                                                  .length}</span
-                                              >`
+                                                  <img
+                                                    src=${flaskIcon}
+                                                    alt="research cost"
+                                                  />
+                                                </div>
+                                                ${isResearched
+                                                  ? html`<div>
+                                                      Status: Completed
+                                                    </div>`
+                                                  : html`<div>
+                                                      Progress:
+                                                      ${b.toLocaleString()} /
+                                                      ${tech.cost.toLocaleString()}
+                                                      (${pct}%)
+                                                    </div>`}
+                                              </div>`;
+                                            })()}
+                                          </div>
+                                          <div
+                                            style="font-weight:600; margin-bottom:6px;"
+                                          >
+                                            ${display.name}
+                                          </div>
+                                          <div
+                                            class="cost-inline"
+                                            translate="no"
+                                          >
+                                            <span
+                                              >${tech.cost.toLocaleString()}</span
+                                            >
+                                            <img
+                                              src=${flaskIcon}
+                                              alt="research cost"
+                                            />
+                                          </div>
+                                          ${!isResearched && me
+                                            ? (() => {
+                                                const b =
+                                                  me.researchBeakers?.(
+                                                    tech.id,
+                                                  ) ?? 0;
+                                                const pct = Math.min(
+                                                  100,
+                                                  Math.floor(
+                                                    (b / (tech.cost || 1)) *
+                                                      100,
+                                                  ),
+                                                );
+                                                return b > 0
+                                                  ? html`<div
+                                                      class="progress-track"
+                                                    >
+                                                      <div
+                                                        class="progress-fill ${priority ===
+                                                        tech.id
+                                                          ? "priority"
+                                                          : ""}"
+                                                        style="width:${pct}%"
+                                                      ></div>
+                                                    </div>`
+                                                  : "";
+                                              })()
                                             : ""}
-                                          ${tech.requiresOneOf?.length
-                                            ? html`<span class="pill pill-oneof"
-                                                >One of:
-                                                ${tech.requiresOneOf
-                                                  .length}</span
-                                              >`
-                                            : ""}
-                                          ${priority === tech.id &&
-                                          !isResearched
-                                            ? html`<span
-                                                class="pill pill-priority"
-                                                >Priority</span
-                                              >`
-                                            : ""}
-                                        </div>
-                                      </button>`;
-                                    })()}
-                                    ${action}
-                                  </div>`;
-                                })
-                              : html`<div class="empty-level">
-                                  No techs at this level
-                                </div>`}
-                          </div>
-                        </div>`;
-                      })}
-                    </div>`
-                  : html`<div class="empty-state">
-                      No research categories found.
-                    </div>`}
-              ${!isAllView
+                                          <div>
+                                            ${tech.requiresAllOf?.length
+                                              ? html`<span class="pill pill-req"
+                                                  >Requires:
+                                                  ${tech.requiresAllOf
+                                                    .length}</span
+                                                >`
+                                              : ""}
+                                            ${tech.requiresOneOf?.length
+                                              ? html`<span
+                                                  class="pill pill-oneof"
+                                                  >One of:
+                                                  ${tech.requiresOneOf
+                                                    .length}</span
+                                                >`
+                                              : ""}
+                                            ${priority === tech.id &&
+                                            !isResearched
+                                              ? html`<span
+                                                  class="pill pill-priority"
+                                                  >Priority</span
+                                                >`
+                                              : ""}
+                                          </div>
+                                        </button>`;
+                                      })()}
+                                      ${action}
+                                    </div>`;
+                                  })
+                                : html`<div class="empty-level">
+                                    No techs at this level
+                                  </div>`}
+                            </div>
+                          </div>`;
+                        })}
+                      </div>`
+                    : html`<div class="empty-state">
+                        No research categories found.
+                      </div>`}
+              ${!isAllView && !isPolicyDirectivesView
                 ? html`<div class="line-layer"><svg></svg></div>`
                 : ""}
             </div>

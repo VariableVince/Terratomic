@@ -8,12 +8,13 @@ import {
   Tick,
   Unit,
   UnitType,
+  UpgradeType,
 } from "../game/Game";
 import { TileRef } from "../game/GameMap";
 import { PathFindResultType } from "../pathfinding/AStar";
 import { PathFinder } from "../pathfinding/PathFinding";
 import { PseudoRandom } from "../PseudoRandom";
-import { tradeIncomeModifiers } from "../tech/TechEffects";
+import { roadEffectModifiers, tradeIncomeModifiers } from "../tech/TechEffects";
 
 type PairKey = string; // `${fromId}->${toId}`
 
@@ -148,6 +149,14 @@ export class TradeManagerExecution implements Execution {
         // If either side has an embargo against the other, demand is zero
         if (a.hasEmbargoAgainst(b) || b.hasEmbargoAgainst(a)) {
           // Keep fractional demand at 0 for this pair
+          this.demand.set(this.key(a, b), 0);
+          continue;
+        }
+        // If either side lacks InternationalTrade upgrade (autarky), demand is zero
+        if (
+          !a.hasUpgrade(UpgradeType.InternationalTrade) ||
+          !b.hasUpgrade(UpgradeType.InternationalTrade)
+        ) {
           this.demand.set(this.key(a, b), 0);
           continue;
         }
@@ -1107,8 +1116,13 @@ export class AssignedTradeRouteExecution implements Execution {
     // Calculate base shares with tech modifiers
     const aBaseTechShare = BigInt(Math.floor(Number(third) * aMods.incomeMul));
     const bBaseTechShare = BigInt(Math.floor(Number(third) * bMods.incomeMul));
+    // Ship owner gets both incomeMul and tradeShipIncomeMul bonus
     const ownerBaseTechShare = BigInt(
-      Math.floor(Number(third + remainder) * ownerMods.incomeMul),
+      Math.floor(
+        Number(third + remainder) *
+          ownerMods.incomeMul *
+          ownerMods.tradeShipIncomeMul,
+      ),
     );
 
     // Apply road connection bonus to port owners' shares
@@ -1164,7 +1178,9 @@ export class AssignedTradeRouteExecution implements Execution {
     // Get road quality (0-150, with 100 being baseline)
     const roadQuality = (owner as Player).roadNetworkQuality();
     // Road bonus: at 100% quality = 20% increase, at 50% = 10%, at 150% = 30%
-    const bonusFactor = 0.2 * (roadQuality / 100);
+    // roadEffectMul further amplifies/dampens the road bonus (e.g., Transport Priority policy)
+    const roadMods = roadEffectModifiers(owner as Player);
+    const bonusFactor = 0.2 * (roadQuality / 100) * roadMods.effectMul;
     const bonusGold = BigInt(Math.floor(Number(baseGold) * bonusFactor));
 
     return baseGold + bonusGold;
