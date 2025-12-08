@@ -1354,37 +1354,11 @@ export class PlayerImpl implements Player {
       }
     }
 
-    // Warship tech requirement (Early Cold War Cruisers)
-    if (unitType === UnitType.Warship) {
-      if (!this.hasUpgrade(UpgradeType.WarshipLevel1)) {
-        return false;
-      }
-    }
+    // Warship and Submarine: Level 1 are available by default, no tech requirement
 
-    // Submarine tech requirement (Diesel-Electric Subs)
-    if (unitType === UnitType.Submarine) {
-      if (!this.hasUpgrade(UpgradeType.SubmarineLevel1)) {
-        return false;
-      }
-    }
+    // Air units: Fighter and Bomber Level 1 are available by default, no tech requirement
 
-    // Air tech requirements (Jet Engines)
-    if (
-      unitType === UnitType.Airfield ||
-      unitType === UnitType.FighterJet ||
-      unitType === UnitType.Bomber
-    ) {
-      if (!this.hasUpgrade(UpgradeType.JetEngines)) {
-        return false;
-      }
-    }
-
-    // SAM Launcher tech requirement (Surface-to-Air Missiles)
-    if (unitType === UnitType.SAMLauncher) {
-      if (!this.hasUpgrade(UpgradeType.SAMLevel1)) {
-        return false;
-      }
-    }
+    // SAM Launcher: Level 1 is available by default, no tech requirement
 
     // Military Academy tech requirement (WWII Lessons Learned)
     if (unitType === UnitType.Academy) {

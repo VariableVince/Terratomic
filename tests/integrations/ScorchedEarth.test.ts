@@ -30,11 +30,14 @@ describe("Scorched Earth Full Cycle Integration Test", () => {
     }
 
     // Research core economy techs to unlock and test revocation behavior
-    player.addResearchedTech(RESEARCH_TECH_IDS.POST_WW2_MODERNIZATION);
+    player.addResearchedTech(
+      RESEARCH_TECH_IDS.POST_WW2_GROUND_FORCES_MODERNIZATION,
+    );
     player.addResearchedTech(RESEARCH_TECH_IDS.NATIONAL_RECONSTRUCTION_PROGRAM);
-    player.addResearchedTech(RESEARCH_TECH_IDS.INDUSTRIAL_DEVELOPMENT_STRATEGY);
+    player.addResearchedTech(
+      RESEARCH_TECH_IDS.NATIONAL_RESEARCH_INDUSTRIAL_FOUNDATIONS,
+    );
     player.addResearchedTech(RESEARCH_TECH_IDS.TRADE_POLICY_FRAMEWORK);
-    player.addResearchedTech(RESEARCH_TECH_IDS.INFRASTRUCTURE_PRIORITIZATION);
 
     // Allow the automatic road upgrade to build out the network
     for (let i = 0; i < 200; i++) {
@@ -61,7 +64,7 @@ describe("Scorched Earth Full Cycle Integration Test", () => {
     ).toBe(true);
     expect(
       player.hasResearchedTech(
-        RESEARCH_TECH_IDS.INDUSTRIAL_DEVELOPMENT_STRATEGY,
+        RESEARCH_TECH_IDS.NATIONAL_RESEARCH_INDUSTRIAL_FOUNDATIONS,
       ),
     ).toBe(true);
 

@@ -91,98 +91,30 @@ export type TechDefinition = {
 
 // Unified registry containing both metadata and effects per tech
 export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
-  // Sea techs - Level 1
-  [RESEARCH_TECH_IDS.EARLY_COLD_WAR_CRUISERS]: {
+  // Sea techs - Level 1: Early Missile Navy
+  [RESEARCH_TECH_IDS.EARLY_MISSILE_NAVY]: {
     meta: {
-      name: "Early Cold War Cruisers",
+      name: "Early Missile Navy",
       description:
-        "Enables Level 1 Warships. Post-war cruiser designs with improved armament and fire control systems.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.WarshipLevel1)) {
-          player.addUpgrade?.(UpgradeType.WarshipLevel1);
-        }
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.DIESEL_ELECTRIC_SUBS]: {
-    meta: {
-      name: "Diesel-Electric Subs",
-      description:
-        "Enables Level 1 Submarines. Conventional submarines with improved stealth and endurance.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.SubmarineLevel1)) {
-          player.addUpgrade?.(UpgradeType.SubmarineLevel1);
-        }
-      },
-    },
-  },
-  // Sea techs - Level 2
-  [RESEARCH_TECH_IDS.FIRST_MISSILE_CRUISERS]: {
-    meta: {
-      name: "First-Missile Cruisers",
-      description:
-        "Enables Level 2 Warships. Guided missile cruisers with long-range anti-ship capabilities.",
+        "Develop guided missile technology for naval warfare. Unlocks Warship Level 2, Submarine Level 2.",
     },
     effects: {
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.WarshipLevel2)) {
           player.addUpgrade?.(UpgradeType.WarshipLevel2);
         }
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.NUCLEAR_ATTACK_SUBMARINES]: {
-    meta: {
-      name: "Nuclear Attack Submarines",
-      description:
-        "Enables Level 2 Submarines. Nuclear-powered attack submarines with unlimited range and improved speed.",
-    },
-    effects: {
-      onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.SubmarineLevel2)) {
           player.addUpgrade?.(UpgradeType.SubmarineLevel2);
         }
       },
     },
   },
-  [RESEARCH_TECH_IDS.BALLISTIC_MISSILE_SUBMARINES]: {
+  // Sea techs - Level 2: Submarine Silent Service Modernization
+  [RESEARCH_TECH_IDS.SUBMARINE_SILENT_SERVICE]: {
     meta: {
-      name: "Ballistic Missile Submarines",
+      name: "Submarine Silent Service Modernization",
       description:
-        "Allows Submarines to launch Atomic Bombs. Nuclear-powered ballistic missile submarines for strategic deterrence.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.NuclearSubmarineResearch)) {
-          player.addUpgrade?.(UpgradeType.NuclearSubmarineResearch);
-        }
-      },
-    },
-  },
-  // Sea techs - Level 3
-  [RESEARCH_TECH_IDS.ADVANCED_MISSILE_CRUISERS]: {
-    meta: {
-      name: "Advanced Missile Cruisers",
-      description:
-        "Enables Level 3 Warships. Modern guided missile cruisers with advanced combat systems.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.WarshipLevel3)) {
-          player.addUpgrade?.(UpgradeType.WarshipLevel3);
-        }
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.ADVANCED_NUCLEAR_ATTACK_SUBS]: {
-    meta: {
-      name: "Advanced Nuclear Attack Subs",
-      description:
-        "Enables Level 3 Submarines. Next-generation nuclear attack submarines with improved stealth and weapons.",
+        "Advanced quieting and acoustic stealth for submarines. Unlocks Submarine Level 3.",
     },
     effects: {
       onComplete: (player) => {
@@ -192,46 +124,44 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       },
     },
   },
-  [RESEARCH_TECH_IDS.NAVAL_SAM_SYSTEMS]: {
+  // Sea techs - Level 3: SSBN Programs
+  [RESEARCH_TECH_IDS.SSBN_PROGRAMS]: {
     meta: {
-      name: "Naval SAM Systems",
+      name: "SSBN Programs",
       description:
-        "Equips Warships with an anti-air (AA) missile system to engage nearby enemy aircraft. Does not intercept nuclear missiles.",
+        "Ballistic missile submarine programs for strategic deterrence. Unlocks SSBNs (Submarines can launch nuclear weapons).",
     },
     effects: {
       onComplete: (player) => {
+        if (!player.hasUpgrade?.(UpgradeType.NuclearSubmarineResearch)) {
+          player.addUpgrade?.(UpgradeType.NuclearSubmarineResearch);
+        }
+      },
+    },
+  },
+  // Sea techs - Level 4: Modern Fleet Sensor & SAM Integration
+  [RESEARCH_TECH_IDS.MODERN_FLEET_SENSOR_SAM]: {
+    meta: {
+      name: "Modern Fleet Sensor & SAM Integration",
+      description:
+        "Advanced sensor suites and integrated air defense systems for the fleet. Unlocks Warship Level 3, Ship SAM Systems.",
+    },
+    effects: {
+      onComplete: (player) => {
+        if (!player.hasUpgrade?.(UpgradeType.WarshipLevel3)) {
+          player.addUpgrade?.(UpgradeType.WarshipLevel3);
+        }
         if (!player.hasUpgrade?.(UpgradeType.WarshipAntiAir)) {
           player.addUpgrade?.(UpgradeType.WarshipAntiAir);
         }
       },
     },
   },
-  // Sea techs - Level 4
-  [RESEARCH_TECH_IDS.AEGIS_WARSHIP_SYSTEMS]: {
+  [RESEARCH_TECH_IDS.POST_WW2_GROUND_FORCES_MODERNIZATION]: {
     meta: {
-      name: "Aegis Warship Systems",
+      name: "Post-WW2 Ground Forces Modernization",
       description:
-        "Advanced integrated naval weapons system with multi-target tracking and engagement capabilities.",
-    },
-    effects: {
-      // Placeholder - no effect for now
-    },
-  },
-  [RESEARCH_TECH_IDS.QUIETING_ACOUSTIC_STEALTH]: {
-    meta: {
-      name: "Quieting and Acoustic Stealth",
-      description:
-        "Advanced noise reduction and acoustic signature management for improved submarine stealth.",
-    },
-    effects: {
-      // Placeholder - no effect for now
-    },
-  },
-  [RESEARCH_TECH_IDS.POST_WW2_MODERNIZATION]: {
-    meta: {
-      name: "Post-WW2 Modernization",
-      description:
-        "Doctrine refined by hard-won experience improves offensive capabilities and tactical efficiency. Effects: Enables Military Academy, City AA. Enemy takes +5% more losses when you attack them. Your offensive speed +5%.",
+        "Doctrine refined by hard-won experience improves offensive capabilities and tactical efficiency. Effects: Enables Military Academy, AA Guns. +5% offensive speed. Casualty Effects (20%): +10% enemy losses when you attack, -10% your losses when defending.",
     },
     effects: {
       onComplete: (player, game) => {
@@ -245,7 +175,10 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
         }
       },
       attack: (mods) => {
-        mods.defenderLossMul *= 1.05; // enemy (defender) takes 5% more losses when we attack
+        mods.defenderLossMul *= 1.1; // enemy (defender) takes 10% more losses when we attack
+      },
+      defense: (mods) => {
+        mods.defenderLossMul *= 0.9; // we take 10% less losses when defending
       },
       attackSpeed: (mods) => {
         mods.speedMul *= 1.05; // 5% faster offensive speed
@@ -256,7 +189,7 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
     meta: {
       name: "National Reconstruction Program",
       description:
-        "Revitalize infrastructure and industry by mobilizing civilian labor and resources to rebuild the national economy. Effects: Enables Roads, +5% infrastructure spending effectiveness.",
+        "Revitalize infrastructure and industry by mobilizing civilian labor and resources to rebuild the national economy. Effects: Enables Roads, Hospitals. +20% infrastructure spending effectiveness, +20% stronger road effects.",
     },
     effects: {
       onComplete: (player, game) => {
@@ -268,126 +201,94 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
         if (player.hasUpgrade?.(UpgradeType.ScorchedEarth)) {
           player.removeUpgrade?.(UpgradeType.ScorchedEarth);
         }
-      },
-      infrastructureEffectiveness: (mods) => {
-        mods.effectivenessMul *= 1.05; // +5% infrastructure spending effectiveness
-      },
-    },
-  },
-  // Economy Level 2 techs
-  [RESEARCH_TECH_IDS.INDUSTRIAL_DEVELOPMENT_STRATEGY]: {
-    meta: {
-      name: "Industrial Development Strategy",
-      description:
-        "Prioritize industrial capacity and manufacturing output to strengthen the national economy.",
-    },
-    effects: {
-      // Effects to be added later
-    },
-  },
-  [RESEARCH_TECH_IDS.TRADE_POLICY_FRAMEWORK]: {
-    meta: {
-      name: "Trade Policy Framework",
-      description:
-        "Establish trade agreements and commercial policies to boost economic growth.",
-    },
-    effects: {
-      // Effects to be added later
-    },
-  },
-  // Economy Level 3 techs
-  [RESEARCH_TECH_IDS.SCIENTIFIC_RESEARCH_NETWORK]: {
-    meta: {
-      name: "Scientific Research Network",
-      description:
-        "Establish national research networks for scientific advancement. Effects: Enables Research Labs.",
-    },
-    effects: {
-      onComplete: (player) => {
-        player.addUpgrade?.(UpgradeType.ResearchLabResearch);
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.INFRASTRUCTURE_PRIORITIZATION]: {
-    meta: {
-      name: "Infrastructure Prioritization",
-      description:
-        "Focus national resources on critical infrastructure development. Effects: Enables Hospitals.",
-    },
-    effects: {
-      onComplete: (player) => {
+        // Unlock Hospitals
         if (!player.hasUpgrade?.(UpgradeType.HospitalResearch)) {
           player.addUpgrade?.(UpgradeType.HospitalResearch);
         }
       },
-    },
-  },
-  // Economy Level 4 techs
-  [RESEARCH_TECH_IDS.COMPUTING_DATA_SYSTEMS]: {
-    meta: {
-      name: "Computing & Data Systems",
-      description:
-        "Develop computing infrastructure and data processing systems. Effects: +5% research spending effectiveness, +5% infrastructure spending effectiveness.",
-    },
-    effects: {
-      researchEffectiveness: (mods) => {
-        mods.effectivenessMul *= 1.05; // +5% research spending effectiveness
-      },
       infrastructureEffectiveness: (mods) => {
-        mods.effectivenessMul *= 1.05; // +5% infrastructure spending effectiveness
+        mods.effectivenessMul *= 1.2; // +20% infrastructure spending effectiveness
+      },
+      roadEffect: (mods) => {
+        mods.effectMul *= 1.2; // +20% stronger road effects
       },
     },
   },
-  [RESEARCH_TECH_IDS.NATIONAL_ECONOMIC_COORDINATION]: {
+  // Economy Level 2 tech - National Research & Industrial Foundations (1960s)
+  [RESEARCH_TECH_IDS.NATIONAL_RESEARCH_INDUSTRIAL_FOUNDATIONS]: {
     meta: {
-      name: "National Economic Coordination Systems",
-      description: "National systems for economic planning and coordination.",
+      name: "National Research & Industrial Foundations",
+      description:
+        "Establish national research institutions and industrial base. Effects: Enables Research Labs. Policy Directive: Industrial Expansion Priority (+5% domestic income, +20% construction speed) or Scientific Institution Priority (+30% research spending effectiveness).",
     },
     effects: {
-      // Effects to be added later
+      onComplete: (player) => {
+        if (!player.hasUpgrade?.(UpgradeType.ResearchLabResearch)) {
+          player.addUpgrade?.(UpgradeType.ResearchLabResearch);
+        }
+      },
+      // Policy directive effects are applied via getPolicyChoice
     },
   },
-  // Land Level 2 techs
+  // Economy Level 3 tech - Trade Policy Framework (1970s)
+  [RESEARCH_TECH_IDS.TRADE_POLICY_FRAMEWORK]: {
+    meta: {
+      name: "Trade Policy Framework",
+      description:
+        "Establish trade agreements and commercial policies. Policy Directive: Open Trade Policy (+5% trade income, +5% trade ship income) or Autarky Doctrine (disables international trade, +20% domestic income).",
+    },
+    effects: {
+      // Policy directive effects are applied via getPolicyChoice
+    },
+  },
+  // Economy Level 4 tech - National Infrastructure Modernization (1980s)
+  [RESEARCH_TECH_IDS.NATIONAL_INFRASTRUCTURE_MODERNIZATION]: {
+    meta: {
+      name: "National Infrastructure Modernization",
+      description:
+        "Modernize national infrastructure with advanced technology. Effects: +20% infrastructure spending effectiveness, -20% maintenance costs, +10% construction speed.",
+    },
+    effects: {
+      infrastructureEffectiveness: (mods) => {
+        mods.effectivenessMul *= 1.2; // +20% infrastructure spending effectiveness
+      },
+      constructionSpeed: (mods) => {
+        mods.speedMul *= 1.1; // +10% construction speed
+      },
+      // TODO: -20% maintenance costs when maintenance is implemented
+    },
+  },
+  // Economy Level 5 tech - Digital Administration & Economic Coordination Systems (Early 1990s)
+  [RESEARCH_TECH_IDS.DIGITAL_ADMINISTRATION_SYSTEMS]: {
+    meta: {
+      name: "Digital Administration & Economic Coordination Systems",
+      description:
+        "Digital systems for administration and economic coordination. Policy Directive: Market Optimization Systems (+10% domestic income, -10% maintenance costs) or Central Planning Automation (+5% domestic income, +20% infrastructure spending effectiveness, +10% construction speed).",
+    },
+    effects: {
+      // Policy directive effects are applied via getPolicyChoice
+    },
+  },
+  // Land Level 2 tech - Mechanized Warfare Doctrine (1960s)
   [RESEARCH_TECH_IDS.MECHANIZED_WARFARE_DOCTRINE]: {
     meta: {
       name: "Mechanized Warfare Doctrine",
       description:
-        "Develop doctrine for mechanized infantry and armored operations. Effects: Unlocks Scorched Earth. Policy Directive: Mobile Infantry Emphasis (+10% offensive speed) or Armored Breakthrough Emphasis (-10% losses when attacking).",
+        "Develop doctrine for mechanized infantry and armored operations. Effects: Unlocks Scorched Earth. +5% offensive speed. Policy Directive (20%): Mobile Infantry Tactics (-10% your losses attacking, +10% enemy losses when they attack you) or Armored Breakthrough Doctrine (+10% enemy losses when you attack, -10% your losses when defending).",
     },
     effects: {
-      // Policy directive effects are applied via getPolicyChoice
-    },
-  },
-  [RESEARCH_TECH_IDS.SAM_DEPLOYMENT]: {
-    meta: {
-      name: "Surface-to-Air Missile Deployment",
-      description:
-        "Deploy first-generation SAM systems (SA-2 Guideline, Nike Hercules, S-75). Effects: Enables SAM Level 1.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.SAMLevel1)) {
-          player.addUpgrade?.(UpgradeType.SAMLevel1);
-        }
+      attackSpeed: (mods) => {
+        mods.speedMul *= 1.05; // 5% faster offensive speed
       },
-    },
-  },
-  // Land Level 3 techs
-  [RESEARCH_TECH_IDS.MAIN_BATTLE_TANK_STANDARDIZATION]: {
-    meta: {
-      name: "Main Battle Tank Standardization",
-      description:
-        "Adopt standardized MBT designs (T-62, T-72, M60, Leopard 1) for improved maintenance and battlefield coordination. Policy Directive: Survivability Focus (-10% losses defending) or Offensive Armor Focus (-10% losses attacking).",
-    },
-    effects: {
       // Policy directive effects are applied via getPolicyChoice
     },
   },
-  [RESEARCH_TECH_IDS.ADVANCED_SAM_SYSTEMS]: {
+  // Land Level 3 tech - Air-Defense Grid Expansion (1970s)
+  [RESEARCH_TECH_IDS.AIR_DEFENSE_GRID_EXPANSION]: {
     meta: {
-      name: "Advanced SAM Systems",
+      name: "Air-Defense Grid Expansion",
       description:
-        "Deploy mobile SAM batteries (SA-6, Hawk, early TELARs). Effects: Enables SAM Level 2.",
+        "Expand air defense networks with improved SAM coverage. Effects: Enables SAM Level 2. +5% offensive speed. Casualty Effects (20%): +15% enemy losses when they attack you, -5% your losses when defending.",
     },
     effects: {
       onComplete: (player) => {
@@ -395,24 +296,21 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.SAMLevel2);
         }
       },
+      defense: (mods) => {
+        mods.attackerLossMul *= 1.15; // enemy takes 15% more losses when they attack us
+        mods.defenderLossMul *= 0.95; // we take 5% less losses when defending
+      },
+      attackSpeed: (mods) => {
+        mods.speedMul *= 1.05; // 5% faster offensive speed
+      },
     },
   },
-  // Land Level 4 techs
-  [RESEARCH_TECH_IDS.NIGHT_VISION_BATTLEFIELD_SENSORS]: {
+  // Land Level 4 tech - Integrated SAM & Battlefield Command Systems (1980s)
+  [RESEARCH_TECH_IDS.INTEGRATED_SAM_BATTLEFIELD_COMMAND]: {
     meta: {
-      name: "Night Vision & Battlefield Sensors",
+      name: "Integrated SAM & Battlefield Command Systems",
       description:
-        "Equip forces with infrared and thermal imaging for 24-hour combat capability. Policy Directive: High-Speed Night Maneuvers (+10% offensive speed) or Precision Night Engagements (+10% enemy losses when attacking).",
-    },
-    effects: {
-      // Policy directive effects are applied via getPolicyChoice
-    },
-  },
-  [RESEARCH_TECH_IDS.INTEGRATED_C3I_SAM_NETWORKS]: {
-    meta: {
-      name: "Integrated C3I & Advanced SAM Networks",
-      description:
-        "Integrate SA-10, Patriot-era SAM platforms with C3I systems. Effects: Enables SAM Level 3, +5% enemy losses when you attack, +5% enemy losses when they attack you.",
+        "Integrate SA-10, Patriot-era SAM platforms with C3I systems. Effects: Enables SAM Level 3. +5% offensive speed. Casualty Effects (20%): +10% enemy losses when they attack you, -10% your losses when attacking.",
     },
     effects: {
       onComplete: (player) => {
@@ -420,60 +318,37 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
           player.addUpgrade?.(UpgradeType.SAMLevel3);
         }
       },
-      attack: (mods) => {
-        mods.defenderLossMul *= 1.05; // enemy takes 5% more losses when we attack
-      },
       defense: (mods) => {
-        mods.attackerLossMul *= 1.05; // enemy takes 5% more losses when they attack us
+        mods.attackerLossMul *= 1.1; // enemy takes 10% more losses when they attack us
+      },
+      attack: (mods) => {
+        mods.attackerLossMul *= 0.9; // we take 10% less losses when attacking
+      },
+      attackSpeed: (mods) => {
+        mods.speedMul *= 1.05; // 5% faster offensive speed
       },
     },
   },
-  [RESEARCH_TECH_IDS.JET_ENGINES]: {
+  // Land Level 5 tech - Night Vision, Thermal Imaging & Digital C3I (Early 1990s)
+  [RESEARCH_TECH_IDS.NIGHT_VISION_THERMAL_C3I]: {
     meta: {
-      name: "Jet Engines",
-      description: "Enables: Fighters, Bombers, Airfields",
+      name: "Night Vision, Thermal Imaging & Digital C3I",
+      description:
+        "Equip forces with night vision, thermal imaging, and digital command systems for 24-hour combat capability. Effects: +5% offensive speed. Policy Directive (20%): High-Tempo Maneuver Warfare (+10% enemy losses when you attack, -10% your losses when attacking) or Precision Defensive Fire Doctrine (+10% enemy losses when they attack you, -10% your losses when defending).",
     },
     effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.JetEngines)) {
-          player.addUpgrade?.(UpgradeType.JetEngines);
-        }
+      attackSpeed: (mods) => {
+        mods.speedMul *= 1.05; // 5% faster offensive speed
       },
+      // Policy directive effects are applied via getPolicyChoice
     },
   },
-  [RESEARCH_TECH_IDS.SUPERSONIC_FLIGHT]: {
+  // Air techs - Level 1: Early Jet Aviation Framework
+  [RESEARCH_TECH_IDS.EARLY_JET_AVIATION_FRAMEWORK]: {
     meta: {
-      name: "Supersonic Flight",
+      name: "Early Jet Aviation Framework",
       description:
-        "Enables Level 2 Fighters. Advanced supersonic aircraft with improved speed and maneuverability.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.FighterLevel2)) {
-          player.addUpgrade?.(UpgradeType.FighterLevel2);
-        }
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.TURBOJET_BOMBERS]: {
-    meta: {
-      name: "Turbojet Bombers",
-      description:
-        "Enables Level 2 Bombers. Advanced bomber technology improving bomber effectiveness and capabilities.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.BomberLevel2)) {
-          player.addUpgrade?.(UpgradeType.BomberLevel2);
-        }
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.AIRBORNE_OPERATIONS]: {
-    meta: {
-      name: "Airborne Operations",
-      description:
-        "Unlocks Paratroopers, allowing you to launch surprise attacks from the sky. Requires an Airfield.",
+        "Establish jet aviation infrastructure and doctrine. Unlocks Paratroopers.",
     },
     effects: {
       onComplete: (player) => {
@@ -483,72 +358,58 @@ export const TECHS: Readonly<Record<string, TechDefinition>> = Object.freeze({
       },
     },
   },
-  // Air techs - Level 3
-  [RESEARCH_TECH_IDS.PULSE_DOPPLER_RADAR]: {
+  // Air techs - Level 2: Supersonic Airframe Development
+  [RESEARCH_TECH_IDS.SUPERSONIC_AIRFRAME_DEVELOPMENT]: {
     meta: {
-      name: "Pulse-Doppler Radar",
+      name: "Supersonic Airframe Development",
       description:
-        "Enables Level 3 Fighters. Advanced radar technology for improved aircraft detection and tracking.",
+        "Develop supersonic aircraft designs. Unlocks Fighter Level 2, Bomber Level 2.",
+    },
+    effects: {
+      onComplete: (player) => {
+        if (!player.hasUpgrade?.(UpgradeType.FighterLevel2)) {
+          player.addUpgrade?.(UpgradeType.FighterLevel2);
+        }
+        if (!player.hasUpgrade?.(UpgradeType.BomberLevel2)) {
+          player.addUpgrade?.(UpgradeType.BomberLevel2);
+        }
+      },
+    },
+  },
+  // Air techs - Level 3: Pulse-Doppler Radar & BVR Combat
+  [RESEARCH_TECH_IDS.PULSE_DOPPLER_RADAR_BVR]: {
+    meta: {
+      name: "Pulse-Doppler Radar & BVR Combat",
+      description:
+        "Advanced radar and beyond-visual-range combat systems. Unlocks Fighter Level 3, Naval Strike Capability.",
     },
     effects: {
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.FighterLevel3)) {
           player.addUpgrade?.(UpgradeType.FighterLevel3);
         }
-      },
-    },
-  },
-  [RESEARCH_TECH_IDS.NAVAL_STRIKE_TARGETING]: {
-    meta: {
-      name: "Naval Strike Targeting",
-      description:
-        "Equips Fighter Jets with advanced targeting systems to engage and destroy enemy naval units.",
-    },
-    effects: {
-      onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.FighterJetNavalTargeting)) {
           player.addUpgrade?.(UpgradeType.FighterJetNavalTargeting);
         }
       },
     },
   },
-  [RESEARCH_TECH_IDS.SUPERSONIC_BOMBERS]: {
+  // Air techs - Level 4: Fly-By-Wire Platforms & Advanced Maneuverability
+  [RESEARCH_TECH_IDS.FLY_BY_WIRE_PLATFORMS]: {
     meta: {
-      name: "Supersonic Bombers",
+      name: "Fly-By-Wire Platforms & Advanced Maneuverability",
       description:
-        "Enables Level 3 Bombers. High-speed bomber aircraft capable of evading enemy defenses.",
-    },
-    effects: {
-      onComplete: (player) => {
-        if (!player.hasUpgrade?.(UpgradeType.BomberLevel3)) {
-          player.addUpgrade?.(UpgradeType.BomberLevel3);
-        }
-      },
-    },
-  },
-  // Air techs - Level 4
-  [RESEARCH_TECH_IDS.FLY_BY_WIRE_SYSTEMS]: {
-    meta: {
-      name: "Fly-By-Wire Systems",
-      description:
-        "Enables Level 4 Fighters. Digital flight control systems for enhanced aircraft maneuverability and stability.",
+        "Digital flight control systems for maximum aircraft performance. Unlocks Fighter Level 4, Bomber Level 3.",
     },
     effects: {
       onComplete: (player) => {
         if (!player.hasUpgrade?.(UpgradeType.FighterLevel4)) {
           player.addUpgrade?.(UpgradeType.FighterLevel4);
         }
+        if (!player.hasUpgrade?.(UpgradeType.BomberLevel3)) {
+          player.addUpgrade?.(UpgradeType.BomberLevel3);
+        }
       },
-    },
-  },
-  [RESEARCH_TECH_IDS.PRECISION_GUIDED_MUNITIONS]: {
-    meta: {
-      name: "Precision-Guided Munitions",
-      description:
-        "Smart bombs and missiles with pinpoint accuracy for strategic targets.",
-    },
-    effects: {
-      // Placeholder - add specific upgrade when needed
     },
   },
   [RESEARCH_TECH_IDS.NUCLEAR_FISSION]: {
@@ -691,6 +552,9 @@ export function defenseCasualtyModifiers(defender: {
       );
       if (option?.effects.defenderLossMul) {
         mods.defenderLossMul *= option.effects.defenderLossMul;
+      }
+      if (option?.effects.attackerLossMulOnDefense) {
+        mods.attackerLossMul *= option.effects.attackerLossMulOnDefense;
       }
     }
   }

@@ -56,14 +56,14 @@ export function maxUnitLevel(type: UnitType): number {
 }
 
 // Return maximum upgrade level for a player based on their researched techs.
-// For FighterJet: Jet Engines = level 1, Supersonic Flight = level 2,
-// Pulse-Doppler Radar = level 3, Fly-By-Wire Systems = level 4.
-// For Bomber: Jet Engines = level 1, Turbojet Bombers = level 2,
-// Supersonic Bombers = level 3.
-// For Warship: Early Cold War Cruisers = level 1, First-Missile Cruisers = level 2,
-// Advanced Missile Cruisers = level 3.
-// For Submarine: Diesel-Electric Subs = level 1, Nuclear Attack Submarines = level 2,
-// Advanced Nuclear Attack Subs = level 3.
+// For FighterJet: Level 1 by default, Supersonic Airframe = level 2,
+// Pulse-Doppler Radar = level 3, Fly-By-Wire = level 4.
+// For Bomber: Level 1 by default, Supersonic Airframe = level 2,
+// Fly-By-Wire = level 3.
+// For Warship: Level 1 by default, Early Missile Navy = level 2,
+// Modern Fleet Sensor & SAM = level 3.
+// For Submarine: Level 1 by default, Early Missile Navy = level 2,
+// Submarine Silent Service = level 3.
 export function playerMaxUnitLevel(player: HasUpgrade, type: UnitType): number {
   const globalMax = maxUnitLevel(type);
 
@@ -74,7 +74,7 @@ export function playerMaxUnitLevel(player: HasUpgrade, type: UnitType): number {
       return Math.min(3, globalMax);
     if (player.hasUpgrade(UpgradeType.FighterLevel2))
       return Math.min(2, globalMax);
-    // Jet Engines (required to build fighters) gives level 1
+    // Fighter Level 1 is available by default at game start
     return 1;
   }
 
@@ -83,7 +83,7 @@ export function playerMaxUnitLevel(player: HasUpgrade, type: UnitType): number {
       return Math.min(3, globalMax);
     if (player.hasUpgrade(UpgradeType.BomberLevel2))
       return Math.min(2, globalMax);
-    // Jet Engines (required to build bombers) gives level 1
+    // Bomber Level 1 is available by default at game start
     return 1;
   }
 
@@ -92,10 +92,8 @@ export function playerMaxUnitLevel(player: HasUpgrade, type: UnitType): number {
       return Math.min(3, globalMax);
     if (player.hasUpgrade(UpgradeType.WarshipLevel2))
       return Math.min(2, globalMax);
-    if (player.hasUpgrade(UpgradeType.WarshipLevel1))
-      return Math.min(1, globalMax);
-    // No warship tech - can't build warships
-    return 0;
+    // Warship Level 1 is available by default at game start
+    return 1;
   }
 
   if (type === UnitType.Submarine) {
@@ -103,10 +101,8 @@ export function playerMaxUnitLevel(player: HasUpgrade, type: UnitType): number {
       return Math.min(3, globalMax);
     if (player.hasUpgrade(UpgradeType.SubmarineLevel2))
       return Math.min(2, globalMax);
-    if (player.hasUpgrade(UpgradeType.SubmarineLevel1))
-      return Math.min(1, globalMax);
-    // No submarine tech - can't build submarines
-    return 0;
+    // Submarine Level 1 is available by default at game start
+    return 1;
   }
 
   // For other unit types, return global max
@@ -125,9 +121,8 @@ export function playerMaxStructureLevel(
   if (type === UnitType.SAMLauncher) {
     if (player.hasUpgrade(UpgradeType.SAMLevel3)) return Math.min(3, globalMax);
     if (player.hasUpgrade(UpgradeType.SAMLevel2)) return Math.min(2, globalMax);
-    if (player.hasUpgrade(UpgradeType.SAMLevel1)) return Math.min(1, globalMax);
-    // No SAM tech researched - can't build SAM launchers
-    return 0;
+    // SAM Level 1 is available by default at game start
+    return Math.min(1, globalMax);
   }
 
   // For other structures, return global max
@@ -147,13 +142,14 @@ export function tryParseUnitType(value: string): UnitType | null {
 export function isUnitAvailable(player: HasUpgrade, type: UnitType): boolean {
   switch (type) {
     case UnitType.Warship:
-      return player.hasUpgrade(UpgradeType.WarshipLevel1);
     case UnitType.Submarine:
-      return player.hasUpgrade(UpgradeType.SubmarineLevel1);
+      // Warship and Submarine Level 1 are available by default at game start
+      return true;
     case UnitType.Airfield:
     case UnitType.FighterJet:
     case UnitType.Bomber:
-      return player.hasUpgrade(UpgradeType.JetEngines);
+      // Fighter and Bomber Level 1 are available by default at game start
+      return true;
     case UnitType.AtomBomb:
     case UnitType.MissileSilo:
       return player.hasUpgrade(UpgradeType.NuclearFission);
@@ -164,7 +160,8 @@ export function isUnitAvailable(player: HasUpgrade, type: UnitType): boolean {
     case UnitType.DoomsdayDevice:
       return player.hasUpgrade(UpgradeType.DoomsdayDeviceResearch);
     case UnitType.SAMLauncher:
-      return player.hasUpgrade(UpgradeType.SAMLevel1);
+      // SAM Level 1 is available by default at game start
+      return true;
     case UnitType.Academy:
       return player.hasUpgrade(UpgradeType.MilitaryAcademy);
     case UnitType.Hospital:

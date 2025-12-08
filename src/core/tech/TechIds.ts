@@ -5,54 +5,41 @@
  */
 export const RESEARCH_TECH_IDS = {
   // Air techs - Level 1
-  JET_ENGINES: "Air-0",
+  EARLY_JET_AVIATION_FRAMEWORK: "Air-1",
   // Air techs - Level 2
-  SUPERSONIC_FLIGHT: "Air-2A",
-  TURBOJET_BOMBERS: "Air-2B",
-  AIRBORNE_OPERATIONS: "Air-2C",
+  SUPERSONIC_AIRFRAME_DEVELOPMENT: "Air-2",
   // Air techs - Level 3
-  PULSE_DOPPLER_RADAR: "Air-3A",
-  NAVAL_STRIKE_TARGETING: "Air-3B",
-  SUPERSONIC_BOMBERS: "Air-3C",
+  PULSE_DOPPLER_RADAR_BVR: "Air-3",
   // Air techs - Level 4
-  FLY_BY_WIRE_SYSTEMS: "Air-4A",
-  PRECISION_GUIDED_MUNITIONS: "Air-4B",
+  FLY_BY_WIRE_PLATFORMS: "Air-4",
   // Sea techs - Level 1
-  EARLY_COLD_WAR_CRUISERS: "Sea-0",
-  DIESEL_ELECTRIC_SUBS: "Sea-1",
+  EARLY_MISSILE_NAVY: "Sea-1",
   // Sea techs - Level 2
-  FIRST_MISSILE_CRUISERS: "Sea-2A",
-  NUCLEAR_ATTACK_SUBMARINES: "Sea-2B",
-  BALLISTIC_MISSILE_SUBMARINES: "Sea-2C",
+  SUBMARINE_SILENT_SERVICE: "Sea-2",
   // Sea techs - Level 3
-  ADVANCED_MISSILE_CRUISERS: "Sea-3A",
-  ADVANCED_NUCLEAR_ATTACK_SUBS: "Sea-3B",
-  NAVAL_SAM_SYSTEMS: "Sea-3C",
+  SSBN_PROGRAMS: "Sea-3",
   // Sea techs - Level 4
-  AEGIS_WARSHIP_SYSTEMS: "Sea-4A",
-  QUIETING_ACOUSTIC_STEALTH: "Sea-4B",
+  MODERN_FLEET_SENSOR_SAM: "Sea-4",
   // Land techs - Level 1
-  POST_WW2_MODERNIZATION: "Land-1",
+  POST_WW2_GROUND_FORCES_MODERNIZATION: "Land-1",
   // Land techs - Level 2
-  MECHANIZED_WARFARE_DOCTRINE: "Land-2A",
-  SAM_DEPLOYMENT: "Land-2B",
+  MECHANIZED_WARFARE_DOCTRINE: "Land-2",
   // Land techs - Level 3
-  MAIN_BATTLE_TANK_STANDARDIZATION: "Land-3A",
-  ADVANCED_SAM_SYSTEMS: "Land-3B",
+  AIR_DEFENSE_GRID_EXPANSION: "Land-3",
   // Land techs - Level 4
-  NIGHT_VISION_BATTLEFIELD_SENSORS: "Land-4A",
-  INTEGRATED_C3I_SAM_NETWORKS: "Land-4B",
-  // Economy techs - Level 1
+  INTEGRATED_SAM_BATTLEFIELD_COMMAND: "Land-4",
+  // Land techs - Level 5
+  NIGHT_VISION_THERMAL_C3I: "Land-5",
+  // Economy techs - Level 1 (1950s)
   NATIONAL_RECONSTRUCTION_PROGRAM: "Economy-1",
-  // Economy techs - Level 2
-  INDUSTRIAL_DEVELOPMENT_STRATEGY: "Economy-2A",
-  TRADE_POLICY_FRAMEWORK: "Economy-2B",
-  // Economy techs - Level 3
-  SCIENTIFIC_RESEARCH_NETWORK: "Economy-3A",
-  INFRASTRUCTURE_PRIORITIZATION: "Economy-3B",
-  // Economy techs - Level 4
-  COMPUTING_DATA_SYSTEMS: "Economy-4A",
-  NATIONAL_ECONOMIC_COORDINATION: "Economy-4B",
+  // Economy techs - Level 2 (1960s)
+  NATIONAL_RESEARCH_INDUSTRIAL_FOUNDATIONS: "Economy-2",
+  // Economy techs - Level 3 (1970s)
+  TRADE_POLICY_FRAMEWORK: "Economy-3",
+  // Economy techs - Level 4 (1980s)
+  NATIONAL_INFRASTRUCTURE_MODERNIZATION: "Economy-4",
+  // Economy techs - Level 5 (Early 1990s)
+  DIGITAL_ADMINISTRATION_SYSTEMS: "Economy-5",
   // Nuclear techs
   NUCLEAR_FISSION: "Nuclear-1",
   THERMONUCLEAR_STAGING: "Nuclear-2",
