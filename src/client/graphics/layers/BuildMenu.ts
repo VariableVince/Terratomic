@@ -30,13 +30,13 @@ import {
   isUnitAvailable,
   isUpgradeableStructure,
   isUpgradeableUnit,
+  maxStructureLevel,
   maxUnitLevel,
   playerMaxStructureLevel,
   playerMaxUnitLevel,
 } from "../../../core/game/Upgradeables";
 import { ToggleBomberUpgradeModeEvent } from "../../events/ToggleBomberUpgradeModeEvent";
 import { ToggleUpgradeModeEvent } from "../../events/ToggleUpgradeModeEvent";
-import { CloseViewEvent } from "../../InputHandler";
 import { displayKey, renderNumber } from "../../Utils";
 import { UIState } from "../UIState";
 
@@ -188,6 +188,9 @@ export class BuildMenu extends LitElement {
 
   @property({ type: Array })
   unitFilter: UnitType[] | null = null;
+
+  @property({ type: Object })
+  structureLevels: Record<string, number> = {};
 
   @state()
   private filteredBuildTable: BuildItemDisplay[][] = [];
@@ -586,6 +589,12 @@ export class BuildMenu extends LitElement {
   }
 
   private _desiredStructureLevel(type: UnitType): number {
+    // If a specific level is requested via the UI prop, use that (clamped by max level)
+    const level = this.structureLevels[type];
+    if (level && level > 1) {
+      return Math.min(maxStructureLevel(type), level);
+    }
+
     try {
       const raw = localStorage.getItem("buildSettings.levels");
       if (!raw) return 1;
@@ -645,7 +654,7 @@ export class BuildMenu extends LitElement {
     } else {
       this.uiState.pendingBuildUnitType = item.unitType;
     }
-    this.eventBus.emit(new CloseViewEvent());
+    // this.eventBus.emit(new CloseViewEvent()); // Keep menu open for level selection
     this.requestUpdate();
   };
 
@@ -713,7 +722,7 @@ export class BuildMenu extends LitElement {
                         />
                       </span>
                     </div>
-                    ${desiredLevel > 1
+                    ${desiredLevel >= 1
                       ? html`<div class="build-level-chip">
                           L${desiredLevel}
                         </div>`
