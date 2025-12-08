@@ -151,9 +151,8 @@ export class PlayerExecution implements Execution {
     if (investRate <= 0 || grossGold <= 0) return;
 
     const investment = Math.max(0, grossGold * investRate);
-    const A = this.config.researchAlpha();
     const B = this.config.researchBeta();
-    let xTotal = A * Math.pow(investment, B);
+    let xTotal = Math.pow(investment, B);
     if (!Number.isFinite(xTotal) || xTotal <= 0) return;
 
     // Apply Research Lab multiplier: +40% for first, +20% for second, halving thereafter

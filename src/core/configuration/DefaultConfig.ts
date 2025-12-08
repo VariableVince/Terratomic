@@ -1376,16 +1376,13 @@ export class DefaultConfig implements Config {
     return getUnitLevelCost(type, targetLevel);
   }
   // --- Research system defaults ---
-  // f(x) = A * investment^B, where investment is gold allocated to research this tick
-  researchAlpha(): number {
-    return 1.0; // Tunable: scalar applied to investment^B
-  }
+  // f(x) = investment^B, where investment is gold allocated to research this tick
   researchBeta(): number {
     return 1.0; // Tunable: exponent applied to investment
   }
   // Success probability p = 1 - exp(-k * x)
   researchK(): number {
-    return 0.0001; // Tunable: scales how quickly probability rises with x
+    return 0.0002; // Tunable: scales how quickly probability rises with x
   }
   // Beaker award range when a success occurs (inclusive bounds)
   researchBeakerMin(): number {
