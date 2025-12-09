@@ -56,6 +56,11 @@ export class TerritoryLayer implements Layer {
   >();
   private territoryColorCache = new Map<string, Colord>();
 
+  // Dirty tracking to minimize putImageData calls
+  private isDirty = false;
+  private dirtyRect: { x0: number; y0: number; x1: number; y1: number } | null =
+    null;
+
   // Cached map dimensions to avoid repeated method calls in hot render path
   private _width: number;
   private _height: number;
@@ -404,25 +409,36 @@ export class TerritoryLayer implements Layer {
       this.lastRefresh = now;
       this.renderTerritory();
 
-      const [topLeft, bottomRight] = this.transformHandler.screenBoundingRect();
-      const vx0 = Math.max(0, topLeft.x);
-      const vy0 = Math.max(0, topLeft.y);
-      const vx1 = Math.min(this._width - 1, bottomRight.x);
-      const vy1 = Math.min(this._height - 1, bottomRight.y);
-
-      const w = vx1 - vx0 + 1;
-      const h = vy1 - vy0 + 1;
-
-      if (w > 0 && h > 0) {
-        this.context.putImageData(
-          this.alternativeView ? this.alternativeImageData : this.imageData,
-          0,
-          0,
-          vx0,
-          vy0,
-          w,
-          h,
+      // Only call putImageData if something actually changed
+      if (this.isDirty && this.dirtyRect) {
+        const [topLeft, bottomRight] =
+          this.transformHandler.screenBoundingRect();
+        // Intersect dirty rect with visible viewport
+        const vx0 = Math.max(0, topLeft.x, this.dirtyRect.x0);
+        const vy0 = Math.max(0, topLeft.y, this.dirtyRect.y0);
+        const vx1 = Math.min(this._width - 1, bottomRight.x, this.dirtyRect.x1);
+        const vy1 = Math.min(
+          this._height - 1,
+          bottomRight.y,
+          this.dirtyRect.y1,
         );
+
+        const w = vx1 - vx0 + 1;
+        const h = vy1 - vy0 + 1;
+
+        if (w > 0 && h > 0) {
+          this.context.putImageData(
+            this.alternativeView ? this.alternativeImageData : this.imageData,
+            0,
+            0,
+            vx0,
+            vy0,
+            w,
+            h,
+          );
+        }
+        this.isDirty = false;
+        this.dirtyRect = null;
       }
     }
 
@@ -609,12 +625,38 @@ export class TerritoryLayer implements Layer {
     imageData.data[offset + 1] = color.rgba.g;
     imageData.data[offset + 2] = color.rgba.b;
     imageData.data[offset + 3] = alpha;
+
+    // Track dirty region
+    this.isDirty = true;
+    const x = tile % this._width;
+    const y = Math.floor(tile / this._width);
+    if (!this.dirtyRect) {
+      this.dirtyRect = { x0: x, y0: y, x1: x, y1: y };
+    } else {
+      if (x < this.dirtyRect.x0) this.dirtyRect.x0 = x;
+      if (y < this.dirtyRect.y0) this.dirtyRect.y0 = y;
+      if (x > this.dirtyRect.x1) this.dirtyRect.x1 = x;
+      if (y > this.dirtyRect.y1) this.dirtyRect.y1 = y;
+    }
   }
 
   clearTile(tile: TileRef) {
     const offset = tile * 4;
     this.imageData.data[offset + 3] = 0; // Set alpha to 0 (fully transparent)
     this.alternativeImageData.data[offset + 3] = 0; // Set alpha to 0 (fully transparent)
+
+    // Track dirty region
+    this.isDirty = true;
+    const x = tile % this._width;
+    const y = Math.floor(tile / this._width);
+    if (!this.dirtyRect) {
+      this.dirtyRect = { x0: x, y0: y, x1: x, y1: y };
+    } else {
+      if (x < this.dirtyRect.x0) this.dirtyRect.x0 = x;
+      if (y < this.dirtyRect.y0) this.dirtyRect.y0 = y;
+      if (x > this.dirtyRect.x1) this.dirtyRect.x1 = x;
+      if (y > this.dirtyRect.y1) this.dirtyRect.y1 = y;
+    }
   }
 
   enqueueTile(tile: TileRef) {
