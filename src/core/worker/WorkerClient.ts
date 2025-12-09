@@ -9,7 +9,7 @@ import { TileRef } from "../game/GameMap";
 import { ErrorUpdate, GameUpdateViewData } from "../game/GameUpdates";
 import { ClientID, GameStartInfo, Turn } from "../Schemas";
 import { generateID } from "../Util";
-import { WorkerMessage } from "./WorkerMessages";
+import { GameUpdateMessage, WorkerMessage } from "./WorkerMessages";
 
 export class WorkerClient {
   private worker: Worker;
@@ -35,22 +35,23 @@ export class WorkerClient {
 
   private handleWorkerMessage(event: MessageEvent<WorkerMessage>) {
     const message = event.data;
+    const { type } = message;
 
-    switch (message.type) {
-      case "game_update":
-        if (this.gameUpdateCallback && message.gameUpdate) {
-          this.gameUpdateCallback(message.gameUpdate);
-        }
-        break;
+    // Fast path for the most frequent message type
+    if (type === "game_update") {
+      // Avoid property access in condition; callback is almost always set
+      this.gameUpdateCallback?.((message as GameUpdateMessage).gameUpdate);
+      return;
+    }
 
-      case "initialized":
-      default:
-        if (message.id && this.messageHandlers.has(message.id)) {
-          const handler = this.messageHandlers.get(message.id)!;
-          handler(message);
-          this.messageHandlers.delete(message.id);
-        }
-        break;
+    // For request/response pattern messages, use single Map lookup
+    const { id } = message;
+    if (id) {
+      const handler = this.messageHandlers.get(id);
+      if (handler) {
+        this.messageHandlers.delete(id);
+        handler(message);
+      }
     }
   }
 
