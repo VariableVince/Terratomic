@@ -356,8 +356,16 @@ export class GameRenderer {
   }
 
   resizeCanvas() {
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = this.canvas.getBoundingClientRect();
+    // Fall back to window dimensions if canvas isn't in DOM yet
+    const width = rect.width || window.innerWidth;
+    const height = rect.height || window.innerHeight;
+    // Set canvas internal resolution to CSS size * DPR for sharp rendering on high-DPI displays
+    this.canvas.width = width * dpr;
+    this.canvas.height = height * dpr;
+    // Scale context so drawing logic remains in CSS-pixel coordinates
+    this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.transformHandler.updateCanvasBoundingRect();
     //this.redraw()
   }
@@ -373,13 +381,17 @@ export class GameRenderer {
   renderGame() {
     PerformanceMetrics.getInstance().resetVisibleCount();
     const start = performance.now();
-    // Set background
+    const dpr = window.devicePixelRatio || 1;
+    const rect = this.canvas.getBoundingClientRect();
+    // Ensure DPR scale is applied at the start of each frame (in case of zoom changes)
+    this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Set background using CSS dimensions
     this.context.fillStyle = this.game
       .config()
       .theme()
       .backgroundColor()
       .toHex();
-    this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.context.fillRect(0, 0, rect.width, rect.height);
 
     // Render layers in order, switching transform state as needed
     let isTransformed = false;
@@ -394,6 +406,8 @@ export class GameRenderer {
         isTransformed = true;
       } else if (!layerNeedsTransform && isTransformed) {
         this.context.restore();
+        // Reapply DPR scale after restore for screen-space layers
+        this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
         isTransformed = false;
       }
 
@@ -407,6 +421,8 @@ export class GameRenderer {
 
     if (isTransformed) {
       this.context.restore();
+      // Reapply DPR scale after final restore
+      this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     this.transformHandler.resetChanged();
 
@@ -426,7 +442,9 @@ export class GameRenderer {
   }
 
   resize(width: number, height: number): void {
-    this.canvas.width = Math.ceil(width / window.devicePixelRatio);
-    this.canvas.height = Math.ceil(height / window.devicePixelRatio);
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = Math.ceil(width * dpr);
+    this.canvas.height = Math.ceil(height * dpr);
+    this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 }
