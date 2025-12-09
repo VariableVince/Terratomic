@@ -54,6 +54,7 @@ export class TerritoryLayer implements Layer {
     string,
     { light: Colord; dark: Colord }
   >();
+  private territoryColorCache = new Map<string, Colord>();
 
   // Cached map dimensions to avoid repeated method calls in hot render path
   private _width: number;
@@ -365,6 +366,7 @@ export class TerritoryLayer implements Layer {
     this.borderCache = new Uint8Array(size);
     this.defendedCache = new Uint8Array(size);
     this.borderColorsCache.clear();
+    this.territoryColorCache.clear();
 
     this.game.forEachTile((t) => {
       this.paintTerritory(t);
@@ -445,11 +447,22 @@ export class TerritoryLayer implements Layer {
   renderTerritory() {
     if (this.tileToRenderQueue.size === 0) return;
 
-    const tilesToPaint = new Set<TileRef>();
+    // Collect tiles to paint: queued tiles + their neighbors (for border updates)
+    // Use a Set to deduplicate since many neighbors overlap
+    const tilesToPaint = new Set<TileRef>(this.tileToRenderQueue);
     for (const tile of this.tileToRenderQueue) {
-      tilesToPaint.add(tile);
+      // Invalidate border/defended cache for the tile and neighbors
+      if (this.borderCache) {
+        this.borderCache[tile] = 0;
+      }
+      if (this.defendedCache) {
+        this.defendedCache[tile] = 0;
+      }
       for (const neighbor of this.game.neighbors(tile)) {
         tilesToPaint.add(neighbor);
+        if (this.borderCache) {
+          this.borderCache[neighbor] = 0;
+        }
       }
     }
     this.tileToRenderQueue.clear();
@@ -581,12 +594,12 @@ export class TerritoryLayer implements Layer {
         );
       }
 
-      this.paintTile(
-        this.imageData,
-        tile,
-        this.theme.territoryColor(owner),
-        150,
-      );
+      let territoryColor = this.territoryColorCache.get(owner.id());
+      if (!territoryColor) {
+        territoryColor = this.theme.territoryColor(owner);
+        this.territoryColorCache.set(owner.id(), territoryColor);
+      }
+      this.paintTile(this.imageData, tile, territoryColor, 150);
     }
   }
 
