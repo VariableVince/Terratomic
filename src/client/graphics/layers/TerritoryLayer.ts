@@ -55,12 +55,18 @@ export class TerritoryLayer implements Layer {
     { light: Colord; dark: Colord }
   >();
 
+  // Cached map dimensions to avoid repeated method calls in hot render path
+  private _width: number;
+  private _height: number;
+
   constructor(
     private game: GameView,
     private eventBus: EventBus,
     private transformHandler: TransformHandler,
   ) {
     this.theme = game.config().theme();
+    this._width = game.width();
+    this._height = game.height();
   }
 
   shouldTransform(): boolean {
@@ -211,12 +217,7 @@ export class TerritoryLayer implements Layer {
       return;
     }
 
-    this.highlightContext.clearRect(
-      0,
-      0,
-      this.game.width(),
-      this.game.height(),
-    );
+    this.highlightContext.clearRect(0, 0, this._width, this._height);
     const humans = this.game
       .playerViews()
       .filter((p) => p.type() === PlayerType.Human);
@@ -331,8 +332,8 @@ export class TerritoryLayer implements Layer {
     const context = this.canvas.getContext("2d");
     if (context === null) throw new Error("2d context not supported");
     this.context = context;
-    this.canvas.width = this.game.width();
-    this.canvas.height = this.game.height();
+    this.canvas.width = this._width;
+    this.canvas.height = this._height;
 
     // Allocate blank ImageData buffers rather than reading back from the canvas.
     // This avoids expensive GPU->CPU readbacks and the Chrome warning about getImageData.
@@ -356,11 +357,11 @@ export class TerritoryLayer implements Layer {
     });
     if (highlightContext === null) throw new Error("2d context not supported");
     this.highlightContext = highlightContext;
-    this.highlightCanvas.width = this.game.width();
-    this.highlightCanvas.height = this.game.height();
+    this.highlightCanvas.width = this._width;
+    this.highlightCanvas.height = this._height;
 
     // Initialize caches
-    const size = this.game.width() * this.game.height();
+    const size = this._width * this._height;
     this.borderCache = new Uint8Array(size);
     this.defendedCache = new Uint8Array(size);
     this.borderColorsCache.clear();
@@ -385,7 +386,7 @@ export class TerritoryLayer implements Layer {
   initImageData() {
     this.game.forEachTile((tile) => {
       const cell = new Cell(this.game.x(tile), this.game.y(tile));
-      const index = cell.y * this.game.width() + cell.x;
+      const index = cell.y * this._width + cell.x;
       const offset = index * 4;
       this.imageData.data[offset + 3] = 0;
       this.alternativeImageData.data[offset + 3] = 0;
@@ -404,8 +405,8 @@ export class TerritoryLayer implements Layer {
       const [topLeft, bottomRight] = this.transformHandler.screenBoundingRect();
       const vx0 = Math.max(0, topLeft.x);
       const vy0 = Math.max(0, topLeft.y);
-      const vx1 = Math.min(this.game.width() - 1, bottomRight.x);
-      const vy1 = Math.min(this.game.height() - 1, bottomRight.y);
+      const vx1 = Math.min(this._width - 1, bottomRight.x);
+      const vy1 = Math.min(this._height - 1, bottomRight.y);
 
       const w = vx1 - vx0 + 1;
       const h = vy1 - vy0 + 1;
@@ -425,18 +426,18 @@ export class TerritoryLayer implements Layer {
 
     context.drawImage(
       this.canvas,
-      -this.game.width() / 2,
-      -this.game.height() / 2,
-      this.game.width(),
-      this.game.height(),
+      -this._width / 2,
+      -this._height / 2,
+      this._width,
+      this._height,
     );
     if (this.game.inSpawnPhase()) {
       context.drawImage(
         this.highlightCanvas,
-        -this.game.width() / 2,
-        -this.game.height() / 2,
-        this.game.width(),
-        this.game.height(),
+        -this._width / 2,
+        -this._height / 2,
+        this._width,
+        this._height,
       );
     }
   }

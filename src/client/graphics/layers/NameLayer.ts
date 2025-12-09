@@ -92,19 +92,8 @@ export class NameLayer implements Layer {
   }
 
   resizeCanvas() {
-    const dpr = window.devicePixelRatio || 1;
-    const rect = this.canvas.getBoundingClientRect();
-    // Fall back to window dimensions if canvas isn't in DOM yet
-    const width = rect.width || window.innerWidth;
-    const height = rect.height || window.innerHeight;
-    // Set canvas internal resolution to CSS size * DPR for sharp rendering on high-DPI displays
-    this.canvas.width = width * dpr;
-    this.canvas.height = height * dpr;
-    // Scale context so drawing logic remains in CSS-pixel coordinates
-    const ctx = this.canvas.getContext("2d");
-    if (ctx) {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
   }
 
   shouldTransform(): boolean {

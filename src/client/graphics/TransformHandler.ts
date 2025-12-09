@@ -59,16 +59,14 @@ export class TransformHandler {
     // Disable image smoothing for pixelated effect
     context.imageSmoothingEnabled = false;
 
-    // Apply DPR scaling combined with zoom and pan
-    const dpr = window.devicePixelRatio || 1;
-    const combinedScale = this.scale * dpr;
+    // Apply zoom and pan
     context.setTransform(
-      combinedScale,
+      this.scale,
       0,
       0,
-      combinedScale,
-      (this.game.width() / 2 - this.offsetX * this.scale) * dpr,
-      (this.game.height() / 2 - this.offsetY * this.scale) * dpr,
+      this.scale,
+      this.game.width() / 2 - this.offsetX * this.scale,
+      this.game.height() / 2 - this.offsetY * this.scale,
     );
   }
 
