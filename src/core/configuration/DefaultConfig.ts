@@ -1021,7 +1021,7 @@ export class DefaultConfig implements Config {
           within(defenderDensity, 3, 50) ** 0.2 *
           (attackStandardSize / attackTroops) ** 0.2 *
           speed *
-          within(attackRatio, 0.1, 20) ** 0.37,
+          within(attackRatio, 0.1, 18) ** 0.38,
       };
     } else {
       return {
@@ -1130,7 +1130,7 @@ export class DefaultConfig implements Config {
     //population grows proportional to current population with growth decreasing as it approaches max
     // smaller countries recieve a boost to pop growth to speed up early game
     const baseAdditionRate = 10;
-    const basePopGrowthRate = 1300 / max + 1 / 220;
+    const basePopGrowthRate = 1200 / max + 1 / 220;
     const reproductionPop = player.troops() + 1.15 * player.workers();
     let toAdd = baseAdditionRate + basePopGrowthRate * reproductionPop;
     const totalPop = player.totalPopulation();
@@ -1163,7 +1163,7 @@ export class DefaultConfig implements Config {
 
   // Gross gold per tick BEFORE any investments are subtracted
   grossGoldAdditionRate(player: Player | PlayerView): number {
-    const base = 0.12 * Math.pow(player.workers(), 0.65);
+    const base = 0.11 * Math.pow(player.workers(), 0.65);
     const productivity = player.productivity();
     const k = player.effectiveUnits(UnitType.Factory);
     const factoryFactor = Math.pow(1 + k, 0.35);
@@ -1382,7 +1382,7 @@ export class DefaultConfig implements Config {
   }
   // Success probability p = 1 - exp(-k * x)
   researchK(): number {
-    return 0.0002; // Tunable: scales how quickly probability rises with x
+    return 0.0003; // Tunable: scales how quickly probability rises with x
   }
   // Beaker award range when a success occurs (inclusive bounds)
   researchBeakerMin(): number {

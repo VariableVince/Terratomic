@@ -241,16 +241,16 @@ export class PlayerExecution implements Execution {
 
     const alloc: Record<string, number> = {};
     if (priorityId && !priorityInSet) {
-      // Priority target not available: allocate half to the frontier of its missing prereqs
+      // Priority target not available: allocate 60% to the frontier of its missing prereqs
       const pathSet = buildMissingPrereqPath(priorityId);
       const frontier = available.filter((n) => pathSet.has(n.id));
       if (frontier.length > 0) {
-        const half = 0.5 * xTotal;
-        const shareFrontier = half / frontier.length;
+        const priorityShare = 0.6 * xTotal;
+        const shareFrontier = priorityShare / frontier.length;
         for (const n of frontier)
           alloc[n.id] = (alloc[n.id] ?? 0) + shareFrontier;
         const others = available.filter((n) => !pathSet.has(n.id));
-        const remaining = xTotal - half;
+        const remaining = xTotal - priorityShare;
         const shareOthers = others.length > 0 ? remaining / others.length : 0;
         for (const n of others) alloc[n.id] = (alloc[n.id] ?? 0) + shareOthers;
       } else {
@@ -259,10 +259,11 @@ export class PlayerExecution implements Execution {
         for (const n of available) alloc[n.id] = share;
       }
     } else if (priorityInSet && available.length > 1) {
-      const half = 0.5 * xTotal;
-      alloc[priorityId!] = (alloc[priorityId!] ?? 0) + half;
+      const priorityShare = 0.6 * xTotal;
+      alloc[priorityId!] = (alloc[priorityId!] ?? 0) + priorityShare;
       const others = available.filter((n) => n.id !== priorityId);
-      const share = others.length > 0 ? half / others.length : 0;
+      const share =
+        others.length > 0 ? (xTotal - priorityShare) / others.length : 0;
       for (const n of others) alloc[n.id] = (alloc[n.id] ?? 0) + share;
     } else {
       const share = xTotal / available.length;
