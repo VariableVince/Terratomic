@@ -14,6 +14,7 @@ const unitOptions: { type: UnitType; translationKey: string }[] = [
   { type: UnitType.Port, translationKey: "unit_type.port" },
   { type: UnitType.Airfield, translationKey: "unit_type.airfield" },
   { type: UnitType.Warship, translationKey: "unit_type.warship" },
+  { type: UnitType.Artillery, translationKey: "unit_type.artillery" },
   { type: UnitType.FighterJet, translationKey: "unit_type.fighter_jet" },
   { type: UnitType.MissileSilo, translationKey: "unit_type.missile_silo" },
   { type: UnitType.SAMLauncher, translationKey: "unit_type.sam_launcher" },
@@ -38,7 +39,7 @@ export function renderUnitTypeOptions({
     ({ type, translationKey }) => html`
       <label
         class="option-card ${disabledUnits.includes(type) ? "" : "selected"}"
-        style="width: 140px;"
+        style="width: 115px;"
       >
         <div class="checkbox-icon"></div>
         <input

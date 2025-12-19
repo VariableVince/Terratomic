@@ -47,13 +47,13 @@ export type Intent =
   | RoadInvestmentIntent
   | ResearchInvestmentIntent
   | BuildUnitIntent
-  | ScorchedEarthIntent
   | ResearchTreeSelectIntent
   | EmbargoIntent
   | QuickChatIntent
   | MoveWarshipIntent
   | MoveSubmarineIntent
   | MoveFighterJetIntent
+  | MoveArtilleryIntent
   | BomberIntent
   | ParatrooperAttackIntent
   | CancelParatrooperIntent
@@ -61,9 +61,7 @@ export type Intent =
   | SetAutoBombingIntent
   | KickPlayerIntent
   | UpgradeStructureIntent
-  | UpgradeBomberIntent
-  | PolicyDirectiveSelectIntent
-  | MarkPolicyDirectivesSeenIntent;
+  | UpgradeBomberIntent;
 
 export type AttackIntent = z.infer<typeof AttackIntentSchema>;
 export type CancelAttackIntent = z.infer<typeof CancelAttackIntentSchema>;
@@ -91,13 +89,13 @@ export type ResearchInvestmentIntent = z.infer<
   typeof ResearchInvestmentIntentSchema
 >;
 export type BuildUnitIntent = z.infer<typeof BuildUnitIntentSchema>;
-export type ScorchedEarthIntent = z.infer<typeof ScorchedEarthIntentSchema>;
 export type ResearchTreeSelectIntent = z.infer<
   typeof ResearchTreeSelectIntentSchema
 >;
 export type MoveWarshipIntent = z.infer<typeof MoveWarshipIntentSchema>;
 export type MoveSubmarineIntent = z.infer<typeof MoveSubmarineIntentSchema>;
 export type MoveFighterJetIntent = z.infer<typeof MoveFighterJetIntentSchema>;
+export type MoveArtilleryIntent = z.infer<typeof MoveArtilleryIntentSchema>;
 export type BomberIntent = z.infer<typeof BomberIntentSchema>;
 export type SetAutoBombingIntent = z.infer<typeof SetAutoBombingIntentSchema>;
 export type ParatrooperAttackIntent = z.infer<
@@ -117,12 +115,6 @@ export type UpgradeStructureIntent = z.infer<
   typeof UpgradeStructureIntentSchema
 >;
 export type UpgradeBomberIntent = z.infer<typeof UpgradeBomberIntentSchema>;
-export type PolicyDirectiveSelectIntent = z.infer<
-  typeof PolicyDirectiveSelectIntentSchema
->;
-export type MarkPolicyDirectivesSeenIntent = z.infer<
-  typeof MarkPolicyDirectivesSeenIntentSchema
->;
 
 export type Turn = z.infer<typeof TurnSchema>;
 export enum PeaceTimerDuration {
@@ -178,12 +170,22 @@ export interface GameInfo {
   numClients?: number;
   msUntilStart?: number;
   gameConfig?: GameConfig;
+  messages?: LobbyMessage[];
 }
 export interface ClientInfo {
   clientID: ClientID;
   username: string;
   teamIndex?: number | null;
 }
+
+export interface LobbyMessage {
+  clientID: ClientID;
+  username: string;
+  isHost: boolean;
+  text: string;
+  timestamp: number;
+}
+
 export enum LogSeverity {
   Debug = "DEBUG",
   Info = "INFO",
@@ -251,6 +253,7 @@ export const GameConfigSchema = z.object({
     .union(GoldMultiplierValues.map((value) => z.literal(value)))
     .optional()
     .default(1),
+  chatEnabled: z.boolean().default(false),
 });
 
 export const TeamSchema = z.string();
@@ -425,14 +428,10 @@ export const BuildUnitIntentSchema = BaseIntentSchema.extend({
   tile: z.number(),
   // Optional desired starting level for upgradeable structures.
   // Server will clamp based on type and game rules.
-  targetLevel: z.number().int().min(1).max(99).optional(),
+  targetLevel: z.number().int().min(1).max(25).optional(),
   // Optional desired bomber upgrade level for airfields.
   // Server will clamp based on maxUnitLevel(UnitType.Bomber).
   bomberLevel: z.number().int().min(1).max(99).optional(),
-});
-
-export const ScorchedEarthIntentSchema = BaseIntentSchema.extend({
-  type: z.literal("activate_scorched_earth"),
 });
 
 export const UpgradeStructureIntentSchema = BaseIntentSchema.extend({
@@ -449,16 +448,6 @@ export const UpgradeBomberIntentSchema = BaseIntentSchema.extend({
 export const ResearchTreeSelectIntentSchema = BaseIntentSchema.extend({
   type: z.literal("research_tree_select"),
   techId: z.string().max(128),
-});
-
-export const PolicyDirectiveSelectIntentSchema = BaseIntentSchema.extend({
-  type: z.literal("policy_directive_select"),
-  directiveId: z.string().max(128),
-  optionId: z.string().max(128),
-});
-
-export const MarkPolicyDirectivesSeenIntentSchema = BaseIntentSchema.extend({
-  type: z.literal("mark_policy_directives_seen"),
 });
 
 export const CancelAttackIntentSchema = BaseIntentSchema.extend({
@@ -485,6 +474,12 @@ export const MoveSubmarineIntentSchema = BaseIntentSchema.extend({
 
 export const MoveFighterJetIntentSchema = BaseIntentSchema.extend({
   type: z.literal("move_fighter_jet"),
+  unitId: z.number(),
+  tile: z.number(),
+});
+
+export const MoveArtilleryIntentSchema = BaseIntentSchema.extend({
+  type: z.literal("move_artillery"),
   unitId: z.number(),
   tile: z.number(),
 });
@@ -551,16 +546,14 @@ const IntentSchema = z.discriminatedUnion("type", [
   RoadInvestmentIntentSchema,
   ResearchInvestmentIntentSchema,
   BuildUnitIntentSchema,
-  ScorchedEarthIntentSchema,
   UpgradeStructureIntentSchema,
   UpgradeBomberIntentSchema,
   ResearchTreeSelectIntentSchema,
-  PolicyDirectiveSelectIntentSchema,
-  MarkPolicyDirectivesSeenIntentSchema,
   EmbargoIntentSchema,
   MoveWarshipIntentSchema,
   MoveSubmarineIntentSchema,
   MoveFighterJetIntentSchema,
+  MoveArtilleryIntentSchema,
   BomberIntentSchema,
   ParatrooperAttackIntentSchema,
   CancelParatrooperIntentSchema,

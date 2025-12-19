@@ -1,6 +1,7 @@
 import type { Execution, Game, Player, Unit } from "../game/Game";
 import { UnitType } from "../game/Game";
 import type { TileRef } from "../game/GameMap";
+import { playerMaxStructureTechLevel } from "../game/Upgradeables";
 import { StraightPathFinder } from "../pathfinding/PathFinding";
 import { roadEffectModifiers } from "../tech/TechEffects";
 
@@ -371,11 +372,17 @@ export class BomberExecution implements Execution {
     ) {
       const targetPlayer = this.mg.player(intent.targetPlayerID);
       if (targetPlayer && this.origOwner.isAtWarWith(targetPlayer)) {
-        return this.findTargetFromQueue(
+        const target = this.findTargetFromQueue(
           targetPlayer,
           intent.structures,
           intent.preferClosest,
         );
+        // If we found a target in manual mode, use it
+        if (target) {
+          return target;
+        }
+        // If no targets remain, clear the manual intent and fall through to auto-bombing
+        this.origOwner.setBomberIntent(null);
       }
     } // Auto-bombing mode
     if (!this.origOwner.isAutoBombingEnabled()) {
@@ -384,6 +391,7 @@ export class BomberExecution implements Execution {
 
     const range = this.mg.config().bomberTargetRange(this.getBomberLevel());
     const priority: UnitType[] = [
+      UnitType.Artillery,
       UnitType.SAMLauncher,
       UnitType.Airfield,
       UnitType.MissileSilo,
@@ -546,7 +554,8 @@ export class BomberExecution implements Execution {
   private getEffectiveSAMRange(sam: Unit): number {
     const base = this.mg.config().defaultSamRange();
     const bonus = this.mg.config().samRangeUpgradePercent();
-    const lvl = sam.level?.() ?? 1;
+    // Use player's SAM tech level, not unit level (which is stack count)
+    const lvl = playerMaxStructureTechLevel(sam.owner(), UnitType.SAMLauncher);
     if (lvl <= 1) return base;
     // Apply per-upgrade multiplicative increase
     const factor = Math.pow(1 + bonus, lvl - 1);

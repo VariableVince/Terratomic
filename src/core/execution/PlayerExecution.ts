@@ -8,12 +8,20 @@ import {
   UnitType,
   UpgradeType,
 } from "../game/Game";
-import { GameImpl } from "../game/GameImpl";
 import { TileRef } from "../game/GameMap";
 import { PseudoRandom } from "../PseudoRandom";
 import { getTechNodes, isTechAvailable } from "../tech/ResearchTree";
 import { researchEffectivenessModifiers } from "../tech/TechEffects";
 import { calculateBoundingBox, getMode, inscribed, simpleHash } from "../Util";
+
+// Traversal state for cluster calculation to avoid repeated allocations
+interface ClusterTraversalState {
+  visited: Uint8Array;
+  currentGen: number;
+}
+
+// Per-game traversal state used by calculateClusters() to avoid per-player buffers.
+const traversalStates = new WeakMap<Game, ClusterTraversalState>();
 
 export class PlayerExecution implements Execution {
   private config: Config;
@@ -202,11 +210,12 @@ export class PlayerExecution implements Execution {
     );
     if (available.length === 0) return;
 
-    // Allocation: 50% to priority, 50% split among remaining; if no valid priority, split evenly
-    const priorityId: string | null =
-      (this.player as any).researchPriority?.() ?? null;
-    const priorityInSet =
-      priorityId !== null && available.some((n) => n.id === priorityId);
+    // Get all priorities and check which are available
+    const allPriorities: Set<string> =
+      (this.player as any).researchPriorities?.() ?? new Set();
+    const availablePriorities = available.filter((n) =>
+      allPriorities.has(n.id),
+    );
 
     const k = this.config.researchK();
     const bMin = this.config.researchBeakerMin();
@@ -260,16 +269,20 @@ export class PlayerExecution implements Execution {
     };
 
     const alloc: Record<string, number> = {};
-    if (priorityId && !priorityInSet) {
-      // Priority target not available: allocate 60% to the frontier of its missing prereqs
-      const pathSet = buildMissingPrereqPath(priorityId);
-      const frontier = available.filter((n) => pathSet.has(n.id));
+    if (allPriorities.size > 0 && availablePriorities.length === 0) {
+      // Has priorities but none available: allocate 60% to the frontier of their missing prereqs
+      const allPathSets = new Set<string>();
+      for (const priorityId of allPriorities) {
+        const pathSet = buildMissingPrereqPath(priorityId);
+        pathSet.forEach((id) => allPathSets.add(id));
+      }
+      const frontier = available.filter((n) => allPathSets.has(n.id));
       if (frontier.length > 0) {
         const priorityShare = 0.6 * xTotal;
         const shareFrontier = priorityShare / frontier.length;
         for (const n of frontier)
           alloc[n.id] = (alloc[n.id] ?? 0) + shareFrontier;
-        const others = available.filter((n) => !pathSet.has(n.id));
+        const others = available.filter((n) => !allPathSets.has(n.id));
         const remaining = xTotal - priorityShare;
         const shareOthers = others.length > 0 ? remaining / others.length : 0;
         for (const n of others) alloc[n.id] = (alloc[n.id] ?? 0) + shareOthers;
@@ -278,14 +291,22 @@ export class PlayerExecution implements Execution {
         const share = xTotal / available.length;
         for (const n of available) alloc[n.id] = share;
       }
-    } else if (priorityInSet && available.length > 1) {
+    } else if (
+      availablePriorities.length > 0 &&
+      available.length > availablePriorities.length
+    ) {
+      // Some priorities available: 60% split among priorities, 40% among others
       const priorityShare = 0.6 * xTotal;
-      alloc[priorityId!] = (alloc[priorityId!] ?? 0) + priorityShare;
-      const others = available.filter((n) => n.id !== priorityId);
+      const sharePriority = priorityShare / availablePriorities.length;
+      for (const n of availablePriorities) {
+        alloc[n.id] = sharePriority;
+      }
+      const others = available.filter((n) => !allPriorities.has(n.id));
       const share =
         others.length > 0 ? (xTotal - priorityShare) / others.length : 0;
       for (const n of others) alloc[n.id] = (alloc[n.id] ?? 0) + share;
     } else {
+      // No priorities or all available are prioritized: even split
       const share = xTotal / available.length;
       for (const n of available) alloc[n.id] = share;
     }
@@ -360,9 +381,12 @@ export class PlayerExecution implements Execution {
     const enemies = new Set<number>();
     for (const tile of cluster) {
       // Check if this tile has water access (ocean or lake) - escape route via boat
-      const hasWaterAccess = this.mg
-        .neighbors(tile)
-        .some((n) => !this.mg.isLand(n));
+      let hasWaterAccess = false;
+      this.mg.forEachNeighbor(tile, (n) => {
+        if (!this.mg.isLand(n)) {
+          hasWaterAccess = true;
+        }
+      });
 
       // If any tile has water access or is on map edge, not surrounded
       if (hasWaterAccess || this.mg.isOnEdgeOfMap(tile)) {
@@ -370,13 +394,21 @@ export class PlayerExecution implements Execution {
       }
 
       // Check if there are any unowned neighbors (neutral territory = escape)
-      if (this.mg.neighbors(tile).some((n) => !this.mg?.hasOwner(n))) {
+      let hasUnownedNeighbor = false;
+      this.mg.forEachNeighbor(tile, (n) => {
+        if (!this.mg?.hasOwner(n)) {
+          hasUnownedNeighbor = true;
+        }
+      });
+      if (hasUnownedNeighbor) {
         return false;
       }
-      this.mg
-        .neighbors(tile)
-        .filter((n) => this.mg?.ownerID(n) !== this.player?.smallID())
-        .forEach((p) => this.mg && enemies.add(this.mg.ownerID(p)));
+
+      this.mg.forEachNeighbor(tile, (n) => {
+        if (this.mg?.ownerID(n) !== this.player?.smallID()) {
+          enemies.add(this.mg.ownerID(n));
+        }
+      });
       if (enemies.size !== 1) {
         return false;
       }
@@ -397,22 +429,26 @@ export class PlayerExecution implements Execution {
     const enemyTiles = new Set<TileRef>();
     for (const tr of cluster) {
       // Check if this tile has water access (ocean or lake) - escape route via boat
-      const hasWaterAccess = this.mg
-        .neighbors(tr)
-        .some((n) => !this.mg.isLand(n));
+      let hasWaterAccess = false;
+      this.mg.forEachNeighbor(tr, (n) => {
+        if (!this.mg.isLand(n)) {
+          hasWaterAccess = true;
+        }
+      });
 
       // If any tile has water access or is on map edge, not surrounded
       if (hasWaterAccess || this.mg.isOnEdgeOfMap(tr)) {
         return false;
       }
-      this.mg
-        .neighbors(tr)
-        .filter(
-          (n) =>
-            this.mg?.owner(n).isPlayer() &&
-            this.mg?.ownerID(n) !== this.player?.smallID(),
-        )
-        .forEach((n) => enemyTiles.add(n));
+
+      this.mg.forEachNeighbor(tr, (n) => {
+        if (
+          this.mg?.owner(n).isPlayer() &&
+          this.mg?.ownerID(n) !== this.player?.smallID()
+        ) {
+          enemyTiles.add(n);
+        }
+      });
     }
     if (enemyTiles.size === 0) {
       return false;
@@ -466,11 +502,11 @@ export class PlayerExecution implements Execution {
   private getCapturingPlayer(cluster: Set<TileRef>): Player | null {
     const neighborsIDs = new Set<number>();
     for (const t of cluster) {
-      for (const neighbor of this.mg.neighbors(t)) {
+      this.mg.forEachNeighbor(t, (neighbor) => {
         if (this.mg.ownerID(neighbor) !== this.player.smallID()) {
           neighborsIDs.add(this.mg.ownerID(neighbor));
         }
-      }
+      });
     }
 
     let largestNeighborAttack: Player | null = null;
@@ -506,29 +542,50 @@ export class PlayerExecution implements Execution {
   }
 
   private calculateClusters(): Set<TileRef>[] {
-    const seen = new Set<TileRef>();
     const border = this.player.borderTiles();
     const clusters: Set<TileRef>[] = [];
+
+    // Get or create traversal state for this game instance
+    let state = traversalStates.get(this.mg);
+    if (!state) {
+      state = {
+        visited: new Uint8Array(this.mg.width() * this.mg.height()),
+        currentGen: 1,
+      };
+      traversalStates.set(this.mg, state);
+    }
+
+    // Increment generation instead of clearing the array
+    state.currentGen++;
+    if (state.currentGen === 255) {
+      // Wraparound: reset to 1 and clear array
+      state.currentGen = 1;
+      state.visited.fill(0);
+    }
+
+    const currentGen = state.currentGen;
+    const visited = state.visited;
+
     for (const tile of border) {
-      if (seen.has(tile)) {
+      if (visited[tile] === currentGen) {
         continue;
       }
 
       const cluster = new Set<TileRef>();
-      const queue: TileRef[] = [tile];
-      seen.add(tile);
-      while (queue.length > 0) {
-        const curr = queue.shift();
+      const stack: TileRef[] = [tile];
+      visited[tile] = currentGen;
+
+      while (stack.length > 0) {
+        const curr = stack.pop();
         if (curr === undefined) throw new Error("curr is undefined");
         cluster.add(curr);
 
-        const neighbors = (this.mg as GameImpl).neighborsWithDiag(curr);
-        for (const neighbor of neighbors) {
-          if (border.has(neighbor) && !seen.has(neighbor)) {
-            queue.push(neighbor);
-            seen.add(neighbor);
+        this.mg.forEachNeighborWithDiag(curr, (neighbor) => {
+          if (border.has(neighbor) && visited[neighbor] !== currentGen) {
+            stack.push(neighbor);
+            visited[neighbor] = currentGen;
           }
-        }
+        });
       }
       clusters.push(cluster);
     }

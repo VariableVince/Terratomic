@@ -4,16 +4,11 @@ import multiBuildIcon from "../../../../resources/images/MultiBuildIcon.svg";
 import upgradeArrowIcon from "../../../../resources/images/UpgradeArrowIcon.svg";
 import type { EventBus } from "../../../core/EventBus";
 import type { Gold, PlayerID } from "../../../core/game/Game";
-import { PlayerType, UnitType, UpgradeType } from "../../../core/game/Game";
-import type {
-  GameView,
-  PlayerView,
-  UnitView,
-} from "../../../core/game/GameView";
+import { UnitType, UpgradeType } from "../../../core/game/Game";
+import type { GameView } from "../../../core/game/GameView";
 import {
   isUnitAvailable,
   maxStructureLevel,
-  maxUnitLevel,
   playerMaxStructureLevel,
   playerMaxUnitLevel,
 } from "../../../core/game/Upgradeables";
@@ -34,13 +29,7 @@ import { ToggleUpgradeModeEvent } from "../../events/ToggleUpgradeModeEvent";
 import { AttackRatioEvent } from "../../InputHandler";
 import "../../StatisticsModal"; // ensure statistics modal is registered
 import {
-  SendAllianceRequestIntentEvent,
   SendBomberIntentEvent,
-  SendBreakAllianceIntentEvent,
-  SendDeclareWarIntentEvent,
-  SendEmbargoIntentEvent,
-  SendPeaceRequestIntentEvent,
-  SendSetAutoBombingEvent,
   SendSetInvestmentRateEvent,
   SendSetResearchInvestmentEvent,
   SendSetRoadInvestmentEvent,
@@ -106,28 +95,10 @@ export class ControlPanel2 extends LitElement implements Layer {
   private init_: boolean = false;
 
   @state()
-  private activeTab:
-    | "Build"
-    | "Attack"
-    | "Economy"
-    | "Bombers"
-    | "Trade"
-    | "Diplomacy" = "Build";
-
-  @state()
-  private _lastAirfieldCount: number = 0;
-
-  @state()
-  private _lastPlayersHash: string = "";
-
-  @state()
-  private _reachablePlayersHash: string = "";
+  private activeTab: "Build" | "Attack" | "Economy" = "Build";
 
   @state()
   private _hasAirfields: boolean = false;
-
-  @state()
-  private _highlightBombersTab: boolean = false;
 
   @state()
   private _currentTargetPlayerId: PlayerID | null = null;
@@ -139,25 +110,28 @@ export class ControlPanel2 extends LitElement implements Layer {
   private _currentTargetPlayerName: string | null = null;
 
   @state()
-  private _bomberPreferClosest: boolean = true;
-
-  @state()
-  private _isAutoBombingEnabled: boolean = false;
-
-  @state()
-  private _lastSelectedBomberTarget: PlayerID | null = null;
-
-  @state()
   private _multibuildEnabled: boolean = false;
 
   @state()
-  private _structureLevels: Record<string, number> = {};
+  private _structureLevels: Record<string, number> = {}; // Stack counts for structures
 
   @state()
   private _unitLevels: Record<string, number> = {};
 
   @state()
   private _uiSelectedStructures: UnitType[] = [];
+
+  // Cache for trade demand to prevent flickering tooltips
+  @state()
+  private _tradeDemandCache: {
+    label: string;
+    color: string;
+    queueLen: number;
+    availableShips: number;
+    myShipCount: number;
+    tooltip: string;
+    timestamp: number;
+  } | null = null;
 
   private unitIconMap: { [key: string]: string } = {
     City: "/images/CityIconWhite.svg",
@@ -212,6 +186,7 @@ export class ControlPanel2 extends LitElement implements Layer {
     UnitType.FighterJet,
     UnitType.Warship,
     UnitType.Submarine,
+    UnitType.Artillery,
   ];
 
   private readonly StructureTypes: UnitType[] = [
@@ -357,15 +332,7 @@ export class ControlPanel2 extends LitElement implements Layer {
     });
     this._updatePlayerHashAndRefresh(); // Initial hash calculation
 
-    // Load structure levels
-    try {
-      const raw = localStorage.getItem("buildSettings.levels");
-      if (raw) {
-        this._structureLevels = JSON.parse(raw);
-      }
-    } catch (e) {
-      console.warn("Failed to load build settings", e);
-    }
+    // Structure stack counts default to 1 (no persistence between games)
 
     // Load unit levels
     try {
@@ -378,21 +345,7 @@ export class ControlPanel2 extends LitElement implements Layer {
     }
   }
 
-  private _updatePlayerHashAndRefresh() {
-    const currentPlayersHash = this.game
-      .players()
-      .map((p) => p.id())
-      .sort()
-      .join(",");
-
-    if (this._lastPlayersHash !== currentPlayersHash) {
-      this._lastPlayersHash = currentPlayersHash;
-      // Only refresh the list if the relevant tab is active
-      if (this.activeTab === "Bombers") {
-        this._refreshBomberPlayerLists();
-      }
-    }
-  }
+  private _updatePlayerHashAndRefresh() {}
 
   tick() {
     if (this.init_) {
@@ -544,27 +497,6 @@ export class ControlPanel2 extends LitElement implements Layer {
 
     // Track relevant state for dynamic updates
     const currentAirfieldCount = player.units(UnitType.Airfield).length;
-    this._hasAirfields = currentAirfieldCount > 0;
-
-    if (this.activeTab === "Bombers" && this.game.ticks() % 10 === 0) {
-      const currentReachablePlayersHash = this._getPlayersInAirfieldRange()
-        .map((p) => p.id())
-        .sort()
-        .join(",");
-
-      if (
-        this._lastAirfieldCount !== currentAirfieldCount ||
-        this._reachablePlayersHash !== currentReachablePlayersHash
-      ) {
-        this._refreshBomberPlayerLists();
-        this._lastAirfieldCount = currentAirfieldCount;
-        this._reachablePlayersHash = currentReachablePlayersHash;
-      }
-    }
-
-    if (this.activeTab === "Bombers" && !this._hasAirfields) {
-      this.activeTab = "Build"; // Changed from "Controls"
-    }
 
     this.requestUpdate();
 
@@ -782,88 +714,12 @@ export class ControlPanel2 extends LitElement implements Layer {
     return player?.hasUpgrade?.(UpgradeType.Roads) ?? false;
   }
 
-  private _getPlayersInAirfieldRange(): PlayerView[] {
-    const myPlayer = this.game.myPlayer();
-    if (!myPlayer?.isAlive()) {
-      return [];
-    }
-
-    const myAirfields = myPlayer
-      .units(UnitType.Airfield)
-      .filter((u) => u.isActive());
-    if (myAirfields.length === 0) {
-      return [];
-    }
-
-    const reachablePlayers = new Map<PlayerID, PlayerView>();
-
-    const structureIndex = this.game.getStructureIndex();
-
-    for (const airfield of myAirfields) {
-      const bomberRange = this.game
-        .config()
-        .bomberTargetRange(airfield.bomberLevel());
-      const airfieldPos = {
-        x: this.game.x(airfield.tile()),
-        y: this.game.y(airfield.tile()),
-      };
-      const nearbyStructures = structureIndex.getInRange(
-        airfieldPos.x,
-        airfieldPos.y,
-        bomberRange,
-      );
-
-      for (const structure of nearbyStructures) {
-        const owner = structure.owner();
-        if (
-          owner &&
-          owner.isPlayer() &&
-          owner.id() !== myPlayer.id() && // Prevent self-targeting
-          !myPlayer.isFriendly(owner) &&
-          owner.type() !== PlayerType.Bot
-        ) {
-          if (!reachablePlayers.has(owner.id())) {
-            reachablePlayers.set(owner.id(), owner);
-          }
-        }
-      }
-    }
-
-    return Array.from(reachablePlayers.values()).sort((a, b) =>
-      a.name().localeCompare(b.name()),
-    );
-  }
-
-  private _refreshBomberPlayerLists() {
-    this.populateBomberForm(); // Populates the main player select list
-  }
-
   updated(changedProperties: Map<string | number | symbol, unknown>) {
     if (changedProperties.has("isOpen")) {
       if (this.isOpen) {
         this.classList.remove("hidden");
       } else {
         this.classList.add("hidden");
-      }
-    }
-
-    if (this.activeTab === "Bombers") {
-      if (
-        changedProperties.has("activeTab") ||
-        changedProperties.has("_hasAirfields")
-      ) {
-        this._refreshBomberPlayerLists();
-      }
-    }
-
-    if (changedProperties.has("_hasAirfields")) {
-      const oldHasAirfields = changedProperties.get("_hasAirfields");
-      if (this._hasAirfields && !oldHasAirfields) {
-        // Airfields just became available, highlight the tab
-        this._highlightBombersTab = true;
-        setTimeout(() => {
-          this._highlightBombersTab = false;
-        }, 3000); // Highlight for 3 seconds
       }
     }
 
@@ -876,55 +732,6 @@ export class ControlPanel2 extends LitElement implements Layer {
     });
   }
 
-  populateBomberForm() {
-    const playerSelect = this.querySelector(
-      "#bomber-player-select",
-    ) as HTMLSelectElement | null;
-    if (!this.game || !playerSelect) return;
-
-    const me = this.game.myPlayer();
-    if (!me) return;
-
-    const playersToDisplay: PlayerView[] = this._getPlayersInAirfieldRange();
-
-    if (playersToDisplay.length === 0) {
-      playerSelect.innerHTML = `<option value="" disabled selected>No building in bomber reach.</option>`;
-      playerSelect.disabled = true;
-      this._lastSelectedBomberTarget = null; // Clear selection if no targets are available
-    } else {
-      const optsPlayers = playersToDisplay
-        .map((p) => `<option value="${p.id()}">${p.name()}</option>`)
-        .join("");
-      playerSelect.innerHTML = optsPlayers;
-      playerSelect.disabled = false;
-
-      const stillAValidTarget = playersToDisplay.some(
-        (p) => p.id() === this._lastSelectedBomberTarget,
-      );
-
-      if (stillAValidTarget) {
-        playerSelect.value = this._lastSelectedBomberTarget as string;
-      } else {
-        // If the last target is no longer valid, default to the first in the list and update the state
-        this._lastSelectedBomberTarget = playerSelect.value;
-      }
-    }
-  }
-
-  handleBomberIntent() {
-    const playerSelect = this.querySelector(
-      "#bomber-player-select",
-    ) as HTMLSelectElement;
-
-    if (!playerSelect || this._uiSelectedStructures.length === 0) return;
-
-    const targetID = String(playerSelect.value);
-    // Use the state variable instead of querying the DOM
-    const structures = [...this._uiSelectedStructures];
-
-    this.sendBomberIntent(targetID, structures, this._bomberPreferClosest);
-  }
-
   sendBomberIntent(
     targetID: string | null,
     structures: UnitType[] | null,
@@ -933,7 +740,6 @@ export class ControlPanel2 extends LitElement implements Layer {
     if (!this.eventBus) return;
     this._currentTargetPlayerId = targetID;
     this._currentTargetStructureTypes = structures ?? [];
-    this._bomberPreferClosest = preferClosest;
     if (targetID) {
       const targetPlayer = this.game.players().find((p) => p.id() === targetID);
       this._currentTargetPlayerName = targetPlayer ? targetPlayer.name() : null;
@@ -943,45 +749,6 @@ export class ControlPanel2 extends LitElement implements Layer {
     this.eventBus.emit(
       new SendBomberIntentEvent(targetID, structures, preferClosest),
     );
-  }
-
-  _startAutoBombing() {
-    this._isAutoBombingEnabled = true;
-    this.eventBus.emit(new SendSetAutoBombingEvent(true));
-    // Clear any manual target when auto-bombing is enabled
-    this.sendBomberIntent(null, null, true);
-  }
-
-  async _stopAutoBombing() {
-    this._isAutoBombingEnabled = false;
-    this.eventBus.emit(new SendSetAutoBombingEvent(false));
-    // Clear any manual target when auto-bombing is disabled
-    this.sendBomberIntent(null, null, true);
-
-    await this.updateComplete; // Wait for the UI to update
-
-    this._refreshBomberPlayerLists(); // NOW refresh the list
-  }
-
-  handleStructureChange(e: Event) {
-    const checkbox = e.target as HTMLInputElement;
-    const value = checkbox.value as UnitType;
-
-    if (checkbox.checked) {
-      if (!this._uiSelectedStructures.includes(value)) {
-        this._uiSelectedStructures = [...this._uiSelectedStructures, value];
-      }
-    } else {
-      this._uiSelectedStructures = this._uiSelectedStructures.filter(
-        (s) => s !== value,
-      );
-    }
-    this.requestUpdate();
-  }
-
-  private _handleBomberTargetChange(e: Event) {
-    const select = e.target as HTMLSelectElement;
-    this._lastSelectedBomberTarget = select.value;
   }
 
   private _handleMultibuildToggle() {
@@ -1071,6 +838,7 @@ export class ControlPanel2 extends LitElement implements Layer {
       UnitType.FighterJet,
       UnitType.Submarine,
       UnitType.Bomber,
+      UnitType.Artillery,
     ];
     if (typeof openFn !== "function") {
       console.warn("UnitUpgradeSettingsModal missing open() method");
@@ -1098,9 +866,7 @@ export class ControlPanel2 extends LitElement implements Layer {
     return el;
   }
 
-  private _changeTab(
-    tab: "Build" | "Attack" | "Economy" | "Bombers" | "Trade" | "Diplomacy",
-  ) {
+  private _changeTab(tab: "Build" | "Attack" | "Economy") {
     this.activeTab = tab;
     if (this.uiState.pendingBuildUnitType) {
       this.uiState.pendingBuildUnitType = null;
@@ -1354,40 +1120,6 @@ export class ControlPanel2 extends LitElement implements Layer {
           >
             Economy
           </button>
-          <button
-            class="py-2 px-4 text-center font-ocr uppercase cp2-tab ${this
-              .activeTab === "Trade"
-              ? "active"
-              : ""}"
-            @click=${() => this._changeTab("Trade")}
-            data-i18n-title="control_panel2.trade_tab_tooltip"
-          >
-            Trade
-          </button>
-          <button
-            class="py-2 px-4 text-center font-ocr uppercase cp2-tab ${this
-              .activeTab === "Diplomacy"
-              ? "active"
-              : ""}"
-            @click=${() => this._changeTab("Diplomacy")}
-            data-i18n-title="control_panel2.diplomacy_tab_tooltip"
-          >
-            Diplomacy
-          </button>
-          ${this._hasAirfields
-            ? html`
-                <button
-                  class="py-2 px-4 text-center font-ocr uppercase cp2-tab ${this
-                    .activeTab === "Bombers"
-                    ? "active"
-                    : ""} ${this._highlightBombersTab ? "highlight-tab" : ""}"
-                  @click=${() => this._changeTab("Bombers")}
-                  data-i18n-title="control_panel2.bombers_tab_tooltip"
-                >
-                  Bombers
-                </button>
-              `
-            : ""}
           <div class="ml-auto flex items-center">
             <button
               class="cp2-tab flex items-center justify-center mx-1"
@@ -1404,405 +1136,107 @@ export class ControlPanel2 extends LitElement implements Layer {
           </div>
         </div>
 
-        <div class="tab-content flex-grow overflow-y-auto max-w-full pr-4 pt-2">
-          ${this.activeTab === "Bombers"
-            ? html`
-
-                <div class="flex w-full gap-2 h-full">
-                  <!-- Column 1: Targeting Configuration (2/3 width) -->
-                  <div class="w-2/3 flex flex-col gap-2">
-                    ${
-                      this._isAutoBombingEnabled
-                        ? html`
-                            <div
-                              class="flex flex-col items-center justify-center h-full text-blue-300 font-bold text-center border border-dashed border-blue-900 rounded bg-blue-900/20"
-                            >
-                              <div class="text-lg mb-2">
-                                AUTO-BOMBING ACTIVE
-                              </div>
-                              <div class="text-sm opacity-80">
-                                Bombers are automatically targeting nearby
-                                enemies.
-                              </div>
-                            </div>
-                          `
-                        : html`
-                            <div class="flex gap-2 items-end">
-                              <label class="flex-grow text-sm military-label">
-                                Target Player
-                                <select
-                                  id="bomber-player-select"
-                                  class="mt-1 block w-full p-1 text-white rounded-sm truncate text-sm"
-                                  style="background-color: var(--ui-secondary); border: 1px solid var(--ui-panel-border);"
-                                  @change=${this._handleBomberTargetChange}
-                                ></select>
-                              </label>
-
-                              <div class="flex flex-col justify-end pb-0.5">
-                                <span class="text-[10px] military-label mb-1"
-                                  >Priority</span
-                                >
-                                <div class="flex bg-gray-800 rounded p-0.5">
-                                  <label
-                                    class="flex items-center px-2 py-0.5 cursor-pointer hover:bg-gray-700 rounded transition-colors"
-                                    title="Target closest structures first"
-                                  >
-                                    <input
-                                      type="radio"
-                                      name="distance-pref"
-                                      value="closest"
-                                      ?checked=${this._bomberPreferClosest}
-                                      @change=${() => {
-                                        this._bomberPreferClosest = true;
-                                      }}
-                                      class="hidden"
-                                    />
-                                    <span
-                                      class="text-xs ${this._bomberPreferClosest
-                                        ? "text-blue-400 font-bold"
-                                        : "text-gray-400"}"
-                                      >Closest</span
-                                    >
-                                  </label>
-                                  <div class="w-px bg-gray-700 mx-0.5"></div>
-                                  <label
-                                    class="flex items-center px-2 py-0.5 cursor-pointer hover:bg-gray-700 rounded transition-colors"
-                                    title="Target furthest structures first"
-                                  >
-                                    <input
-                                      type="radio"
-                                      name="distance-pref"
-                                      value="furthest"
-                                      ?checked=${!this._bomberPreferClosest}
-                                      @change=${() => {
-                                        this._bomberPreferClosest = false;
-                                      }}
-                                      class="hidden"
-                                    />
-                                    <span
-                                      class="text-xs ${!this
-                                        ._bomberPreferClosest
-                                        ? "text-blue-400 font-bold"
-                                        : "text-gray-400"}"
-                                      >Furthest</span
-                                    >
-                                  </label>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div class="flex-grow flex flex-col min-h-0">
-                              <label class="text-xs military-label mb-1"
-                                >Target Structures</label
-                              >
-                              <div
-                                class="grid grid-cols-11 gap-1.5 overflow-y-auto pr-1"
-                              >
-                                ${[
-                                  UnitType.City,
-                                  UnitType.DefensePost,
-                                  UnitType.SAMLauncher,
-                                  UnitType.MissileSilo,
-                                  UnitType.Port,
-                                  UnitType.Airfield,
-                                  UnitType.Hospital,
-                                  UnitType.Academy,
-                                  UnitType.ResearchLab,
-                                  UnitType.Factory,
-                                  UnitType.DoomsdayDevice,
-                                ].map((s) => {
-                                  const isSelected =
-                                    this._uiSelectedStructures.includes(s);
-                                  return html`
-                                    <label
-                                      class="flex flex-col items-center justify-center p-0.5 rounded cursor-pointer transition-all aspect-square ${isSelected
-                                        ? "border-[0.5px] border-white shadow-[0_0_5px_rgba(29,58,96,1.0)]"
-                                        : "border border-gray-700 hover:bg-gray-800"}"
-                                      style="${isSelected
-                                        ? "background-color: rgb(29, 58, 96);"
-                                        : ""}"
-                                      title="${s}"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        name="structure"
-                                        value="${s}"
-                                        class="hidden"
-                                        .checked=${isSelected}
-                                        @change=${this.handleStructureChange}
-                                      />
-                                      <img
-                                        src="${this.unitIconMap[s]}"
-                                        alt="${s}"
-                                        class="w-4 h-4 object-contain"
-                                      />
-                                    </label>
-                                  `;
-                                })}
-                              </div>
-                            </div>
-
-                            <!-- SET TARGET Button -->
-                            <div class="flex gap-2 items-center mt-2">
-                              <button
-                                type="button"
-                                class="military-button py-2 px-4 font-bold"
-                                @click=${this.handleBomberIntent}
-                              >
-                                SET TARGET
-                              </button>
-                              <button
-                                type="button"
-                                class="text-xs text-gray-400 hover:text-white underline"
-                                @click=${() =>
-                                  this.sendBomberIntent(null, null, true)}
-                              >
-                                Clear
-                              </button>
-                              <div class="text-xs flex-grow">
-                                ${this._currentTargetPlayerId &&
-                                this._currentTargetStructureTypes.length > 0
-                                  ? html`
-                                      <div class="flex items-center gap-2">
-                                        <span class="font-bold text-blue-300"
-                                          >${this
-                                            ._currentTargetPlayerName}</span
-                                        >
-                                        <span class="text-[10px] text-gray-400"
-                                          >${this._bomberPreferClosest
-                                            ? "Closest"
-                                            : "Furthest"}</span
-                                        >
-                                        <div class="flex gap-0.5">
-                                          ${this._currentTargetStructureTypes.map(
-                                            (structType) => html`
-                                              <img
-                                                src="${this.unitIconMap[
-                                                  structType
-                                                ]}"
-                                                class="w-3 h-3 opacity-80"
-                                              />
-                                            `,
-                                          )}
-                                        </div>
-                                      </div>
-                                    `
-                                  : html`<span class="text-gray-500 italic"
-                                      >No target set</span
-                                    >`}
-                              </div>
-                            </div>
-                          `
-                    }
-                  </div>
-
-                  <!-- Column 2: Actions & Status (1/3 width) -->
-                  <div class="w-1/3 flex flex-col gap-2 pl-2 border-l border-gray-800">
-                    <!-- Upgrade Bombers Button -->
-                    <div class="bg-gray-900/50 p-2 rounded border border-gray-800">
-                      <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs font-bold text-gray-300"
-                          >Upgrade Bombers</span
-                        >
-                        <div
-                          class="w-2 h-2 rounded-full ${
-                            this.uiState.bomberUpgradeMode
-                              ? "bg-green-500 shadow-[0_0_5px_#22c55e]"
-                              : "bg-gray-600"
-                          }"
-                        ></div>
-                      </div>
-                      <button
-                        type="button"
-                        class="military-button w-full text-xs py-1.5"
-                        title="Click airfields to upgrade their bombers"
-                        @click=${() => {
-                          const enabled = !this.uiState.bomberUpgradeMode;
-                          this.uiState.bomberUpgradeMode = enabled;
-                          this.eventBus.emit(
-                            new ToggleBomberUpgradeModeEvent(enabled),
-                          );
-                          // Disable structure upgrade mode if bomber upgrade is enabled
-                          if (enabled && this.uiState.upgradeMode) {
-                            this.uiState.upgradeMode = false;
-                            this.eventBus.emit(
-                              new ToggleUpgradeModeEvent(false),
-                            );
-                          }
-                          // Clear pending build selection when upgrade is enabled
-                          if (enabled) {
-                            this.uiState.pendingBuildUnitType = null;
-                          }
-                          this.requestUpdate();
-                        }}
-                      >
-                        Upgrade Bombers
-                      </button>
-                    </div>
-
-                    <!-- Auto-Bombing Toggle -->
-                    <div class="bg-gray-900/50 p-2 rounded border border-gray-800">
-                      <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs font-bold text-gray-300"
-                          >Auto-Bomb</span
-                        >
-                        <div
-                          class="w-2 h-2 rounded-full ${
-                            this._isAutoBombingEnabled
-                              ? "bg-green-500 shadow-[0_0_5px_#22c55e]"
-                              : "bg-gray-600"
-                          }"
-                        ></div>
-                      </div>
-                      ${
-                        this._isAutoBombingEnabled
-                          ? html`
-                              <button
-                                type="button"
-                                class="military-button w-full text-xs py-1.5"
-                                style="background-color: var(--alertColor); border-color: var(--alertColor);"
-                                @click=${this._stopAutoBombing}
-                              >
-                                Stop Auto
-                              </button>
-                            `
-                          : html`
-                              <button
-                                type="button"
-                                class="military-button w-full text-xs py-1.5"
-                                @click=${this._startAutoBombing}
-                                title="Automatically target nearby enemies"
-                              >
-                                Start Auto
-                              </button>
-                            `
-                      }
-                    </div>
-                  </div>
-                  </div>
-                </div>
-              `
-            : ""}
-          ${this.activeTab === "Build"
-            ? html` <div class="flex items-center mb-2 gap-4 ml-1"></div> `
-            : ""}
+        <div class="tab-content flex-grow overflow-hidden max-w-full pr-4 pt-0">
           ${this.activeTab === "Build"
             ? html`
-                <div class="flex items-center mb-2 gap-4 ml-1">
+                <!-- Toolbar Row -->
+                <div class="build-toolbar">
                   <button
-                    class="upgrade-structures-button ${this._multibuildEnabled
-                      ? "selected"
+                    class="toolbar-btn ${this._multibuildEnabled
+                      ? "active"
                       : ""}"
-                    title="Place multiple structures without re-selecting"
+                    title="Multi-Build: Place multiple structures without re-selecting"
                     @click=${this._handleMultibuildToggle}
                   >
-                    <img
-                      class="upgrade-icon"
-                      src=${multiBuildIcon}
-                      alt="Multi-Build"
-                    />
-                    <span>Multi-Build Structures</span>
+                    <img src=${multiBuildIcon} alt="" class="toolbar-icon" />
+                    <span>Multi-Build</span>
                   </button>
-                  <div class="relative inline-block">
-                    <div
-                      class="flex items-center h-[36px] px-3"
-                      style="
-                        border: 2px solid var(--ui-panel-border);
-                        background: var(--ui-primary);
-                        border-radius: 6px;
-                        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
-                        white-space: nowrap;
-                      "
-                      title="Select a structure below to set its level"
-                    >
-                      <span
-                        style="font-size: 11px; margin-right: 8px; font-weight: bold; color: var(--ui-text-accent);"
-                      >
-                        ${this.uiState.pendingBuildUnitType
-                          ? `Set ${this.uiState.pendingBuildUnitType} Level`
-                          : "Select a structure..."}
-                      </span>
-                      <button
-                        class="w-6 h-6 flex items-center justify-center bg-[#4c516d] hover:bg-[#5a617c] text-white rounded mr-1 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                        ?disabled=${!this.uiState.pendingBuildUnitType}
-                        @click=${() => {
-                          if (!this.uiState.pendingBuildUnitType) return;
-                          const type = this.uiState.pendingBuildUnitType;
-                          const current = this._structureLevels[type] || 1;
-                          const max = maxStructureLevel(type);
-                          const next = Math.min(max, current + 1);
-                          this._structureLevels = {
-                            ...this._structureLevels,
-                            [type]: next,
-                          };
-                          localStorage.setItem(
-                            "buildSettings.levels",
-                            JSON.stringify(this._structureLevels),
-                          );
-                        }}
-                      >
-                        +
-                      </button>
-                      <button
-                        class="w-6 h-6 flex items-center justify-center bg-[#4c516d] hover:bg-[#5a617c] text-white rounded font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                        ?disabled=${!this.uiState.pendingBuildUnitType}
-                        @click=${() => {
-                          if (!this.uiState.pendingBuildUnitType) return;
-                          const type = this.uiState.pendingBuildUnitType;
-                          const current = this._structureLevels[type] || 1;
-                          const next = Math.max(1, current - 1);
-                          this._structureLevels = {
-                            ...this._structureLevels,
-                            [type]: next,
-                          };
-                          localStorage.setItem(
-                            "buildSettings.levels",
-                            JSON.stringify(this._structureLevels),
-                          );
-                        }}
-                      >
-                        -
-                      </button>
-                    </div>
-                  </div>
                   <button
-                    class="upgrade-structures-button ${this.uiState.upgradeMode
-                      ? "selected"
+                    class="toolbar-btn ${this.uiState.upgradeMode
+                      ? "active"
                       : ""}"
-                    title="Click structures to upgrade them"
+                    title="Stack Mode: Click existing structures to add stacks"
                     @click=${() => {
                       const enabled = !this.uiState.upgradeMode;
                       this.uiState.upgradeMode = enabled;
                       this.eventBus.emit(new ToggleUpgradeModeEvent(enabled));
-                      // Disable mass production if upgrade is enabled
                       if (enabled && this._multibuildEnabled) {
                         this._multibuildEnabled = false;
                         this.uiState.multibuildEnabled = false;
                       }
-                      // Disable bomber upgrade mode if structure upgrade is enabled
                       if (enabled && this.uiState.bomberUpgradeMode) {
                         this.uiState.bomberUpgradeMode = false;
                         this.eventBus.emit(
                           new ToggleBomberUpgradeModeEvent(false),
                         );
                       }
-                      // Clear pending build selection when upgrade is enabled
                       if (enabled) {
                         this.uiState.pendingBuildUnitType = null;
                       }
                       this.requestUpdate();
                     }}
                   >
-                    <img
-                      class="upgrade-icon"
-                      src=${upgradeArrowIcon}
-                      alt="Upgrade"
-                    />
-                    <span>Upgrade Structures</span>
+                    <img src=${upgradeArrowIcon} alt="" class="toolbar-icon" />
+                    <span>Stack Mode</span>
                   </button>
+                  <div
+                    class="toolbar-stack-control"
+                    title="Set stack count for selected structure"
+                  >
+                    <span class="stack-label">Stack:</span>
+                    <button
+                      class="stack-btn"
+                      ?disabled=${!this.uiState.pendingBuildUnitType}
+                      @click=${() => {
+                        if (!this.uiState.pendingBuildUnitType) return;
+                        const type = this.uiState.pendingBuildUnitType;
+                        const current = this._structureLevels[type] || 1;
+                        const next = Math.max(1, current - 1);
+                        this._structureLevels = {
+                          ...this._structureLevels,
+                          [type]: next,
+                        };
+                        localStorage.setItem(
+                          "buildSettings.stackCount",
+                          JSON.stringify(this._structureLevels),
+                        );
+                      }}
+                    >
+                      −
+                    </button>
+                    <span class="stack-value">
+                      ${this.uiState.pendingBuildUnitType
+                        ? `${this._structureLevels[this.uiState.pendingBuildUnitType] || 1}`
+                        : "1"}
+                    </span>
+                    <button
+                      class="stack-btn"
+                      ?disabled=${!this.uiState.pendingBuildUnitType}
+                      @click=${() => {
+                        if (!this.uiState.pendingBuildUnitType) return;
+                        const type = this.uiState.pendingBuildUnitType;
+                        const current = this._structureLevels[type] || 1;
+                        const max = maxStructureLevel(type);
+                        const next = Math.min(max, current + 1);
+                        this._structureLevels = {
+                          ...this._structureLevels,
+                          [type]: next,
+                        };
+                        localStorage.setItem(
+                          "buildSettings.stackCount",
+                          JSON.stringify(this._structureLevels),
+                        );
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div class="toolbar-spacer"></div>
+                  ${this._renderTradeDemand()}
                 </div>
+                <!-- Build Grid -->
                 <build-menu
-                  style="width: 100%; display: block;"
+                  style="display: block; width: 100%;"
                   .game=${this.game}
                   .eventBus=${this.eventBus}
                   .uiState=${this.uiState}
@@ -1813,94 +1247,17 @@ export class ControlPanel2 extends LitElement implements Layer {
             : ""}
           ${this.activeTab === "Attack"
             ? html`
-                <div class="flex items-center mb-2 gap-4 ml-1">
+                <!-- Toolbar Row -->
+                <div class="build-toolbar">
                   <button
-                    class="upgrade-structures-button ${this._multibuildEnabled
-                      ? "selected"
+                    class="toolbar-btn ${this._multibuildEnabled
+                      ? "active"
                       : ""}"
-                    title="Multi-Build Units"
+                    title="Multi-Build: Place multiple units without re-selecting"
                     @click=${this._handleMultibuildToggle}
                   >
-                    <img
-                      class="upgrade-icon"
-                      src=${multiBuildIcon}
-                      alt="Multi-Build"
-                    />
-                    <span>Multi-Build Units</span>
-                  </button>
-                  <div class="relative inline-block">
-                    <div
-                      class="flex items-center h-[36px] px-3"
-                      style="
-                        border: 2px solid var(--ui-panel-border);
-                        background: var(--ui-primary);
-                        border-radius: 6px;
-                        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
-                        white-space: nowrap;
-                      "
-                      title="Select a unit below to set its level"
-                    >
-                      <span
-                        style="font-size: 11px; margin-right: 8px; font-weight: bold; color: var(--ui-text-accent);"
-                      >
-                        ${this.uiState.pendingBuildUnitType
-                          ? `Set ${this.uiState.pendingBuildUnitType} Level`
-                          : "Select a unit..."}
-                      </span>
-                      <button
-                        class="w-6 h-6 flex items-center justify-center bg-[#4c516d] hover:bg-[#5a617c] text-white rounded mr-1 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                        ?disabled=${!this.uiState.pendingBuildUnitType}
-                        @click=${() => {
-                          if (!this.uiState.pendingBuildUnitType) return;
-                          const type = this.uiState.pendingBuildUnitType;
-                          const current = this._unitLevels[type] || 1;
-                          const max = maxUnitLevel(type);
-                          const next = Math.min(max, current + 1);
-                          this._unitLevels = {
-                            ...this._unitLevels,
-                            [type]: next,
-                          };
-                          localStorage.setItem(
-                            "unitUpgradeSettings.levels",
-                            JSON.stringify(this._unitLevels),
-                          );
-                        }}
-                      >
-                        +
-                      </button>
-                      <button
-                        class="w-6 h-6 flex items-center justify-center bg-[#4c516d] hover:bg-[#5a617c] text-white rounded font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                        ?disabled=${!this.uiState.pendingBuildUnitType}
-                        @click=${() => {
-                          if (!this.uiState.pendingBuildUnitType) return;
-                          const type = this.uiState.pendingBuildUnitType;
-                          const current = this._unitLevels[type] || 1;
-                          const next = Math.max(1, current - 1);
-                          this._unitLevels = {
-                            ...this._unitLevels,
-                            [type]: next,
-                          };
-                          localStorage.setItem(
-                            "unitUpgradeSettings.levels",
-                            JSON.stringify(this._unitLevels),
-                          );
-                        }}
-                      >
-                        -
-                      </button>
-                    </div>
-                  </div>
-                  <button
-                    class="upgrade-structures-button"
-                    title="Set default upgrade levels for units"
-                    @click=${() => this._openUnitUpgradeSettings()}
-                  >
-                    <img
-                      class="upgrade-icon"
-                      src=${upgradeArrowIcon}
-                      alt="Upgrade"
-                    />
-                    <span>Upgrade Units</span>
+                    <img src=${multiBuildIcon} alt="" class="toolbar-icon" />
+                    <span>Multi-Build</span>
                   </button>
                 </div>
                 <build-menu
@@ -2306,493 +1663,196 @@ export class ControlPanel2 extends LitElement implements Layer {
                 </div>
               `
             : ""}
-          ${this.activeTab === "Trade" ? this._renderTradeTab() : ""}
-          ${this.activeTab === "Diplomacy" ? this.renderDiplomacyTab() : ""}
         </div>
       </div>
     `;
   }
 
-  private _renderTradeTab() {
+  private _renderTradeDemand() {
     const me = this.game.myPlayer();
     if (!me) return html``;
-    const ships = me.units(UnitType.TradeShip).filter((u) => u.isActive());
-    const ports = me.units(UnitType.Port).filter((p) => p.isActive());
-    const ticks = this.game.ticks();
-    const delay = this.game.config().tradeShipReplacementDelayTicks();
-    // Multi-build: gather all pending construction due ticks across ports
-    const pendingEntries: Array<{ port: UnitView; due: number }> = [];
-    for (const p of ports) {
-      const arr: number[] = (p as any).pendingTradeShipDueTicks?.() ?? [];
-      for (const due of arr) {
-        if (due > ticks) pendingEntries.push({ port: p, due });
-      }
-    }
-    pendingEntries.sort((a, b) => a.due - b.due);
-    const pendingRows = pendingEntries.map(({ port, due }, idx) => {
-      const remaining = due - ticks;
-      const pct = Math.min(
-        100,
-        Math.max(0, Math.round(((delay - remaining) / delay) * 100)),
-      );
-      return html`<div
-        class="py-1 px-2 border-b"
-        style="border-color: var(--ui-panel-border)"
-      >
-        <div class="mb-1 text-gray-300">
-          Cargo Ship #${idx + 1} (Port #${port.id()}) constructing…
-        </div>
-        <div class="progress-track" style="height:6px;">
-          <div class="progress-fill" style="width:${pct}%;"></div>
-        </div>
-      </div>`;
-    });
 
-    const mapHeight = this.game.height();
-    const rows = ships.map((ship) => {
-      const tile = ship.tile();
-      const x = this.game.x(tile);
-      const topOriginY = this.game.y(tile);
-      const y = mapHeight - 1 - topOriginY; // display with bottom-left origin
-      const status = this._computeTradeShipStatus(ship);
-      return html`
-        <div
-          class="flex items-center justify-between py-1 px-2 border-b"
-          style="border-color: var(--ui-panel-border)"
-        >
-          <div class="truncate">
-            <span class="text-blue-200">Ship #${ship.id()}</span>
-            <span class="text-gray-400 ml-2">${status}</span>
-          </div>
-          <div class="text-gray-300 font-mono">(${x}, ${y})</div>
-        </div>
-      `;
-    });
+    // Hide trade demand if player has no ports (trading not yet available)
+    const myPorts = me.units(UnitType.Port).filter((u) => u.isActive());
+    if (myPorts.length === 0) return html``;
 
-    // Compute demand indicator (global: all cargo ships, not just mine)
-    const allTradeShips = this.game
+    // Count MY trade ships (not global)
+    const myTradeShips = me
       .units(UnitType.TradeShip)
       .filter((u) => u.isActive());
-    const totalShips = allTradeShips.length;
-    const availableShips = allTradeShips.filter((s) => {
+    const myShipCount = myTradeShips.length;
+
+    // If I have no trade ships, show "No Ships"
+    if (myShipCount === 0) {
+      const icon = html`<svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="text-gray-400"
+      >
+        <path
+          d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"
+        />
+        <path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.9 5.8 2.5 8" />
+        <path d="M12 10V4" />
+        <path d="M8 8v2" />
+        <path d="M16 8v2" />
+      </svg>`;
+      return html`
+        <div
+          class="trade-demand-indicator"
+          title="Build trade ships to fulfill trade routes"
+        >
+          ${icon}
+          <span style="opacity: 0.7;">Trade Demand:</span>
+          <span class="trade-demand-value" style="color: var(--ui-text-muted);">
+            No Ships
+          </span>
+        </div>
+      `;
+    }
+
+    // Count ships available (idle at my ports)
+    const availableShips = myTradeShips.filter((s) => {
       const isReturning = s.returning();
       const phase = s.tradePhase();
       const hasTarget = s.targetUnitId() !== undefined;
       const dockOwner = s.dockedAtPortOwner();
-      return !isReturning && phase === null && !hasTarget && dockOwner !== null;
+      // Available = at my port, not assigned, not in transit
+      return (
+        !isReturning &&
+        phase === null &&
+        !hasTarget &&
+        dockOwner?.smallID() === me.smallID()
+      );
     }).length;
+
     const queueLen = me.tradeDemandQueueLength();
-    const denom = Math.max(1, totalShips);
-    const queuedPct = queueLen / denom;
-    const availablePct = availableShips / denom;
-    let demandLabel = "Medium";
-    let demandColor = "var(--ui-text-default)";
-    if (queuedPct > 0.5) {
-      demandLabel = "Very High";
-      demandColor = "var(--ui-alert)";
-    } else if (queuedPct > 0.25) {
-      demandLabel = "High";
-      demandColor = "var(--ui-warning)";
-    } else if (availablePct > 0.5) {
-      demandLabel = "Very Low";
-      demandColor = "var(--ui-info)";
-    } else if (availablePct > 0.25) {
-      demandLabel = "Low";
-      demandColor = "var(--ui-success)";
-    } else {
-      demandLabel = "Medium";
-      demandColor = "var(--ui-text-default)";
+
+    // Only update cache if values changed significantly (reduce re-render flicker)
+    const now = Date.now();
+    const cacheValid =
+      this._tradeDemandCache !== null &&
+      this._tradeDemandCache.queueLen === queueLen &&
+      this._tradeDemandCache.availableShips === availableShips &&
+      this._tradeDemandCache.myShipCount === myShipCount &&
+      now - this._tradeDemandCache.timestamp < 2000; // 2 second cache
+
+    if (cacheValid) {
+      const cached = this._tradeDemandCache!;
+      const icon = html`<svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="text-gray-400"
+      >
+        <path
+          d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"
+        />
+        <path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.9 5.8 2.5 8" />
+        <path d="M12 10V4" />
+        <path d="M8 8v2" />
+        <path d="M16 8v2" />
+      </svg>`;
+      return html`
+        <div class="trade-demand-indicator" title="${cached.tooltip}">
+          ${icon}
+          <span style="opacity: 0.7;">Trade Demand:</span>
+          <span
+            class="trade-demand-value"
+            style="color: ${cached.color}; filter: drop-shadow(0 0 2px ${cached.color}80);"
+          >
+            ${cached.label}
+          </span>
+        </div>
+      `;
     }
 
-    return html`
-      <div class="w-full">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="military-heading">Cargo Ships</h3>
-          <div
-            class="text-sm"
-            title="Demand is based on queued routes vs total ships and available ships"
-          >
-            <span
-              class="px-2 py-0.5 rounded-full border"
-              style="border-color: var(--ui-panel-border); color: ${demandColor};"
-            >
-              Trade Demand: ${demandLabel}
-            </span>
-          </div>
-        </div>
-        ${pendingRows.length > 0
-          ? html`<div class="mb-2">
-              <h4 class="text-gray-200 text-sm mb-1">Under Construction</h4>
-              <style>
-                /* Reuse research progress bar styling */
-                .progress-track {
-                  width: 100%;
-                  background: color-mix(
-                    in srgb,
-                    var(--ui-secondary) 25%,
-                    transparent
-                  );
-                  border: 1px solid
-                    color-mix(in srgb, var(--ui-secondary) 35%, transparent);
-                  border-radius: 6px;
-                  overflow: hidden;
-                  margin: 0;
-                }
-                .progress-fill {
-                  height: 100%;
-                  background: linear-gradient(
-                    90deg,
-                    color-mix(in srgb, var(--ui-info) 90%, transparent) 0%,
-                    color-mix(in srgb, var(--ui-info) 70%, transparent) 100%
-                  );
-                  box-shadow:
-                    0 0 10px color-mix(in srgb, var(--ui-info) 55%, transparent),
-                    0 0 16px color-mix(in srgb, var(--ui-info) 35%, transparent),
-                    inset 0 0 4px
-                      color-mix(in srgb, var(--ui-text-light) 10%, transparent);
-                }
-              </style>
-              <div class="divide-y">${pendingRows}</div>
-            </div>`
-          : ""}
-        ${ships.length > 0
-          ? html`<div class="divide-y">${rows}</div>`
-          : ships.length === 0 && pendingRows.length === 0
-            ? html`<div class="text-gray-400">No active cargo ships.</div>`
-            : ""}
+    // Compare queue vs MY ships (not global)
+    const queueRatio = queueLen / Math.max(1, myShipCount);
+    const availableRatio = availableShips / Math.max(1, myShipCount);
 
-        <!-- Embargo Management Buttons -->
-        <div
-          class="mt-4 pt-3 border-t"
-          style="border-color: var(--ui-panel-border)"
+    let demandLabel = "Medium";
+    let demandColor = "var(--ui-text-default)";
+
+    // High demand = lots of routes waiting, need more ships
+    if (queueRatio > 2) {
+      demandLabel = "Very High";
+      demandColor = "var(--ui-alert)";
+    } else if (queueRatio > 1) {
+      demandLabel = "High";
+      demandColor = "var(--ui-warning)";
+    } else if (availableRatio > 0.5) {
+      // Low demand = most ships idle, surplus capacity
+      demandLabel = "Low";
+      demandColor = "var(--ui-success)";
+    } else if (queueLen === 0 && availableShips > 0) {
+      demandLabel = "Very Low";
+      demandColor = "var(--ui-info)";
+    }
+
+    // Update cache
+    const tooltipText = `Trade Demand: ${queueLen} routes waiting, ${availableShips}/${myShipCount} ships available`;
+    this._tradeDemandCache = {
+      label: demandLabel,
+      color: demandColor,
+      queueLen,
+      availableShips,
+      myShipCount,
+      tooltip: tooltipText,
+      timestamp: now,
+    };
+
+    const icon = html`<svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="text-gray-400"
+    >
+      <path
+        d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"
+      />
+      <path d="M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.9 5.8 2.5 8" />
+      <path d="M12 10V4" />
+      <path d="M8 8v2" />
+      <path d="M16 8v2" />
+    </svg>`;
+
+    return html`
+      <div class="trade-demand-indicator" title="${tooltipText}">
+        ${icon}
+        <span style="opacity: 0.7;">Trade Demand:</span>
+        <span
+          class="trade-demand-value"
+          style="color: ${demandColor}; filter: drop-shadow(0 0 2px ${demandColor}80);"
         >
-          <h4 class="text-gray-200 text-sm mb-2">Embargo Management</h4>
-          <div class="flex gap-2">
-            <button
-              class="embargo-btn flex-1 px-3 py-2 text-sm font-semibold rounded border-2 transition-all"
-              style="
-                border-color: var(--ui-panel-border);
-                background: var(--ui-primary);
-                color: var(--ui-text-accent);
-                box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
-              "
-              data-i18n-title="control_panel2.embargo_all_tooltip"
-              @click=${this._handleEmbargoAll}
-            >
-              Embargo All
-            </button>
-            <button
-              class="embargo-btn flex-1 px-3 py-2 text-sm font-semibold rounded border-2 transition-all"
-              style="
-                border-color: var(--ui-panel-border);
-                background: var(--ui-primary);
-                color: var(--ui-text-accent);
-                box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
-              "
-              data-i18n-title="control_panel2.remove_all_embargos_tooltip"
-              @click=${this._handleRemoveAllEmbargos}
-            >
-              Remove All Embargos
-            </button>
-          </div>
-        </div>
+          ${demandLabel}
+        </span>
       </div>
     `;
   }
 
   private renderDiplomacyTab() {
-    const me = this.game.myPlayer();
-    if (!me) return html``;
-
-    const players = this.game
-      .players()
-      .filter(
-        (p) =>
-          p.isAlive() &&
-          p.id() !== me.id() &&
-          (p.type() === PlayerType.Human || p.type() === PlayerType.FakeHuman),
-      );
-
-    // Icons and colors reused from radial menu
-    const warIcon = "/images/waricon.png";
-    const peaceIcon = "/images/dove.png";
-    const allianceIcon = "/images/AllianceIconWhite.svg";
-    const traitorIcon = "/images/TraitorIconWhite.svg";
-
-    // Colors matching radial menu
-    const warColor = "#8B0000"; // dark red for declare war
-    const peaceColor = "#e5e7eb"; // light gray for peace
-    const allianceColor = "#53ac75"; // green for alliance
-    const betrayColor = "#c74848"; // red for betray
-
-    const iconBtn = (
-      src: string,
-      bgColor: string,
-      titleKey: string,
-      onClick: () => void,
-    ) => html`
-      <button
-        class="inline-flex items-center justify-center border-2 border-[var(--ui-panel-border)] rounded px-1 py-1 hover:opacity-80 hover:scale-105 transition-all"
-        style="background-color: ${bgColor};"
-        data-i18n-title=${titleKey}
-        @click=${onClick}
-      >
-        <img src=${src} style="width:16px;height:16px;object-fit:contain;" />
-      </button>
-    `;
-
-    const renderName = (p: PlayerView) => html`
-      <div class="text-sm text-gray-300 truncate" title="${p.name()}">
-        ${p.name()}
-      </div>
-    `;
-
-    const renderBtn = (btn: ReturnType<typeof html>) => html`
-      <div class="flex justify-center">${btn}</div>
-    `;
-
-    const renderEmpty = () => html`<div>&nbsp;</div>`;
-
-    // Build rows for each player
-    const rows = players.map((p) => {
-      const atWar = me.isAtWarWith(p);
-      const allied = me.isAlliedWith(p);
-      const neutral = !atWar && !allied;
-
-      // At War column cell
-      let atWarCell;
-      if (atWar) {
-        atWarCell = renderName(p);
-      } else if (neutral) {
-        atWarCell = renderBtn(
-          iconBtn(
-            warIcon,
-            warColor,
-            "control_panel2.diplomacy_declare_war_tooltip",
-            () => this.eventBus.emit(new SendDeclareWarIntentEvent(me, p)),
-          ),
-        );
-      } else if (allied) {
-        atWarCell = renderBtn(
-          iconBtn(
-            traitorIcon,
-            betrayColor,
-            "control_panel2.diplomacy_betray_tooltip",
-            () => this.eventBus.emit(new SendBreakAllianceIntentEvent(me, p)),
-          ),
-        );
-      } else {
-        atWarCell = renderEmpty();
-      }
-
-      // Allied column cell
-      let alliedCell;
-      if (allied) {
-        alliedCell = renderName(p);
-      } else {
-        // Can request alliance from both neutral and at-war players
-        alliedCell = renderBtn(
-          iconBtn(
-            allianceIcon,
-            allianceColor,
-            "control_panel2.diplomacy_request_alliance_tooltip",
-            () => this.eventBus.emit(new SendAllianceRequestIntentEvent(me, p)),
-          ),
-        );
-      }
-
-      // Neutral column cell
-      let neutralCell;
-      if (neutral) {
-        neutralCell = renderName(p);
-      } else if (atWar) {
-        neutralCell = renderBtn(
-          iconBtn(
-            peaceIcon,
-            peaceColor,
-            "control_panel2.diplomacy_request_peace_tooltip",
-            () => this.eventBus.emit(new SendPeaceRequestIntentEvent(me, p)),
-          ),
-        );
-      } else {
-        neutralCell = renderEmpty();
-      }
-
-      return html`
-        <div class="flex w-full py-1 border-b border-gray-600/50">
-          <div class="w-1/3 px-1 flex items-center justify-center">
-            ${atWarCell}
-          </div>
-          <div class="w-1/3 px-1 flex items-center justify-center">
-            ${alliedCell}
-          </div>
-          <div class="w-1/3 px-1 flex items-center justify-center">
-            ${neutralCell}
-          </div>
-        </div>
-      `;
-    });
-
-    // Bulk action handlers
-    const declareWarOnAll = () => {
-      players.forEach((p) => {
-        if (me.isAlliedWith(p)) {
-          // Break alliance first (betray), then declare war
-          this.eventBus.emit(new SendBreakAllianceIntentEvent(me, p));
-        }
-        if (!me.isAtWarWith(p)) {
-          this.eventBus.emit(new SendDeclareWarIntentEvent(me, p));
-        }
-      });
-    };
-
-    const requestAllianceWithAll = () => {
-      players.forEach((p) => {
-        if (!me.isAlliedWith(p)) {
-          this.eventBus.emit(new SendAllianceRequestIntentEvent(me, p));
-        }
-      });
-    };
-
-    const requestPeaceWithAll = () => {
-      players.forEach((p) => {
-        if (me.isAtWarWith(p)) {
-          this.eventBus.emit(new SendPeaceRequestIntentEvent(me, p));
-        }
-      });
-    };
-
-    // Small icon button for header bulk actions
-    const headerBtn = (
-      icon: string,
-      bgColor: string,
-      titleKey: string,
-      onClick: () => void,
-    ) => html`
-      <button
-        class="ml-1 inline-flex items-center justify-center w-5 h-5 rounded hover:opacity-80 hover:scale-105 transition-all"
-        style="background-color: ${bgColor};"
-        data-i18n-title=${titleKey}
-        @click=${onClick}
-      >
-        <img src=${icon} style="width:12px;height:12px;object-fit:contain;" />
-      </button>
-    `;
-
-    return html`
-      <div class="flex flex-col w-full h-full">
-        <!-- Header row -->
-        <div class="flex w-full mb-2 border-b border-gray-600/50 pb-2">
-          <div class="w-1/3 px-1 flex items-center justify-center">
-            <span class="font-bold text-gray-300">At War</span>
-            ${headerBtn(
-              warIcon,
-              warColor,
-              "control_panel2.diplomacy_war_all_tooltip",
-              declareWarOnAll,
-            )}
-          </div>
-          <div class="w-1/3 px-1 flex items-center justify-center">
-            <span class="font-bold text-gray-300">Allied</span>
-            ${headerBtn(
-              allianceIcon,
-              allianceColor,
-              "control_panel2.diplomacy_ally_all_tooltip",
-              requestAllianceWithAll,
-            )}
-          </div>
-          <div class="w-1/3 px-1 flex items-center justify-center">
-            <span class="font-bold text-gray-300">Neutral</span>
-            ${headerBtn(
-              peaceIcon,
-              peaceColor,
-              "control_panel2.diplomacy_peace_all_tooltip",
-              requestPeaceWithAll,
-            )}
-          </div>
-        </div>
-        <!-- Player rows -->
-        ${rows}
-      </div>
-    `;
-  }
-
-  private _handleEmbargoAll() {
-    const me = this.game.myPlayer();
-    if (!me) return;
-
-    const players = this.game
-      .players()
-      .filter(
-        (p) =>
-          p.isAlive() &&
-          p.id() !== me.id() &&
-          (p.type() === PlayerType.Human || p.type() === PlayerType.FakeHuman),
-      );
-
-    for (const player of players) {
-      if (!me.hasEmbargoAgainst(player)) {
-        this.eventBus.emit(new SendEmbargoIntentEvent(player, "start"));
-      }
-    }
-  }
-
-  private _handleRemoveAllEmbargos() {
-    const me = this.game.myPlayer();
-    if (!me) return;
-
-    const players = this.game
-      .players()
-      .filter(
-        (p) =>
-          p.isAlive() &&
-          p.id() !== me.id() &&
-          (p.type() === PlayerType.Human || p.type() === PlayerType.FakeHuman),
-      );
-
-    for (const player of players) {
-      if (me.hasEmbargoAgainst(player)) {
-        this.eventBus.emit(new SendEmbargoIntentEvent(player, "stop"));
-      }
-    }
-  }
-
-  private _computeTradeShipStatus(ship: UnitView): string {
-    // Debug ship status logging removed
-    const ownerName = (pv: PlayerView | null) => pv?.displayName() ?? "Unknown";
-    const dockOwner = ship.dockedAtPortOwner();
-    const startOwner = ship.tradeRouteStartOwner();
-    const endOwner = ship.tradeRouteEndOwner();
-    const targetId = ship.targetUnitId();
-    const targetUnit =
-      targetId !== undefined ? this.game.unit(targetId) : undefined;
-
-    if (dockOwner && !ship.returning() && targetId === undefined) {
-      return `in port owned by ${ownerName(dockOwner)}`;
-    }
-
-    if (ship.returning()) {
-      if (targetUnit && targetUnit.type() === UnitType.Port) {
-        return `returning to port owned by ${ownerName(targetUnit.owner())}`;
-      }
-      return "returning to port";
-    }
-
-    const phase = ship.tradePhase();
-
-    if (phase === "toStart") {
-      return `traveling to start port owned by ${ownerName(startOwner)}`;
-    }
-    if (phase === "toEnd") {
-      if (startOwner || endOwner) {
-        return `trading between ${ownerName(startOwner)} and ${ownerName(endOwner)}`;
-      }
-      if (targetUnit && targetUnit.type() === UnitType.Port) {
-        return `traveling to port owned by ${ownerName(targetUnit.owner())}`;
-      }
-    }
-
-    return "at sea";
+    // Diplomacy tab removed - relations now shown via NameLayer icons
+    return html``;
   }
 }
 
@@ -2890,6 +1950,116 @@ style.textContent = `
     object-fit: contain;
     pointer-events: none;
     display: block;
+  }
+  /* Build Tab Toolbar */
+  .build-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--ui-border-muted);
+    margin-bottom: 6px;
+  }
+  .toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: 1px solid var(--ui-border-muted);
+    background: var(--ui-panel-shell-top);
+    color: var(--ui-text-accent);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .toolbar-btn:hover {
+    background: var(--ui-panel-shell-bottom);
+    border-color: var(--ui-secondary-hover);
+  }
+  .toolbar-btn.active {
+    background: var(--ui-secondary);
+    border-color: var(--ui-secondary-hover);
+    box-shadow: 0 0 6px rgba(50, 98, 155, 0.4);
+  }
+  .toolbar-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+  }
+  .toolbar-stack-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    border: 1px solid var(--ui-border-muted);
+  }
+  .stack-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ui-text-muted);
+    margin-right: 2px;
+  }
+  .stack-btn {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--ui-panel-shell-top);
+    border: none;
+    border-radius: 3px;
+    color: var(--ui-text-accent);
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .stack-btn:hover:not(:disabled) {
+    background: var(--ui-secondary);
+  }
+  .stack-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .stack-value {
+    min-width: 28px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--ui-text-accent);
+    font-family: monospace;
+  }
+  .toolbar-spacer {
+    flex: 1;
+  }
+  .trade-demand-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--ui-border-muted);
+    border-radius: 4px;
+    font-size: 10px;
+    color: var(--ui-text-muted);
+    pointer-events: auto;
+    position: relative;
+  }
+  .trade-demand-indicator svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+  }
+  .trade-demand-value {
+    font-weight: bold;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    transition: none;
   }
   .embargo-btn:hover {
     background-color: var(--ui-secondary) !important;

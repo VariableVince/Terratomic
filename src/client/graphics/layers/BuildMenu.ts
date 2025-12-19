@@ -1,5 +1,6 @@
 import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import artilleryIcon from "../../../../proprietary/images/artillery-battery.png";
 import doomsdayDeviceIcon from "../../../../proprietary/images/doomsdayicon.png";
 import researchLabIcon from "../../../../proprietary/images/researchlab.png";
 import airfieldIcon from "../../../../resources/images/AirfieldIcon.svg";
@@ -27,12 +28,13 @@ import {
 import { Gold, UnitType, UpgradeType } from "../../../core/game/Game";
 import { GameView } from "../../../core/game/GameView";
 import {
+  isStackableStructure,
+  isTechUpgradeableStructure,
   isUnitAvailable,
-  isUpgradeableStructure,
   isUpgradeableUnit,
-  maxStructureLevel,
+  maxStackCount,
   maxUnitLevel,
-  playerMaxStructureLevel,
+  playerMaxStructureTechLevel,
   playerMaxUnitLevel,
 } from "../../../core/game/Upgradeables";
 import { ToggleBomberUpgradeModeEvent } from "../../events/ToggleBomberUpgradeModeEvent";
@@ -89,6 +91,13 @@ const buildTable: BuildItemDisplay[][] = [
       icon: submarineIcon,
       description: "build_menu.desc.submarine",
       key: "unit_type.submarine",
+      countable: true,
+    },
+    {
+      unitType: UnitType.Artillery,
+      icon: artilleryIcon,
+      description: "build_menu.desc.artillery",
+      key: "unit_type.artillery",
       countable: true,
     },
     {
@@ -264,6 +273,7 @@ export class BuildMenu extends LitElement {
       buildFighterJet: "Digit8",
       buildWarship: "Digit9",
       buildSubmarine: "Digit0",
+      buildArtillery: "Digit4",
       buildCity: "KeyY",
       buildPort: "KeyU",
       buildAirfield: "KeyI",
@@ -284,6 +294,7 @@ export class BuildMenu extends LitElement {
       [keybinds.buildFighterJet]: UnitType.FighterJet,
       [keybinds.buildWarship]: UnitType.Warship,
       [keybinds.buildSubmarine]: UnitType.Submarine,
+      [keybinds.buildArtillery]: UnitType.Artillery,
       [keybinds.buildCity]: UnitType.City,
       [keybinds.buildPort]: UnitType.Port,
       [keybinds.buildAirfield]: UnitType.Airfield,
@@ -331,8 +342,12 @@ export class BuildMenu extends LitElement {
   }
 
   static styles = css`
+    * {
+      box-sizing: border-box;
+    }
     :host {
       display: block;
+      width: 100%;
     }
     .build-menu-prompt {
       display: flex;
@@ -344,47 +359,34 @@ export class BuildMenu extends LitElement {
       text-align: center;
     }
     .build-menu {
-      background-color: transparent;
-      padding: 0px;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      max-width: 95vw;
-      max-height: 95vh;
-      overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      width: 100%;
     }
     .build-row {
-      display: flex;
-      justify-content: left;
-      flex-wrap: wrap;
-      width: 100%;
+      display: contents;
     }
     .build-button {
       position: relative;
-      width: 120px;
-      height: 50px;
+      height: 44px;
       border: 2px solid var(--ui-panel-border);
-      /* Darker idle surface to improve separation */
       background: var(--ui-primary);
-      color: var(--ui-text-accent); /* submarine palette light blue */
+      color: var(--ui-text-accent);
       border-radius: 6px;
-      box-shadow:
-        inset 0 0 10px rgba(0, 0, 0, 0.5),
-        0 2px 6px rgba(0, 0, 0, 0.4);
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: all 0.15s ease;
       display: flex;
       flex-direction: row;
-      justify-content: flex-start;
       align-items: center;
-      margin: 4px;
-      padding: 5px;
-      gap: 8px;
+      padding: 0 6px;
+      gap: 6px;
+      overflow: hidden;
     }
     .build-button:not(:disabled):hover {
-      background-color: var(--ui-secondary); /* deeper navy on hover */
+      background-color: var(--ui-secondary);
       transform: scale(1.02);
-      border-color: var(--ui-secondary); /* blue accent border */
+      border-color: var(--ui-secondary);
       box-shadow:
         inset 0 0 10px rgba(0, 0, 0, 0.5),
         0 2px 8px rgba(0, 0, 0, 0.6);
@@ -394,11 +396,9 @@ export class BuildMenu extends LitElement {
         to bottom,
         var(--ui-secondary-hover),
         var(--ui-secondary)
-      ); /* pressed navy */
+      );
       transform: scale(0.98);
-      box-shadow:
-        inset 0 0 10px rgba(0, 0, 0, 0.7),
-        0 1px 3px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
     .build-button:disabled {
       background-color: var(--ui-primary-disabled);
@@ -414,102 +414,98 @@ export class BuildMenu extends LitElement {
       color: var(--ui-text-muted);
     }
     .selected-for-build {
-      border-color: var(--ui-secondary-hover); /* blue selection accent */
+      border-color: var(--ui-secondary-hover);
+      background-color: var(--ui-secondary);
       box-shadow: 0 0 10px rgba(50, 98, 155, 0.65);
     }
     .build-icon {
-      width: 28px;
-      height: 28px;
+      width: 24px;
+      height: 24px;
       flex-shrink: 0;
+      object-fit: contain;
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
     }
     .build-item-details {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 2px;
+      justify-content: center;
+      flex: 1;
+      min-width: 0;
+      gap: 1px;
     }
     .build-name {
-      font-size: 11px;
-      font-weight: bold;
-      text-align: left;
-      line-height: 1.2;
-      color: var(--ui-text-accent); /* brighten primary label */
-      font-family: monospace;
-    }
-    .build-description {
-      font-size: 0.6rem;
-      line-height: 1.2;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--ui-text-accent);
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      word-break: break-word;
-      max-height: 2.4em;
-      color: var(--ui-text-muted); /* muted info */
+      max-width: 100%;
+      line-height: 1.2;
     }
     .build-cost {
       font-size: 10px;
+      font-family: monospace;
       white-space: nowrap;
-      text-align: left;
-      color: var(--ui-text-accent); /* readable cost color */
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      line-height: 1.2;
+    }
+    .build-description {
+      display: none;
+    }
+    .build-stats {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 1px;
+      flex-shrink: 0;
+    }
+    .build-count {
+      font-size: 11px;
+      font-weight: bold;
+      color: rgba(255, 255, 255, 0.9);
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+    .build-stack {
+      display: none;
+    }
+    .build-stack-badge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      font-size: 10px;
+      color: #fff;
+      font-family: monospace;
+      font-weight: bold;
+      background: #1d4ed8;
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid #3b82f6;
+      z-index: 2;
+      text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
     }
     .build-count-chip {
-      position: absolute;
-      top: -5px;
-      right: -5px;
-      background-color: var(--ui-panel-shell-bottom);
-      color: var(--ui-text-light);
-      padding: 1px 5px;
-      border-radius: 10px;
-      font-size: 9px;
-      border: 1px solid var(--ui-border-muted);
+      display: none;
     }
     .build-level-chip {
-      position: absolute;
-      top: -5px;
-      left: -5px;
-      background-color: var(--ui-panel-shell-bottom);
-      color: var(--ui-text-light);
-      padding: 1px 5px;
-      border-radius: 10px;
-      font-size: 9px;
-      border: 1px solid var(--ui-border-muted);
+      display: none;
     }
     .build-hotkey {
       position: absolute;
       bottom: 2px;
       right: 4px;
-      color: var(--ui-text-muted); /* subtle hint color */
+      color: rgba(255, 255, 255, 0.5);
       font-size: 9px;
-    }
-    .build-button:not(:disabled):hover > .build-count-chip {
-      background-color: var(--ui-panel-shell-top);
-      border-color: var(--ui-border-muted);
-    }
-    .build-button:not(:disabled):hover > .build-level-chip {
-      background-color: var(--ui-panel-shell-top);
-      border-color: var(--ui-border-muted);
-    }
-    .build-button:not(:disabled):active > .build-count-chip {
-      background-color: var(--ui-panel-shell-bottom);
-    }
-    .build-button:not(:disabled):active > .build-level-chip {
-      background-color: var(--ui-panel-shell-bottom);
-    }
-    .build-button:disabled > .build-count-chip {
-      background-color: var(--ui-surface-dark);
-      border-color: var(--ui-border-muted);
-      cursor: not-allowed;
-    }
-    .build-button:disabled > .build-level-chip {
-      background-color: var(--ui-surface-dark);
-      border-color: var(--ui-border-muted);
-      cursor: not-allowed;
-    }
-    .build-count {
-      font-weight: bold;
-      font-size: 10px;
+      font-weight: 600;
+      pointer-events: none;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
     }
   `;
 
@@ -537,6 +533,11 @@ export class BuildMenu extends LitElement {
       case UnitType.HydrogenBomb:
       case UnitType.MIRV:
         return player.unitsOwned(UnitType.MissileSilo) > 0;
+      case UnitType.Artillery:
+        return (
+          player.unitsOwned(UnitType.Factory) > 0 &&
+          player.hasUpgrade(UpgradeType.ArtilleryResearch)
+        );
       default:
         return true;
     }
@@ -547,68 +548,77 @@ export class BuildMenu extends LitElement {
       .config()
       .unitInfo(item.unitType)
       .cost(this.game.myPlayer()!);
-    // Structures: use configured structure multiplier
-    if (isUpgradeableStructure(item.unitType)) {
-      const desired = this._desiredStructureLevel(item.unitType);
+    // Stackable structures: use stack count for cost calculation
+    if (isStackableStructure(item.unitType)) {
+      const stackCount = this._desiredStackCount(item.unitType);
       let structureCost =
-        desired <= 1
+        stackCount <= 1
           ? base
           : aggregateStructureBuildCost(
               this.game.config(),
               this.game.myPlayer()!,
               item.unitType,
-              desired,
+              stackCount,
               this.game.config().structureUpgradeCostMultiplier(item.unitType),
             );
-      // Add bomber upgrade cost for airfields
+      // Add bomber upgrade cost for airfields (based on tech level, not stack)
       if (item.unitType === UnitType.Airfield) {
-        const bomberLevel = this._desiredUnitLevel(UnitType.Bomber);
+        const bomberLevel = this._structureTechLevel(UnitType.Airfield);
         structureCost += computeBomberUpgradeCost(
           this.game.config(),
           this.game.myPlayer()!,
           bomberLevel,
-          desired,
+          stackCount,
         );
       }
       return structureCost;
     }
     // Units: use hardcoded costs from UnitUpgrades (aggregateStructureBuildCost handles this)
     if (isUpgradeableUnit(item.unitType)) {
-      const desired = this._desiredUnitLevel(item.unitType);
-      if (desired <= 1) return base;
+      const techLevel = playerMaxUnitLevel(
+        this.game.myPlayer()!,
+        item.unitType,
+      );
+      if (techLevel <= 1) return base;
       // aggregateStructureBuildCost detects upgradeable units and uses hardcoded costs
       return aggregateStructureBuildCost(
         this.game.config(),
         this.game.myPlayer()!,
         item.unitType,
-        desired,
+        techLevel,
         0, // multiplier ignored for upgradeable units
       );
     }
     return base;
   }
 
-  private _desiredStructureLevel(type: UnitType): number {
-    // If a specific level is requested via the UI prop, use that (clamped by max level)
+  // Get the desired stack count for stackable structures
+  private _desiredStackCount(type: UnitType): number {
+    // If a specific level is requested via the UI prop, use that (clamped by max)
     const level = this.structureLevels[type];
     if (level && level > 1) {
-      return Math.min(maxStructureLevel(type), level);
+      return Math.min(maxStackCount(type), level);
     }
 
+    // Read from localStorage (used for in-game communication, not persistence)
     try {
-      const raw = localStorage.getItem("buildSettings.levels");
+      const raw = localStorage.getItem("buildSettings.stackCount");
       if (!raw) return 1;
       const obj = JSON.parse(raw);
       const key = String(type);
       const val = obj?.[key];
       if (typeof val !== "number" || val < 1) return 1;
-      // Use player-specific max level based on researched techs
-      const player = this.game?.myPlayer();
-      const maxLevel = player ? playerMaxStructureLevel(player, type) : 1;
-      return Math.min(maxLevel, val);
+      return Math.min(maxStackCount(type), val);
     } catch (_) {
       return 1;
     }
+  }
+
+  // Get the tech level for tech-upgradeable structures (SAM, Airfield)
+  private _structureTechLevel(type: UnitType): number {
+    const player = this.game?.myPlayer();
+    if (!player) return 1;
+    return playerMaxStructureTechLevel(player, type);
   }
 
   private _desiredUnitLevel(type: UnitType): number {
@@ -635,7 +645,94 @@ export class BuildMenu extends LitElement {
     if (!player) {
       return "?";
     }
-    return player.units(item.unitType).length.toString();
+    // Use unitsOwned() to get the correct count including stacked structures
+    return player.unitsOwned(item.unitType).toString();
+  }
+
+  private getUnitDisplayName(unitType: UnitType, baseName: string): string {
+    const player = this.game?.myPlayer();
+    if (!player) return baseName;
+
+    // Handle combat units with tech upgrades
+    if (isUpgradeableUnit(unitType)) {
+      const level = playerMaxUnitLevel(player, unitType);
+
+      // Only Fighters use "Gen X" naming
+      if (unitType === UnitType.FighterJet && level > 1) {
+        return `Gen ${level} ${baseName}`;
+      }
+
+      // Warships have specific names per level
+      if (unitType === UnitType.Warship) {
+        switch (level) {
+          case 1:
+            return baseName; // "Warship"
+          case 2:
+            return "Cruiser";
+          case 3:
+            return "Aegis Warship";
+          default:
+            return baseName;
+        }
+      }
+
+      // Submarines have specific names per level
+      if (unitType === UnitType.Submarine) {
+        switch (level) {
+          case 1:
+            return "Diesel Sub";
+          case 2:
+            return "Tactical Sub";
+          case 3:
+            return "Attack Sub";
+          default:
+            return baseName;
+        }
+      }
+
+      // Bombers have specific names per level
+      if (unitType === UnitType.Bomber) {
+        switch (level) {
+          case 1:
+            return baseName; // "Bomber"
+          case 2:
+            return "Heavy Bomber";
+          case 3:
+            return "Supersonic Bomber";
+          default:
+            return baseName;
+        }
+      }
+
+      return baseName;
+    }
+
+    // Handle tech-upgradeable structures (SAM, Airfield)
+    if (isTechUpgradeableStructure(unitType)) {
+      const techLevel = playerMaxStructureTechLevel(player, unitType);
+      const stackCount = this._desiredStackCount(unitType);
+
+      let name = baseName;
+      if (unitType === UnitType.SAMLauncher && techLevel > 1) {
+        name =
+          techLevel === 2
+            ? "Radar SAM"
+            : techLevel === 3
+              ? "Strategic SAM"
+              : baseName;
+      }
+
+      // Do not prefix stack count in the label; chip handles it
+      return name;
+    }
+
+    // Handle other stackable structures
+    if (isStackableStructure(unitType)) {
+      // Do not prefix stack count in the label; chip handles it
+      return baseName;
+    }
+
+    return baseName;
   }
 
   public onBuildSelected = (item: BuildItemDisplay) => {
@@ -674,16 +771,17 @@ export class BuildMenu extends LitElement {
           (row) => html`
             <div class="build-row">
               ${row.map((item) => {
-                const name = item.key
+                const baseName = item.key
                   ? translateText(item.key)
                   : String(item.unitType);
                 const price =
                   this.game && this.game.myPlayer() ? this.cost(item) : 0;
-                const desiredLevel = isUpgradeableStructure(item.unitType)
-                  ? this._desiredStructureLevel(item.unitType)
-                  : isUpgradeableUnit(item.unitType)
-                    ? this._desiredUnitLevel(item.unitType)
-                    : 1;
+
+                const displayName = this.getUnitDisplayName(
+                  item.unitType,
+                  baseName,
+                );
+                const desiredStack = this._desiredStackCount(item.unitType);
 
                 return html`
                   <button
@@ -696,42 +794,36 @@ export class BuildMenu extends LitElement {
                     title=${item.description
                       ? translateText(item.description)
                       : ""}
-                    aria-label=${`${name}, ${renderNumber(price)} gold`}
+                    aria-label=${`${displayName}, ${renderNumber(price)} gold`}
                   >
                     <div class="build-hotkey">
                       ${this.hotkeyMap.get(item.unitType)}
                     </div>
-                    <img
-                      class="build-icon"
-                      src=${item.icon}
-                      alt=${name}
-                      style="width:${this.iconPixelSize(
-                        item.unitType,
-                      )}px;height:${this.iconPixelSize(item.unitType)}px;"
-                    />
+                    ${desiredStack > 1
+                      ? html`<span class="build-stack-badge"
+                          >×${desiredStack}</span
+                        >`
+                      : ""}
+                    <img class="build-icon" src=${item.icon} alt=${baseName} />
                     <div class="build-item-details">
-                      <span class="build-name">${name}</span>
+                      <span class="build-name">${displayName}</span>
                       <span class="build-cost" translate="no">
                         ${renderNumber(price)}
                         <img
                           src=${goldCoinIcon}
-                          alt="gold"
-                          width="12"
-                          height="12"
-                          style="vertical-align: middle;"
+                          alt=""
+                          width="10"
+                          height="10"
                         />
                       </span>
                     </div>
-                    ${desiredLevel >= 1
-                      ? html`<div class="build-level-chip">
-                          L${desiredLevel}
-                        </div>`
-                      : ""}
-                    ${item.countable
-                      ? html`<div class="build-count-chip">
-                          <span class="build-count">${this.count(item)}</span>
-                        </div>`
-                      : ""}
+                    <div class="build-stats">
+                      ${item.countable
+                        ? html`<span class="build-count"
+                            >${this.count(item)}</span
+                          >`
+                        : ""}
+                    </div>
                   </button>
                 `;
               })}

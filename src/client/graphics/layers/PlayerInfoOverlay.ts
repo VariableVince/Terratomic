@@ -178,10 +178,23 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
       let displayRelation = false;
       let relationClass = "";
       let relationName = "";
+      // Icons are not shown in overlay; text only
 
       if (myPlayer.isFriendly(player)) {
         relationClass = this.getRelationClass(Relation.Friendly);
         relationName = translateText("relation.allied");
+        displayRelation = true;
+      } else if (myPlayer.isAtWarWith(player)) {
+        relationClass = "text-red-500";
+        relationName = translateText("relation.hostile");
+        displayRelation = true;
+      } else if (
+        !myPlayer.isAlliedWith(player) &&
+        !myPlayer.isAtWarWith(player)
+      ) {
+        // Neutral
+        relationClass = "text-yellow-300";
+        relationName = translateText("relation.neutral");
         displayRelation = true;
       } else if (player.type() === PlayerType.FakeHuman) {
         const relation =
@@ -219,6 +232,7 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
       UnitType.Factory,
       UnitType.Port,
       UnitType.Warship,
+      UnitType.Artillery,
       UnitType.MissileSilo,
       UnitType.SAMLauncher,
       UnitType.Airfield,
@@ -234,6 +248,7 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
       [UnitType.Factory]: "/images/factoryicon.png",
       [UnitType.Port]: "/images/PortIcon.svg",
       [UnitType.Warship]: "/images/BattleshipIconWhite.svg",
+      [UnitType.Artillery]: "/images/artillery-battery.png",
       [UnitType.MissileSilo]: "/images/MissileSiloIconWhite.svg",
       [UnitType.SAMLauncher]: "/images/SamLauncherIconWhite.svg",
       [UnitType.Airfield]: "/images/AirfieldIcon.svg",
@@ -342,20 +357,23 @@ export class PlayerInfoOverlay extends LitElement implements Layer {
           </div>
 
           <!-- Right Column (Box 1 Refactored) -->
-          <div class="grid grid-cols-12 gap-1">
+          <div class="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1">
             ${unitTypes.map((unitType) => {
               const iconSrc = unitIconMap[unitType];
               if (!iconSrc) return null;
 
-              // Use unitsOwned for upgraded structures (City, Port, Hospital, Academy)
-              // so counts reflect summed levels + constructions, consistent with server.
+              // Use unitsOwned for all stackable structures
+              // so counts reflect summed stack counts + constructions, consistent with server.
               const count =
                 unitType === UnitType.City ||
                 unitType === UnitType.Port ||
                 unitType === UnitType.Hospital ||
                 unitType === UnitType.Academy ||
                 unitType === UnitType.ResearchLab ||
-                unitType === UnitType.Factory
+                unitType === UnitType.Factory ||
+                unitType === UnitType.SAMLauncher ||
+                unitType === UnitType.Airfield ||
+                unitType === UnitType.MissileSilo
                   ? player.unitsOwned(unitType)
                   : player.units(unitType).length;
 
