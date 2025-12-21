@@ -407,6 +407,14 @@ export class ControlPanel2 extends LitElement implements Layer {
     this._productivity = player.productivity();
     this._productivityGrowth = player.productivityGrowthPerMinute();
     this.investmentRate = player.investmentRate();
+    const serverResearchRate = player.researchInvestmentRate();
+    if (Math.abs(serverResearchRate - this._researchInvestmentRate) > 1e-6) {
+      this._researchInvestmentRate = serverResearchRate;
+      localStorage.setItem(
+        "settings.researchInvestmentRate",
+        this._researchInvestmentRate.toString(),
+      );
+    }
     // If Roads are not researched, force road investment to 0 and persist
     const hasRoadsUpgrade = player.hasUpgrade(UpgradeType.Roads);
     if (!hasRoadsUpgrade && this._roadInvestmentRate !== 0) {
