@@ -616,6 +616,18 @@ export class StructureLayer implements Layer {
       const bhl = this.shouldHighlightForBomberUpgrade(unit) ? 1 : 0;
       cacheKey += `-bhl${bhl}`;
     }
+    // Add tech level to cache key for SAM and Airfield (for star display)
+    if (
+      !isConstruction &&
+      (structureType === UnitType.SAMLauncher ||
+        structureType === UnitType.Airfield)
+    ) {
+      const techLevel = playerMaxStructureTechLevel(
+        unit.owner(),
+        structureType as UnitType,
+      );
+      cacheKey += `-lvl${techLevel}`;
+    }
     if (this.textureCache.has(cacheKey)) {
       // If render requested invalidation (upgrade mode toggle), bypass cache by deleting
       // The caller sets render.invalidateTexture; we can't access it here, so rely on a global flag
@@ -801,9 +813,69 @@ export class StructureLayer implements Layer {
       }
     }
 
+    // Draw level indicator stars for SAM and Airfield (top-left corner)
+    if (
+      !isConstruction &&
+      (structureType === UnitType.SAMLauncher ||
+        structureType === UnitType.Airfield)
+    ) {
+      const techLevel = playerMaxStructureTechLevel(
+        unit.owner(),
+        structureType as UnitType,
+      );
+      if (techLevel >= 1 && techLevel <= 3) {
+        const tierColor = "#CD7F32"; /* bronze */
+        const starSize = 4;
+        const spacing = 0.3;
+        const padding = 1.5;
+        // Calculate total width of all stars and position from right edge
+        const totalWidth = techLevel * starSize + (techLevel - 1) * spacing;
+        const startX = ICON_DIM - padding - totalWidth + starSize / 2;
+        const startY = padding + starSize / 2;
+
+        ctx.fillStyle = tierColor;
+        for (let i = 0; i < techLevel; i++) {
+          const x = startX + i * (starSize + spacing);
+          this.drawStar(ctx, x, startY, starSize);
+        }
+      }
+    }
+
     const texture = PIXI.Texture.from(canvas);
     this.textureCache.set(cacheKey, texture);
     return texture;
+  }
+
+  private drawStar(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    size: number,
+  ) {
+    const spikes = 5;
+    const outerRadius = size / 2;
+    const innerRadius = outerRadius * 0.4;
+    let rot = (Math.PI / 2) * 3;
+    const step = Math.PI / spikes;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - outerRadius);
+
+    for (let i = 0; i < spikes; i++) {
+      let x = cx + Math.cos(rot) * outerRadius;
+      let y = cy + Math.sin(rot) * outerRadius;
+      ctx.lineTo(x, y);
+      rot += step;
+
+      x = cx + Math.cos(rot) * innerRadius;
+      y = cy + Math.sin(rot) * innerRadius;
+      ctx.lineTo(x, y);
+      rot += step;
+    }
+
+    ctx.lineTo(cx, cy - outerRadius);
+    ctx.closePath();
+    ctx.fill();
   }
 
   private shouldHighlight(unit: UnitView): boolean {
