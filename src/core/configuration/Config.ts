@@ -219,7 +219,8 @@ export interface Config {
   fighterJetPatrolRange(): number;
   fighterJetTargettingRange(): number;
   fighterJetAttackRate(): number;
-  fighterJetSpeed(): number;
+  fighterJetSpeed(level?: number): number;
+  fighterJetBulletSpeed(level?: number): number;
   fighterJetHealingAmount(): number;
   fighterJetTargetReachedDistance(): number;
   fighterJetDogfightDistance(): number;

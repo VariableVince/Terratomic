@@ -507,8 +507,11 @@ export class DefaultConfig implements Config {
   fighterJetAttackRate(): number {
     return 15;
   }
-  fighterJetSpeed(): number {
-    return 2;
+  fighterJetSpeed(level: number = 1): number {
+    return getFighterLevelData(level).speed;
+  }
+  fighterJetBulletSpeed(level: number = 1): number {
+    return getFighterLevelData(level).bulletSpeed;
   }
   fighterJetHealingAmount(): number {
     return 1;

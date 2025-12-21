@@ -44,7 +44,14 @@ export class ShellExecution implements Execution {
       this.destroyAtTick = this.mg.ticks() + this.mg.config().shellLifetime();
     }
 
-    for (let i = 0; i < 3; i++) {
+    // Determine bullet speed based on owner unit type and level
+    let bulletSpeed = 3; // Default for non-fighter units
+    if (this.ownerUnit.type() === UnitType.FighterJet) {
+      const level = this.ownerUnit.level?.() ?? 1;
+      bulletSpeed = this.mg.config().fighterJetBulletSpeed(level);
+    }
+
+    for (let i = 0; i < bulletSpeed; i++) {
       const result = this.pathFinder.nextTile(
         this.shell.tile(),
         this.target.tile(),
