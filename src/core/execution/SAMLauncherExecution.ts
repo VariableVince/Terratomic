@@ -101,8 +101,22 @@ class SAMTargetingSystem {
       detectionRange,
       [UnitType.AtomBomb, UnitType.HydrogenBomb],
       ({ unit }) => {
+        if (!isUnit(unit)) {
+          return false;
+        }
+
+        const nukeOwner = unit.owner();
+        if (nukeOwner === this.player) {
+          return false;
+        }
+        if (this.player.isFriendly(nukeOwner)) {
+          return false;
+        }
+
+        // Only intercept neutral nukes if they are actually threatening us.
         return (
-          unit.owner() !== this.player && !this.player.isFriendly(unit.owner())
+          this.player.isAtWarWith(nukeOwner) ||
+          this.nukeThreatensPlayerTerritory(unit, this.player)
         );
       },
     );
@@ -146,6 +160,48 @@ class SAMTargetingSystem {
         return 0;
       })
       .slice(0, maxCount);
+  }
+
+  private nukeThreatensPlayerTerritory(nuke: Unit, player: Player): boolean {
+    const targetTile = nuke.targetTile();
+    if (targetTile === undefined) {
+      return false;
+    }
+
+    const playerSmallID = player.smallID();
+    if (this.mg.ownerID(targetTile) === playerSmallID) {
+      return true;
+    }
+
+    const blastRadius = this.mg.config().nukeMagnitudes(nuke.type()).outer;
+    const outer2 = blastRadius * blastRadius;
+
+    // PERF: Avoid bfs() here (allocates a Set + queue) since this can run often.
+    // A tight bounding-box scan with early exit is faster and allocation-free.
+    const tx = this.mg.x(targetTile);
+    const ty = this.mg.y(targetTile);
+    const minX = Math.max(0, tx - blastRadius);
+    const maxX = Math.min(this.mg.width() - 1, tx + blastRadius);
+    const minY = Math.max(0, ty - blastRadius);
+    const maxY = Math.min(this.mg.height() - 1, ty + blastRadius);
+
+    for (let y = minY; y <= maxY; y++) {
+      const dy = y - ty;
+      const dy2 = dy * dy;
+      for (let x = minX; x <= maxX; x++) {
+        const dx = x - tx;
+        if (dx * dx + dy2 > outer2) {
+          continue;
+        }
+
+        const ref = this.mg.ref(x, y);
+        if (this.mg.ownerID(ref) === playerSmallID) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }
 
@@ -383,6 +439,12 @@ export class SAMLauncherExecution implements Execution {
         if (unitOwner === this.player) return false;
 
         if (this.player.isFriendly(unitOwner as Player)) return false;
+
+        // Neutral behavior: only intercept when at war, except defend against
+        // bomber/paratrooper explicitly targeting our land.
+        if (!this.canEngageAirborneTarget(unitOwner as Player, unit)) {
+          return false;
+        }
         if (
           targetUnitOwner === this.player ||
           (targetUnitOwner &&
@@ -458,6 +520,27 @@ export class SAMLauncherExecution implements Execution {
         );
       }
     }
+  }
+
+  private canEngageAirborneTarget(unitOwner: Player, unit: Unit): boolean {
+    if (this.player.isAtWarWith(unitOwner)) {
+      return true;
+    }
+
+    // Neutral: only defend against incoming bomber/paratrooper attacks.
+    if (
+      unit.type() !== UnitType.Bomber &&
+      unit.type() !== UnitType.Paratrooper
+    ) {
+      return false;
+    }
+
+    const targetTile = unit.targetTile();
+    if (targetTile === undefined) {
+      return false;
+    }
+
+    return this.mg.owner(targetTile) === this.player;
   }
 
   isActive(): boolean {

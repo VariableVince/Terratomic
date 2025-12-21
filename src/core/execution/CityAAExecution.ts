@@ -83,10 +83,13 @@ export class CityAAExecution implements Execution {
         .nearbyUnits(city.tile(), Math.sqrt(rangeSquared), planeType)
         .filter(({ unit }) => {
           const owner = unit.owner();
+          if (owner === this.player) {
+            return false;
+          }
           return (
             unit.isActive() &&
-            owner !== this.player &&
             !this.player.isFriendly(owner) &&
+            this.canEngagePlane(owner, unit) &&
             !unit.isAtSourceAirfield() // Don't target planes at their airfield
           );
         });
@@ -100,6 +103,32 @@ export class CityAAExecution implements Execution {
     }
 
     return nearestPlane;
+  }
+
+  private canEngagePlane(planeOwner: Player, plane: Unit): boolean {
+    if (this.isAtWarEffective(planeOwner)) {
+      return true;
+    }
+
+    // Neutral behavior: only defend against explicit incoming attacks.
+    // - Bomber / Paratrooper: allowed only if their targetTile is land owned by us.
+    if (
+      plane.type() !== UnitType.Bomber &&
+      plane.type() !== UnitType.Paratrooper
+    ) {
+      return false;
+    }
+
+    const targetTile = plane.targetTile();
+    if (targetTile === undefined) {
+      return false;
+    }
+
+    return this.mg.owner(targetTile) === this.player;
+  }
+
+  private isAtWarEffective(other: Player): boolean {
+    return this.player.isAtWarWith(other);
   }
 
   isActive(): boolean {

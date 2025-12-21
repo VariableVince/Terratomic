@@ -91,10 +91,12 @@ export class CityAABulletExecution implements Execution {
     }
 
     // Check if target is still valid
+    const targetOwner = this.target.owner();
     if (
       !this.target.isActive() ||
-      this.target.owner() === this.bullet.owner() ||
-      this._owner.isFriendly(this.target.owner())
+      targetOwner === this.bullet.owner() ||
+      this._owner.isFriendly(targetOwner) ||
+      !this.canEngageTarget(targetOwner, this.target)
     ) {
       console.log(
         `AA bullet missed: target ${!this.target.isActive() ? "destroyed" : "became friendly"}`,
@@ -171,6 +173,31 @@ export class CityAABulletExecution implements Execution {
     this.bullet!.setReachedTarget();
     this.bullet!.delete(false);
     this.active = false;
+  }
+
+  private canEngageTarget(targetOwner: Player, target: Unit): boolean {
+    if (this.isAtWarEffective(targetOwner)) {
+      return true;
+    }
+
+    // Neutral behavior: only defend against explicit incoming attacks.
+    if (
+      target.type() !== UnitType.Bomber &&
+      target.type() !== UnitType.Paratrooper
+    ) {
+      return false;
+    }
+
+    const targetTile = target.targetTile();
+    if (targetTile === undefined) {
+      return false;
+    }
+
+    return this.mg.owner(targetTile) === this._owner;
+  }
+
+  private isAtWarEffective(other: Player): boolean {
+    return this._owner.isAtWarWith(other);
   }
 
   isActive(): boolean {
