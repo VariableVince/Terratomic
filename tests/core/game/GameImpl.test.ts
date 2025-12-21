@@ -3,6 +3,7 @@ import { SpawnExecution } from "../../../src/core/execution/SpawnExecution";
 //import { TransportShipExecution } from "../../../src/core/execution/TransportShipExecution";
 import { AllianceRequestExecution } from "../../../src/core/execution/alliance/AllianceRequestExecution";
 import { AllianceRequestReplyExecution } from "../../../src/core/execution/alliance/AllianceRequestReplyExecution";
+import { BreakAllianceExecution } from "../../../src/core/execution/alliance/BreakAllianceExecution";
 import {
   Game,
   Player,
@@ -119,6 +120,35 @@ describe("GameImpl", () => {
     } while (attacker.outgoingAttacks().length > 0);
 
     expect(attacker.isTraitor()).toBe(true);
+  });
+
+  test("Breaking alliance immediately creates war", async () => {
+    jest.spyOn(attacker, "canSendAllianceRequest").mockReturnValue(true);
+    game.addExecution(new AllianceRequestExecution(attacker, defender.id()));
+
+    game.executeNextTick();
+    game.executeNextTick();
+
+    game.addExecution(
+      new AllianceRequestReplyExecution(attacker.id(), defender, true),
+    );
+
+    game.executeNextTick();
+    game.executeNextTick();
+
+    expect(attacker.allianceWith(defender)).toBeTruthy();
+    expect(defender.allianceWith(attacker)).toBeTruthy();
+
+    game.addExecution(new BreakAllianceExecution(attacker, defender.id()));
+
+    game.executeNextTick();
+    game.executeNextTick();
+
+    expect(attacker.allianceWith(defender)).toBeNull();
+    expect(defender.allianceWith(attacker)).toBeNull();
+
+    expect(attacker.isAtWarWith(defender)).toBe(true);
+    expect(defender.isAtWarWith(attacker)).toBe(true);
   });
 });
 
