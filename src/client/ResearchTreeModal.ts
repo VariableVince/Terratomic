@@ -61,6 +61,15 @@ export class ResearchTreeModal extends LitElement {
   @state()
   private lockResearch = false;
 
+  private syncResearchInvestmentFromGame() {
+    const me = this.game?.myPlayer?.();
+    if (!me) return;
+    const serverRate = me.researchInvestmentRate?.() ?? 0;
+    if (Math.abs(serverRate - this.researchInvestmentRate) > 1e-6) {
+      this.researchInvestmentRate = serverRate;
+    }
+  }
+
   connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener(
@@ -76,7 +85,11 @@ export class ResearchTreeModal extends LitElement {
   open() {
     this.modalEl?.open();
     this.requestInvestmentSync();
-    this.refreshTimer ??= window.setInterval(() => this.requestUpdate(), 500);
+    this.syncResearchInvestmentFromGame();
+    this.refreshTimer ??= window.setInterval(() => {
+      this.syncResearchInvestmentFromGame();
+      this.requestUpdate();
+    }, 500);
     this.eventBus.on(CloseViewEvent, this.close);
   }
 

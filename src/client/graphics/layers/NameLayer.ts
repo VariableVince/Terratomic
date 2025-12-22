@@ -656,7 +656,6 @@ export class NameLayer implements Layer {
     center: boolean = false,
   ): HTMLImageElement {
     const icon = document.createElement("img");
-    icon.src = src;
 
     // Make war icon 20% smaller
     const actualSize = id === "war" ? size * 0.8 : size;
@@ -667,6 +666,9 @@ export class NameLayer implements Layer {
 
     if (id === "war") {
       // Use CSS mask with exact warColor #8B0000 from radial menu
+      // Set transparent 1x1 image as src to maintain dimensions
+      icon.src =
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E";
       icon.style.backgroundColor = "#8B0000";
       icon.style.webkitMaskImage = `url(${src})`;
       icon.style.maskImage = `url(${src})`;
@@ -676,8 +678,8 @@ export class NameLayer implements Layer {
       icon.style.maskRepeat = "no-repeat";
       icon.style.webkitMaskPosition = "center";
       icon.style.maskPosition = "center";
-      // Clear the src to prevent img from loading
-      icon.removeAttribute("src");
+    } else {
+      icon.src = src;
     }
 
     if (center) {

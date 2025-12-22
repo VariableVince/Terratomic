@@ -275,7 +275,7 @@ export class FighterJetExecution implements Execution {
     const result = this.pathFinder.nextTile(
       this.fighterJet.tile(),
       targetTileForMovement,
-      this.mg.config().fighterJetSpeed(),
+      this.mg.config().fighterJetSpeed(this.fighterJet.level?.() ?? 1),
     );
 
     if (result !== true) {
@@ -365,7 +365,7 @@ export class FighterJetExecution implements Execution {
     const result = this.pathFinder.nextTile(
       this.fighterJet.tile(),
       this.fighterJet.targetTile()!,
-      this.mg.config().fighterJetSpeed(),
+      this.mg.config().fighterJetSpeed(this.fighterJet.level?.() ?? 1),
     );
 
     if (result === true) {

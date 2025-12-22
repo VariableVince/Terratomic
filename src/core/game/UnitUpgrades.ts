@@ -36,8 +36,13 @@ export interface BomberLevelData extends UnitLevelData {
   speed: number;
 }
 
-/** Fighter level data (uses base UnitLevelData, no additional stats) */
-export type FighterLevelData = UnitLevelData;
+/** Extended fighter level data with fighter-specific stats */
+export interface FighterLevelData extends UnitLevelData {
+  /** Movement speed at this level */
+  speed: number;
+  /** Bullet/shell speed at this level */
+  bulletSpeed: number;
+}
 
 /** Warship level data (uses base UnitLevelData, no additional stats) */
 export type WarshipLevelData = UnitLevelData;
@@ -104,6 +109,8 @@ export const FIGHTER_UPGRADES: readonly FighterLevelData[] = [
     maxHealth: 750,
     damageMin: 200,
     damageMax: 325,
+    speed: 2,
+    bulletSpeed: 4,
   },
   // Level 2
   {
@@ -112,6 +119,8 @@ export const FIGHTER_UPGRADES: readonly FighterLevelData[] = [
     maxHealth: 1000,
     damageMin: 300,
     damageMax: 425,
+    speed: 3,
+    bulletSpeed: 5,
   },
   // Level 3
   {
@@ -120,6 +129,8 @@ export const FIGHTER_UPGRADES: readonly FighterLevelData[] = [
     maxHealth: 1250,
     damageMin: 400,
     damageMax: 525,
+    speed: 4,
+    bulletSpeed: 6,
   },
   // Level 4
   {
@@ -128,6 +139,8 @@ export const FIGHTER_UPGRADES: readonly FighterLevelData[] = [
     maxHealth: 1500,
     damageMin: 500,
     damageMax: 625,
+    speed: 5,
+    bulletSpeed: 7,
   },
 ] as const;
 

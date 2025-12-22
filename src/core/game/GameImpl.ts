@@ -838,6 +838,13 @@ export class GameImpl implements Game {
         `${breaker} not allied with ${other}, cannot break alliance`,
       );
     }
+
+    // Betrayal immediately creates a war state (separate from relations).
+    breaker.setWarWith(other);
+    other.setWarWith(breaker);
+    breaker.recordAggression(other);
+    other.recordAggression(breaker);
+
     if (!other.isTraitor() && !other.isDisconnected()) {
       breaker.markTraitor();
     }

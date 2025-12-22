@@ -2,8 +2,10 @@ import { Game, Player, Unit, UnitType, UpgradeType } from "../../game/Game";
 import { SAMMissileExecution } from "../SAMMissileExecution";
 
 /**
- * Finds all enemy cities with the CityAntiAir upgrade within the nuke's blast radius.
- * Used for SAM missile interception of nukes.
+ * Finds all non-friendly cities with the CityAntiAir upgrade within the nuke's blast radius.
+ *
+ * Note: This is already "targeting-based" for neutral players because we only consider
+ * cities that are threatened by the nuke's target (blast-radius check).
  */
 export function findEligibleCitiesForNuke(nuke: Unit, game: Game): Unit[] {
   const nukeOwner = nuke.owner();

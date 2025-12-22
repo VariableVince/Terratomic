@@ -40,7 +40,6 @@ export class ArtilleryExecution implements Execution {
   init(mg: Game, ticks: number): void {
     this.mg = mg as GameImpl;
     this.random = new PseudoRandom(mg.ticks());
-    this.allowedOwners = new Set<number>();
     if (isUnit(this.input)) {
       this.artillery = this.input;
     } else {
@@ -67,14 +66,9 @@ export class ArtilleryExecution implements Execution {
         this.mg.addUpdate(this.artillery.toUpdate());
       }
     }
-    // Build allowed owner set (own + friendly) like road pathing
+    // Build allowed owner set constrained to the owning player so artillery only walks its own land
     const owner = this.artillery.owner();
-    this.allowedOwners.add(owner.smallID());
-    for (const p of this.mg.players()) {
-      if (p.smallID() !== owner.smallID() && owner.isFriendly(p)) {
-        this.allowedOwners.add(p.smallID());
-      }
-    }
+    this.allowedOwners = new Set<number>([owner.smallID()]);
   }
 
   tick(ticks: number): void {
@@ -280,6 +274,11 @@ export class ArtilleryExecution implements Execution {
       return;
     }
     if (step === this.artillery.tile()) {
+      this.artillery.setTargetTile(undefined);
+      this.clearCachedPath();
+      return;
+    }
+    if (this.mg.owner(step) !== this.artillery.owner()) {
       this.artillery.setTargetTile(undefined);
       this.clearCachedPath();
       return;

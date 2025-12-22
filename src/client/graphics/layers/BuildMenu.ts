@@ -473,13 +473,15 @@ export class BuildMenu extends LitElement {
       border-radius: 3px;
       font-family: monospace;
     }
+    .build-count-row {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
     .build-stack {
       display: none;
     }
     .build-stack-badge {
-      position: absolute;
-      top: 2px;
-      right: 2px;
       font-size: 10px;
       color: #fff;
       font-family: monospace;
@@ -488,7 +490,6 @@ export class BuildMenu extends LitElement {
       padding: 1px 5px;
       border-radius: 3px;
       border: 1px solid #3b82f6;
-      z-index: 2;
       text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
     }
     .build-count-chip {
@@ -506,6 +507,15 @@ export class BuildMenu extends LitElement {
       font-weight: 600;
       pointer-events: none;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }
+    .build-stars {
+      font-size: 14px;
+      color: #cd7f32;
+      letter-spacing: 0.5px;
+      text-shadow:
+        0 0 2px rgba(0, 0, 0, 0.8),
+        0 1px 1px rgba(0, 0, 0, 0.5);
+      line-height: 1;
     }
   `;
 
@@ -735,6 +745,49 @@ export class BuildMenu extends LitElement {
     return baseName;
   }
 
+  /**
+   * Check if a unit type should display upgrade stars in the build menu
+   */
+  private shouldShowStars(unitType: UnitType): boolean {
+    return (
+      unitType === UnitType.Artillery ||
+      unitType === UnitType.FighterJet ||
+      unitType === UnitType.Warship ||
+      unitType === UnitType.Submarine ||
+      unitType === UnitType.Bomber ||
+      unitType === UnitType.SAMLauncher ||
+      unitType === UnitType.Airfield
+    );
+  }
+
+  /**
+   * Get the number of stars to display for a unit (1-4)
+   */
+  private getStarCount(unitType: UnitType): number {
+    const player = this.game?.myPlayer();
+    if (!player) return 1;
+
+    // Upgradeable units
+    if (isUpgradeableUnit(unitType)) {
+      return playerMaxUnitLevel(player, unitType);
+    }
+
+    // Tech-upgradeable structures (SAM, Airfield)
+    if (isTechUpgradeableStructure(unitType)) {
+      return playerMaxStructureTechLevel(player, unitType);
+    }
+
+    return 1;
+  }
+
+  /**
+   * Render bronze stars for upgrade level indication
+   */
+  private renderStars(count: number) {
+    const stars = "★".repeat(Math.max(1, Math.min(4, count)));
+    return html`<span class="build-stars">${stars}</span>`;
+  }
+
   public onBuildSelected = (item: BuildItemDisplay) => {
     // Selecting a build item should exit upgrade mode and unhighlight the button
     if (this.uiState?.upgradeMode) {
@@ -799,11 +852,6 @@ export class BuildMenu extends LitElement {
                     <div class="build-hotkey">
                       ${this.hotkeyMap.get(item.unitType)}
                     </div>
-                    ${desiredStack > 1
-                      ? html`<span class="build-stack-badge"
-                          >×${desiredStack}</span
-                        >`
-                      : ""}
                     <img class="build-icon" src=${item.icon} alt=${baseName} />
                     <div class="build-item-details">
                       <span class="build-name">${displayName}</span>
@@ -818,10 +866,22 @@ export class BuildMenu extends LitElement {
                       </span>
                     </div>
                     <div class="build-stats">
-                      ${item.countable
-                        ? html`<span class="build-count"
-                            >${this.count(item)}</span
-                          >`
+                      ${this.shouldShowStars(item.unitType)
+                        ? this.renderStars(this.getStarCount(item.unitType))
+                        : ""}
+                      ${item.countable || desiredStack > 1
+                        ? html`<div class="build-count-row">
+                            ${desiredStack > 1
+                              ? html`<span class="build-stack-badge"
+                                  >×${desiredStack}</span
+                                >`
+                              : ""}
+                            ${item.countable
+                              ? html`<span class="build-count">
+                                  ${this.count(item)}
+                                </span>`
+                              : ""}
+                          </div>`
                         : ""}
                     </div>
                   </button>

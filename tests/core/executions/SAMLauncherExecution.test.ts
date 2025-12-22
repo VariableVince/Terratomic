@@ -85,6 +85,9 @@ describe("SAM", () => {
   });
 
   test("one sam should take down one nuke", async () => {
+    attacker.setWarWith(defender);
+    defender.setWarWith(attacker);
+
     const sam = defender.buildUnit(UnitType.SAMLauncher, game.ref(1, 1), {});
     game.addExecution(new SAMLauncherExecution(defender, null, sam));
 
@@ -103,6 +106,9 @@ describe("SAM", () => {
   });
 
   test("sam should only get one nuke at a time", async () => {
+    attacker.setWarWith(defender);
+    defender.setWarWith(attacker);
+
     const sam = defender.buildUnit(UnitType.SAMLauncher, game.ref(1, 1), {});
     game.addExecution(new SAMLauncherExecution(defender, null, sam));
     attacker.buildUnit(UnitType.AtomBomb, game.ref(2, 1), {
@@ -129,6 +135,9 @@ describe("SAM", () => {
   });
 
   test("sam should cooldown as long as configured", async () => {
+    attacker.setWarWith(defender);
+    defender.setWarWith(attacker);
+
     const sam = defender.buildUnit(UnitType.SAMLauncher, game.ref(1, 1), {});
     game.addExecution(new SAMLauncherExecution(defender, null, sam));
     expect(sam.isInCooldown()).toBeFalsy();
@@ -155,6 +164,9 @@ describe("SAM", () => {
   });
 
   test("two sams should not target twice same nuke", async () => {
+    attacker.setWarWith(defender);
+    defender.setWarWith(attacker);
+
     const sam1 = defender.buildUnit(UnitType.SAMLauncher, game.ref(1, 1), {});
     game.addExecution(new SAMLauncherExecution(defender, null, sam1));
     const sam2 = defender.buildUnit(UnitType.SAMLauncher, game.ref(1, 2), {});
@@ -175,6 +187,9 @@ describe("SAM", () => {
   });
 
   test("SAMs should target close to launch site", async () => {
+    attacker.setWarWith(defender);
+    defender.setWarWith(attacker);
+
     const targetDistance = 199;
     // Close SAM: should intercept the nuke
     const sam = defender.buildUnit(UnitType.SAMLauncher, game.ref(1, 1), {});
@@ -198,6 +213,13 @@ describe("SAM", () => {
   });
 
   test("SAMs should target only nukes aimed at nearby targets if not close to launch site", async () => {
+    attacker.setWarWith(defender);
+    defender.setWarWith(attacker);
+    attacker.setWarWith(middle_defender);
+    middle_defender.setWarWith(attacker);
+    attacker.setWarWith(far_defender);
+    far_defender.setWarWith(attacker);
+
     const targetDistance = 199;
     // Middle SAM: should not intercept the nuke
     const sam1 = middle_defender.buildUnit(
@@ -230,5 +252,72 @@ describe("SAM", () => {
     expect(nukeExecution.isActive()).toBeFalsy();
     expect(sam1.isInCooldown()).toBeFalsy();
     expect(sam2.isInCooldown()).toBeTruthy();
+  });
+
+  test("neutral: SAM should not intercept bomber unless bomber targets defender land", async () => {
+    const sam = defender.buildUnit(UnitType.SAMLauncher, game.ref(1, 1), {});
+    game.addExecution(new SAMLauncherExecution(defender, null, sam));
+
+    // Bomber in range but targeting attacker land.
+    const bomber = attacker.buildUnit(UnitType.Bomber, game.ref(2, 1), {
+      targetTile: game.ref(7, 7),
+    });
+
+    // Run enough ticks to hit the 20-tick plane interception sweep.
+    executeTicks(game, 25);
+
+    expect(bomber.targetedBySAM()).toBe(false);
+  });
+
+  test("neutral: SAM should intercept bomber when bomber targets defender land", async () => {
+    const sam = defender.buildUnit(UnitType.SAMLauncher, game.ref(1, 1), {});
+    game.addExecution(new SAMLauncherExecution(defender, null, sam));
+
+    // Bomber in range and targeting a tile owned by defender.
+    const bomber = attacker.buildUnit(UnitType.Bomber, game.ref(2, 1), {
+      targetTile: game.ref(1, 1),
+    });
+
+    executeTicks(game, 25);
+
+    expect(bomber.targetedBySAM()).toBe(true);
+  });
+
+  test("neutral: SAM should not intercept a nuke that does not threaten its territory", async () => {
+    const sam = defender.buildUnit(UnitType.SAMLauncher, game.ref(1, 1), {});
+    game.addExecution(new SAMLauncherExecution(defender, null, sam));
+
+    // Nuke travels near the SAM but is targeted far away (blast radius doesn't touch defender land).
+    const nuke = attacker.buildUnit(UnitType.AtomBomb, game.ref(2, 1), {
+      targetTile: game.ref(199, 199),
+      trajectory: [
+        { tile: game.ref(2, 1), targetable: true },
+        { tile: game.ref(2, 2), targetable: true },
+        { tile: game.ref(2, 3), targetable: true },
+      ],
+    });
+
+    executeTicks(game, 5);
+
+    expect(nuke.targetedBySAM()).toBe(false);
+    expect(sam.isInCooldown()).toBeFalsy();
+  });
+
+  test("neutral: SAM should intercept a nuke whose blast radius threatens its territory", async () => {
+    const sam = defender.buildUnit(UnitType.SAMLauncher, game.ref(1, 1), {});
+    game.addExecution(new SAMLauncherExecution(defender, null, sam));
+
+    // Target near defender so blast radius overlaps defender-owned tiles.
+    const nuke = attacker.buildUnit(UnitType.AtomBomb, game.ref(2, 1), {
+      targetTile: game.ref(3, 1),
+      trajectory: [
+        { tile: game.ref(2, 1), targetable: true },
+        { tile: game.ref(3, 1), targetable: true },
+      ],
+    });
+
+    executeTicks(game, 5);
+
+    expect(nuke.targetedBySAM()).toBe(true);
   });
 });

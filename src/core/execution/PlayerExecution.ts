@@ -8,6 +8,7 @@ import {
   UnitType,
   UpgradeType,
 } from "../game/Game";
+import { GameImpl } from "../game/GameImpl";
 import { TileRef } from "../game/GameMap";
 import { PseudoRandom } from "../PseudoRandom";
 import { getTechNodes, isTechAvailable } from "../tech/ResearchTree";
@@ -25,7 +26,7 @@ const traversalStates = new WeakMap<Game, ClusterTraversalState>();
 
 export class PlayerExecution implements Execution {
   private config: Config;
-  private mg: Game;
+  private mg: GameImpl;
   private active = true;
   private random: PseudoRandom | null = null;
   // Accumulate research "intensity" allocation since last innovation calculation
@@ -41,7 +42,7 @@ export class PlayerExecution implements Execution {
   }
 
   init(mg: Game, ticks: number) {
-    this.mg = mg;
+    this.mg = mg as GameImpl;
     this.config = mg.config();
     this.random = new PseudoRandom(ticks + simpleHash(this.player.id()));
   }
@@ -208,7 +209,13 @@ export class PlayerExecution implements Execution {
     const available = nodes.filter(
       (n) => !researched.has(n.id) && isTechAvailable(n.id, researched),
     );
-    if (available.length === 0) return;
+    if (available.length === 0) {
+      if (this.player.researchInvestmentRate?.() ?? 0 > 0) {
+        this.player.setResearchInvestmentRate(0);
+        this.mg.addUpdate(this.player.toUpdate());
+      }
+      return;
+    }
 
     // Get all priorities and check which are available
     const allPriorities: Set<string> =

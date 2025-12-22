@@ -507,8 +507,11 @@ export class DefaultConfig implements Config {
   fighterJetAttackRate(): number {
     return 15;
   }
-  fighterJetSpeed(): number {
-    return 2;
+  fighterJetSpeed(level: number = 1): number {
+    return getFighterLevelData(level).speed;
+  }
+  fighterJetBulletSpeed(level: number = 1): number {
+    return getFighterLevelData(level).bulletSpeed;
   }
   fighterJetHealingAmount(): number {
     return 1;
@@ -1376,9 +1379,9 @@ export class DefaultConfig implements Config {
       case UnitType.Airfield:
         return 0.8; // Default 80%
       case UnitType.MissileSilo:
-        return 0.2; // Missile silo: 20%
+        return 0.8; // Missile silo: 80%
       case UnitType.SAMLauncher:
-        return 0.4; // SAM: 40%
+        return 0.8; // SAM: 80%
       default:
         return 1.0;
     }
