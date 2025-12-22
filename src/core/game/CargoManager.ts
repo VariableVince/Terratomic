@@ -60,9 +60,14 @@ export class CargoManager {
         continue;
       }
       // Domestic
+      // Sum up stack counts to account for stacked structures
+      const effectiveNodeCount = connectedNodes.reduce(
+        (sum, n) => sum + n.stackCount(),
+        0,
+      );
       const spawnChance = this.game
         .config()
-        .cargoTruckSpawnRate(connectedNodes.length);
+        .cargoTruckSpawnRate(effectiveNodeCount);
       if (this.random.chance(spawnChance)) {
         const origin = this.random.randElement(connectedNodes);
         const destination = this.random.randElement(
