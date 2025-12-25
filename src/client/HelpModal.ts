@@ -390,20 +390,6 @@ export class HelpModal extends LitElement {
         altKey: "ui_guide.command_center_economy_alt",
         icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
       },
-      {
-        titleKey: "ui_guide.command_center_diplomacy_title",
-        descKey: "ui_guide.command_center_diplomacy_desc",
-        img: "/images/HelpModalScreenshots/CC-Diplomacy.png",
-        altKey: "ui_guide.command_center_diplomacy_alt",
-        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-      },
-      {
-        titleKey: "ui_guide.command_center_bombers_title",
-        descKey: "ui_guide.command_center_bombers_desc",
-        img: "/images/HelpModalScreenshots/CC-Bombers.png",
-        altKey: "ui_guide.command_center_bombers_alt",
-        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M12 2v20"/><path d="m4.93 4.93 14.14 14.14"/><path d="m19.07 4.93-14.14 14.14"/></svg>`,
-      },
     ];
 
     const radialItems = [
@@ -414,6 +400,7 @@ export class HelpModal extends LitElement {
       "ui_guide.radial_peace",
       "ui_guide.radial_war",
       "ui_guide.radial_air",
+      "ui_guide.radial_bomber",
       "ui_guide.radial_attack",
     ];
 
@@ -561,6 +548,10 @@ export class HelpModal extends LitElement {
                 <li>
                   <div class="icon air-attack-icon inline-icon"></div>
                   ${unsafeHTML(this.t("ui_guide.radial_air"))}
+                </li>
+                <li>
+                  <div class="icon airfield-icon inline-icon"></div>
+                  ${unsafeHTML(this.t("ui_guide.radial_bomber"))}
                 </li>
                 <li>
                   <div class="icon sword-icon inline-icon"></div>
@@ -1229,7 +1220,9 @@ export class HelpModal extends LitElement {
           </div>
           <div class="help-row">
             <div class="help-col">
-              <p class="mb-3">${this.t("tech_tree.overview_desc")}</p>
+              <p class="mb-3">
+                ${unsafeHTML(this.t("tech_tree.overview_desc"))}
+              </p>
             </div>
             <div class="help-col">
               <img
