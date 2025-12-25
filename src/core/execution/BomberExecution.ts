@@ -1,7 +1,6 @@
 import type { Execution, Game, Player, Unit } from "../game/Game";
 import { UnitType } from "../game/Game";
 import type { TileRef } from "../game/GameMap";
-import { playerMaxStructureTechLevel } from "../game/Upgradeables";
 import { StraightPathFinder } from "../pathfinding/PathFinding";
 import { roadEffectModifiers } from "../tech/TechEffects";
 
@@ -20,6 +19,12 @@ export class BomberExecution implements Execution {
   private currentWaypointIndex = 0;
   private hasRebasedToNewAirfield = false; // Track if bomber rebased due to home airfield destruction
   private lastHealthLogTick = 0; // For health logging
+  private cachedTarget:
+    | { tile: TileRef; unit: Unit | null }
+    | null
+    | undefined = undefined;
+  private cachedTargetTick = -999;
+  private static readonly TARGET_CACHE_DURATION = 10;
 
   constructor(
     private origOwner: Player,
@@ -360,9 +365,39 @@ export class BomberExecution implements Execution {
   }
 
   private findTarget(): { tile: TileRef; unit: Unit | null } | null {
-    // Clean up invalid targets from bombersOnTarget map
-    this.cleanupBomberTargets();
+    // Trigger cleanup if PlayerExecution isn't running (e.g., in tests)
+    // PlayerExecution will handle this in normal gameplay
+    const playerExecExists = (this.mg as any).execs?.some?.(
+      (e: any) =>
+        e.constructor.name === "PlayerExecution" &&
+        (e as any).player === this.origOwner,
+    );
+    if (!playerExecExists) {
+      this.cleanupBomberTargetsIfNeeded();
+    }
+
     const intent = this.origOwner.getBomberIntent?.();
+
+    // Check cache validity
+    const currentTick = this.mg.ticks();
+    if (
+      currentTick - this.cachedTargetTick <
+      BomberExecution.TARGET_CACHE_DURATION
+    ) {
+      // Validate cached target is still valid
+      if (
+        this.cachedTarget &&
+        this.cachedTarget.unit &&
+        !this.isTargetValid(this.cachedTarget.unit)
+      ) {
+        // Cached target became invalid, invalidate cache
+        this.cachedTarget = undefined;
+        this.cachedTargetTick = -999;
+      } else {
+        // Return cached result (may be null/undefined)
+        return this.cachedTarget ?? null;
+      }
+    }
 
     // Manual targeting mode
     if (
@@ -379,13 +414,22 @@ export class BomberExecution implements Execution {
         );
         // If we found a target in manual mode, use it
         if (target) {
+          // Cache the result
+          this.cachedTarget = target;
+          this.cachedTargetTick = this.mg.ticks();
           return target;
         }
         // If no targets remain, clear the manual intent and fall through to auto-bombing
         this.origOwner.setBomberIntent(null);
+        // Invalidate cache since intent changed
+        this.cachedTarget = undefined;
+        this.cachedTargetTick = -999;
       }
     } // Auto-bombing mode
     if (!this.origOwner.isAutoBombingEnabled()) {
+      // Cache the null result
+      this.cachedTarget = null;
+      this.cachedTargetTick = this.mg.ticks();
       return null;
     }
 
@@ -437,10 +481,14 @@ export class BomberExecution implements Execution {
     });
 
     // Try with SAM avoidance first, then fall back to direct paths
-    return (
+    const result =
       this.trySelectTarget(sortedEnemies, true) ??
-      this.trySelectTarget(sortedEnemies, false)
-    );
+      this.trySelectTarget(sortedEnemies, false);
+
+    // Cache the result
+    this.cachedTarget = result;
+    this.cachedTargetTick = this.mg.ticks();
+    return result;
   }
 
   private findTargetFromQueue(
@@ -516,20 +564,6 @@ export class BomberExecution implements Execution {
     return true;
   }
 
-  private cleanupBomberTargets(): void {
-    // Remove entries for units that no longer exist or are invalid
-    const keysToDelete: TileRef[] = [];
-    for (const [tile, _count] of this.origOwner.bombersOnTarget) {
-      const units = this.mg.unitsAt(tile);
-      if (units.length === 0 || !this.isTargetValid(units[0])) {
-        keysToDelete.push(tile);
-      }
-    }
-    for (const key of keysToDelete) {
-      this.origOwner.bombersOnTarget.delete(key);
-    }
-  }
-
   private decrementBomberCount(unit: Unit): void {
     const tile = unit.tile();
     const count = this.origOwner.bombersOnTarget.get(tile) ?? 0;
@@ -551,15 +585,21 @@ export class BomberExecution implements Execution {
     this.origOwner.bombersOnTarget.set(tile, newCount);
   }
 
-  private getEffectiveSAMRange(sam: Unit): number {
-    const base = this.mg.config().defaultSamRange();
-    const bonus = this.mg.config().samRangeUpgradePercent();
-    // Use player's SAM tech level, not unit level (which is stack count)
-    const lvl = playerMaxStructureTechLevel(sam.owner(), UnitType.SAMLauncher);
-    if (lvl <= 1) return base;
-    // Apply per-upgrade multiplicative increase
-    const factor = Math.pow(1 + bonus, lvl - 1);
-    return Math.round(base * factor);
+  /**
+   * Fallback cleanup for tests without PlayerExecution.
+   * In production, PlayerExecution.cleanupBomberTargets() handles this.
+   */
+  private cleanupBomberTargetsIfNeeded(): void {
+    const keysToDelete: TileRef[] = [];
+    for (const [tile, _count] of this.origOwner.bombersOnTarget) {
+      const units = this.mg.unitsAt(tile);
+      if (units.length === 0 || !this.isTargetValid(units[0])) {
+        keysToDelete.push(tile);
+      }
+    }
+    for (const key of keysToDelete) {
+      this.origOwner.bombersOnTarget.delete(key);
+    }
   }
 
   private findSafeRoute(
@@ -567,138 +607,8 @@ export class BomberExecution implements Execution {
     end: TileRef,
     targetTile: TileRef | null,
   ): { reachable: boolean; waypoints: TileRef[] } {
-    // Get all hostile SAM launchers with their actual ranges, excluding the target if it's a SAM
-    const hostileSAMs = this.mg
-      .players()
-      .filter(
-        (p) => p.id() !== this.origOwner.id() && this.origOwner.isAtWarWith(p),
-      )
-      .flatMap((p) => p.units(UnitType.SAMLauncher))
-      .filter((sam) => !targetTile || sam.tile() !== targetTile)
-      .map((sam) => ({
-        sam,
-        range: this.getEffectiveSAMRange(sam),
-      }));
-
-    if (hostileSAMs.length === 0) {
-      return { reachable: true, waypoints: [end] }; // No SAMs to avoid, fly direct
-    }
-
-    const startX = this.mg.x(start);
-    const startY = this.mg.y(start);
-    const endX = this.mg.x(end);
-    const endY = this.mg.y(end);
-
-    // Calculate perpendicular offset direction
-    const dx = endX - startX;
-    const dy = endY - startY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (distance < 10) {
-      // Check if direct path is safe
-      if (this.isPathSafe(start, [end], hostileSAMs)) {
-        return { reachable: true, waypoints: [end] };
-      }
-      return { reachable: false, waypoints: [end] };
-    }
-
-    // Perpendicular vector (rotate 90 degrees)
-    const perpX = -dy / distance;
-    const perpY = dx / distance;
-
-    // Try offset distance large enough to clear SAM ranges
-    const maxSamRange = Math.max(...hostileSAMs.map((s) => s.range));
-    const offsetDistance = maxSamRange * 1.5;
-
-    const mapWidth = this.mg.width();
-    const mapHeight = this.mg.height();
-
-    for (const direction of [-1, 1]) {
-      const offsetX = perpX * offsetDistance * direction;
-      const offsetY = perpY * offsetDistance * direction;
-
-      // Create waypoint at 1/3 and 2/3 along the path, offset perpendicular
-      // Clamp to map bounds to prevent invalid coordinates
-      const waypoint1X = Math.max(
-        0,
-        Math.min(mapWidth - 1, Math.round(startX + dx * 0.33 + offsetX)),
-      );
-      const waypoint1Y = Math.max(
-        0,
-        Math.min(mapHeight - 1, Math.round(startY + dy * 0.33 + offsetY)),
-      );
-      const waypoint2X = Math.max(
-        0,
-        Math.min(mapWidth - 1, Math.round(startX + dx * 0.67 + offsetX)),
-      );
-      const waypoint2Y = Math.max(
-        0,
-        Math.min(mapHeight - 1, Math.round(startY + dy * 0.67 + offsetY)),
-      );
-
-      const wp1 = this.mg.ref(waypoint1X, waypoint1Y);
-      const wp2 = this.mg.ref(waypoint2X, waypoint2Y);
-
-      // Check if this route completely avoids all SAM ranges
-      if (this.isPathSafe(start, [wp1, wp2, end], hostileSAMs)) {
-        return { reachable: true, waypoints: [wp1, wp2, end] };
-      }
-    }
-
-    // Check if direct path is safe
-    if (this.isPathSafe(start, [end], hostileSAMs)) {
-      return { reachable: true, waypoints: [end] };
-    }
-
-    // No safe route found
-    return { reachable: false, waypoints: [end] };
-  }
-
-  private isPathSafe(
-    start: TileRef,
-    waypoints: TileRef[],
-    sams: { sam: Unit; range: number }[],
-  ): boolean {
-    const mapWidth = this.mg.width();
-    const mapHeight = this.mg.height();
-    let current = start;
-    for (const waypoint of waypoints) {
-      // Sample points along the segment
-      const x1 = this.mg.x(current);
-      const y1 = this.mg.y(current);
-      const x2 = this.mg.x(waypoint);
-      const y2 = this.mg.y(waypoint);
-      const segmentDist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-      const samples = Math.max(10, Math.floor(segmentDist / 5));
-
-      for (let i = 0; i <= samples; i++) {
-        const t = i / samples;
-        // Clamp sampled points to map bounds
-        const px = Math.max(
-          0,
-          Math.min(mapWidth - 1, Math.round(x1 + (x2 - x1) * t)),
-        );
-        const py = Math.max(
-          0,
-          Math.min(mapHeight - 1, Math.round(y1 + (y2 - y1) * t)),
-        );
-        const point = this.mg.ref(px, py);
-
-        // Check if any SAM can reach this point
-        for (const { sam, range } of sams) {
-          const dist = Math.sqrt(
-            this.mg.euclideanDistSquared(sam.tile(), point),
-          );
-          if (dist <= range) {
-            return false; // Path enters SAM range, not safe
-          }
-        }
-      }
-
-      current = waypoint;
-    }
-
-    return true; // Path completely avoids all SAM ranges
+    // Direct path - SAM avoidance removed for performance
+    return { reachable: true, waypoints: [end] };
   }
 
   private resetMissionState(cooldownTicks: number): void {

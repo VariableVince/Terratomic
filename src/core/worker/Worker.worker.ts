@@ -1,7 +1,9 @@
+import { PerformanceMetrics } from "../../client/utilities/PerformanceMetrics";
 import { createGameRunner, GameRunner } from "../GameRunner";
 import { ErrorUpdate, GameUpdateViewData } from "../game/GameUpdates";
 import {
   AttackAveragePositionResultMessage,
+  ExecutionMetricsMessage,
   InitializedMessage,
   MainThreadMessage,
   PlayerActionsResultMessage,
@@ -12,7 +14,12 @@ import {
 } from "./WorkerMessages";
 
 const ctx: Worker = self as any;
+
+// Make PerformanceMetrics available in worker context
+(self as any).__PERF_METRICS__ = PerformanceMetrics.getInstance();
 let gameRunner: Promise<GameRunner> | null = null;
+let lastMetricsSendTime = 0;
+const METRICS_SEND_INTERVAL = 200; // Send metrics every 200ms
 
 function gameUpdate(gu: GameUpdateViewData | ErrorUpdate) {
   // skip if ErrorUpdate
@@ -33,9 +40,34 @@ ctx.addEventListener("message", async (e: MessageEvent<MainThreadMessage>) => {
   const message = e.data;
 
   switch (message.type) {
-    case "heartbeat":
-      (await gameRunner)?.executeNextTick();
+    case "set_metrics_enabled": {
+      const metrics = (self as any).__PERF_METRICS__;
+      if (metrics) {
+        metrics.enabled = message.enabled;
+        console.log("[Worker] Metrics enabled set to:", message.enabled);
+      }
       break;
+    }
+    case "heartbeat": {
+      (await gameRunner)?.executeNextTick();
+
+      // Send execution metrics to main thread periodically if enabled
+      const metrics = (self as any).__PERF_METRICS__;
+      if (metrics?.enabled) {
+        const now = performance.now();
+        if (now - lastMetricsSendTime >= METRICS_SEND_INTERVAL) {
+          const execMetrics = metrics.getExecutionMetrics();
+          if (execMetrics.length > 0) {
+            sendMessage({
+              type: "execution_metrics",
+              metrics: execMetrics,
+            } as ExecutionMetricsMessage);
+          }
+          lastMetricsSendTime = now;
+        }
+      }
+      break;
+    }
     case "init":
       try {
         gameRunner = createGameRunner(

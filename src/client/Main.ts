@@ -29,6 +29,8 @@ import { UserSettingModal } from "./UserSettingModal";
 import "./UsernameInput";
 import { UsernameInput } from "./UsernameInput";
 import { generateCryptoRandomUUID } from "./Utils";
+import "./components/HardwareAccelerationWarning";
+import type { HardwareAccelerationWarning } from "./components/HardwareAccelerationWarning";
 import "./components/NewsButton";
 import { NewsButton } from "./components/NewsButton";
 import "./components/baseComponents/Button";
@@ -39,6 +41,7 @@ import { isLoggedIn } from "./jwt";
 import "./styles.css";
 import { applyUiPalette, getUiPalette } from "./theme/UiPaletteLoader";
 import { initializeUiScaleFromStorage } from "./uiScale";
+import { detectWebGLSupport } from "./utilities/WebGLDetection";
 
 declare global {
   interface Window {
@@ -204,6 +207,52 @@ class Client {
     this.googleAds = document.querySelectorAll(
       "google-ad",
     ) as NodeListOf<GoogleAdElement>;
+
+    // Check WebGL support and show warning if unavailable or software rendering
+    const webglSupport = detectWebGLSupport();
+    console.log("WebGL detection result:", webglSupport);
+
+    // Detect if on mobile device
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent,
+      );
+
+    // Determine which warning to show (hardware takes priority over browser)
+    let warningType: "hardware" | "browser" | null = null;
+
+    if (!webglSupport.available || webglSupport.isSoftwareRendering) {
+      warningType = "hardware";
+      if (webglSupport.isSoftwareRendering) {
+        console.warn("Software rendering detected:", webglSupport.renderer);
+      } else {
+        console.warn("WebGL not available:", webglSupport.fallbackReason);
+      }
+    } else if (!webglSupport.isChromiumBrowser && !isMobile) {
+      // Only show browser warning on desktop (mobile users can't always choose browser)
+      warningType = "browser";
+      console.warn("Non-Chromium browser detected:", webglSupport.browserName);
+    }
+
+    if (warningType) {
+      // Create and inject warning banner with appropriate type
+      const webglWarning = document.createElement(
+        "hardware-acceleration-warning",
+      ) as HardwareAccelerationWarning;
+      webglWarning.warningType = warningType;
+      document.body.appendChild(webglWarning);
+      console.log(`${warningType} warning banner created and added to DOM`);
+
+      // Trigger slide-down animation after brief delay
+      setTimeout(() => {
+        webglWarning.classList.add("visible");
+        console.log("Warning banner set to visible");
+      }, 500);
+    } else {
+      console.log(
+        "WebGL is available with hardware acceleration on Chromium - no warning needed",
+      );
+    }
 
     window.addEventListener("beforeunload", () => {
       console.log("Browser is closing");

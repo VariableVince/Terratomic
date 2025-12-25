@@ -430,6 +430,15 @@ export class GameImpl implements Game {
   executeNextTick(): GameUpdates {
     this.updates = this.createGameUpdatesMap();
 
+    // Performance metrics tracking (client-side only - works in worker too)
+    let metrics: any = null;
+    if (
+      typeof globalThis !== "undefined" &&
+      (globalThis as any).__PERF_METRICS__
+    ) {
+      metrics = (globalThis as any).__PERF_METRICS__;
+    }
+
     // Process attack executions multiple times per tick for smoother territory changes
     const attackExecs: Execution[] = [];
     const otherExecs: Execution[] = [];
@@ -452,25 +461,57 @@ export class GameImpl implements Game {
     for (let subtick = 0; subtick < ATTACK_SUBTICKS_PER_TICK; subtick++) {
       attackExecs.forEach((e) => {
         if (e.isActive()) {
-          e.tick(this._ticks);
+          if (metrics?.enabled) {
+            const start = performance.now();
+            e.tick(this._ticks);
+            metrics.recordExecutionTime(
+              e.constructor.name,
+              performance.now() - start,
+            );
+          } else {
+            e.tick(this._ticks);
+          }
         }
       });
     }
 
     // Process other executions once per tick
     otherExecs.forEach((e) => {
-      e.tick(this._ticks);
+      if (metrics?.enabled) {
+        const start = performance.now();
+        e.tick(this._ticks);
+        metrics.recordExecutionTime(
+          e.constructor.name,
+          performance.now() - start,
+        );
+      } else {
+        e.tick(this._ticks);
+      }
     });
     const inited: Execution[] = [];
     const unInited: Execution[] = [];
     this.unInitExecs.forEach((e) => {
       if (!this.inSpawnPhase() || e.activeDuringSpawnPhase()) {
-        e.init(this, this._ticks);
+        if (metrics?.enabled) {
+          const start = performance.now();
+          e.init(this, this._ticks);
+          metrics.recordExecutionTime(
+            e.constructor.name + ".init",
+            performance.now() - start,
+          );
+        } else {
+          e.init(this, this._ticks);
+        }
         inited.push(e);
       } else {
         unInited.push(e);
       }
     });
+
+    // Commit metrics for this tick
+    if (metrics?.enabled) {
+      metrics.commitExecutionMetrics();
+    }
 
     this.removeInactiveExecutions();
 

@@ -1,3 +1,4 @@
+import { PerformanceMetrics } from "../../client/utilities/PerformanceMetrics";
 import {
   Cell,
   PlayerActions,
@@ -26,6 +27,11 @@ export class WorkerClient {
     this.worker = new Worker(new URL("./Worker.worker.ts", import.meta.url));
     this.messageHandlers = new Map();
 
+    // Expose worker to window for DevHUD metrics sync
+    if (typeof window !== "undefined") {
+      (window as any).__WORKER_CLIENT__ = this;
+    }
+
     // Set up global message handler
     this.worker.addEventListener(
       "message",
@@ -44,6 +50,13 @@ export class WorkerClient {
       return;
     }
 
+    // Handle execution metrics from worker
+    if (type === "execution_metrics") {
+      const metrics = PerformanceMetrics.getInstance();
+      metrics.setExecutionMetrics(message.metrics);
+      return;
+    }
+
     // For request/response pattern messages, use single Map lookup
     const { id } = message;
     if (id) {
@@ -53,6 +66,11 @@ export class WorkerClient {
         handler(message);
       }
     }
+  }
+
+  // Allow external code to post messages to worker (e.g., DevHUD metrics sync)
+  public postMessage(message: any): void {
+    this.worker.postMessage(message);
   }
 
   initialize(): Promise<void> {

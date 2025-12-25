@@ -52,10 +52,25 @@ export class TradeManagerExecution implements Execution {
   private shipHomePortById: Map<number, number /*portUnitID*/> = new Map();
   private knownPortIds: Set<number> = new Set();
 
+  // Per-tick cache to avoid multiple global iterations
+  private cachedShips: Unit[] = [];
+  private cachedPorts: Unit[] = [];
+  private cacheTickStamp: number = -1;
+
   // --- Debug helpers (human owners only) ---
   // Logging removed per request; retain no-op stubs to avoid refactor churn
   private log(_msg: string): void {}
   private logShip(_ship: Unit, _msg: string): void {}
+
+  private updateCache(ticks: number): void {
+    if (this.cacheTickStamp === ticks) {
+      return; // Already cached this tick
+    }
+
+    this.cachedShips = [...this.mg.units(UnitType.TradeShip)];
+    this.cachedPorts = [...this.mg.units(UnitType.Port)];
+    this.cacheTickStamp = ticks;
+  }
 
   init(mg: Game, _ticks: number): void {
     this.mg = mg;
@@ -80,6 +95,9 @@ export class TradeManagerExecution implements Execution {
 
   tick(ticks: number): void {
     if (!this.active) return;
+
+    // Update per-tick cache to avoid multiple global iterations
+    this.updateCache(ticks);
 
     // Capture whether there was carry-over demand before new accumulation this tick
     const hadCarryOverAtStart = this.queue.length > 0;
@@ -209,7 +227,7 @@ export class TradeManagerExecution implements Execution {
 
     // 1) Update current home-port assignments and track current owners
     const currentShipIds = new Set<number>();
-    const shipsSnapshot = [...this.mg.units(UnitType.TradeShip)];
+    const shipsSnapshot = [...this.cachedShips];
     for (const ship of shipsSnapshot) {
       // Remove trade ships owned by eliminated players
       if (!ship.owner().isAlive()) {
@@ -333,7 +351,7 @@ export class TradeManagerExecution implements Execution {
 
     // 2) Handle new ports: schedule initial supply if needed
     const currentPortIds = new Set<number>();
-    for (const port of this.mg.units(UnitType.Port)) {
+    for (const port of this.cachedPorts) {
       if (!port.isActive()) continue;
       currentPortIds.add(port.id());
       // Detect ownership change of an existing port
@@ -477,7 +495,7 @@ export class TradeManagerExecution implements Execution {
 
   private availableShips(): Unit[] {
     const ships: Unit[] = [];
-    for (const ship of this.mg.units(UnitType.TradeShip)) {
+    for (const ship of this.cachedShips) {
       if (!ship.isActive()) continue;
       // Do not consider ships that are flagged as returning
       if (ship.returning()) continue;
@@ -502,7 +520,7 @@ export class TradeManagerExecution implements Execution {
   private activeHomeSupplyCount(port: Unit): number {
     let count = 0;
     const pid = port.id();
-    for (const ship of this.mg.units(UnitType.TradeShip)) {
+    for (const ship of this.cachedShips) {
       if (!ship.isActive()) continue;
       if (ship.owner() !== port.owner()) continue;
       if (this.shipHomePortById.get(ship.id()) === pid) count++;

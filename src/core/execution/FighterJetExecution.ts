@@ -21,6 +21,11 @@ export class FighterJetExecution implements Execution {
   private pathFinder: StraightPathFinder;
   private nextScanTick = 0;
 
+  // Cache scan results (even when no target found)
+  private cachedScanResult: Unit | undefined = undefined;
+  private cachedScanTick = -999; // Start old so first scan happens
+  private readonly SCAN_INTERVAL = 10; // ticks
+
   constructor(
     private input: (UnitParams<UnitType.FighterJet> & OwnerComp) | Unit,
     private desiredLevel: number = 1,
@@ -70,13 +75,22 @@ export class FighterJetExecution implements Execution {
       this.fighterJet.modifyHealth(this.mg.config().fighterJetHealingAmount());
     }
 
-    if (
-      this.mg.ticks() >= this.nextScanTick ||
-      !this.fighterJet.targetUnit()?.isActive()
-    ) {
-      this.fighterJet.setTargetUnit(this.findTargetUnit());
+    // Check if we need to rescan or if cached target is still valid
+    const currentTick = this.mg.ticks();
+    const shouldRescan =
+      currentTick >= this.nextScanTick ||
+      (this.cachedScanResult !== undefined &&
+        !this.cachedScanResult.isActive());
+
+    if (shouldRescan) {
+      this.cachedScanResult = this.findTargetUnit();
+      this.cachedScanTick = currentTick;
+      this.nextScanTick = currentTick + this.SCAN_INTERVAL;
+      this.fighterJet.setTargetUnit(this.cachedScanResult);
       this.fighterJet.touch();
-      this.nextScanTick = this.mg.ticks() + 10;
+    } else {
+      // Use cached result (may be undefined)
+      this.fighterJet.setTargetUnit(this.cachedScanResult);
     }
 
     if (this.fighterJet.targetUnit() !== undefined) {

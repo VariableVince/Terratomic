@@ -5,6 +5,7 @@ import {
   MessageType,
   Player,
   PlayerType,
+  Unit,
   UnitType,
   UpgradeType,
 } from "../game/Game";
@@ -166,8 +167,39 @@ export class PlayerExecution implements Execution {
       }
     }
 
+    // Cleanup bomber target tracking map
+    this.cleanupBomberTargets();
+
     // --- Research system per-tick processing ---
     this.tickResearch();
+  }
+
+  /**
+   * Remove entries from bombersOnTarget map for units that no longer exist or are invalid.
+   * Runs once per player per tick (not once per bomber) for efficiency.
+   */
+  private cleanupBomberTargets(): void {
+    const keysToDelete: TileRef[] = [];
+    for (const [tile, _count] of this.player.bombersOnTarget) {
+      const units = this.mg.unitsAt(tile);
+      if (units.length === 0 || !this.isValidBomberTarget(units[0])) {
+        keysToDelete.push(tile);
+      }
+    }
+    for (const key of keysToDelete) {
+      this.player.bombersOnTarget.delete(key);
+    }
+  }
+
+  /**
+   * Check if a unit is a valid bomber target.
+   * Must be active and owned by a player the bomber owner is at war with.
+   */
+  private isValidBomberTarget(unit: Unit): boolean {
+    if (!unit.isActive()) return false;
+    const owner = unit.owner();
+    if (!owner.isPlayer()) return false;
+    return this.player.isAtWarWith(owner);
   }
 
   private tickResearch() {

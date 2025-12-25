@@ -4,6 +4,7 @@ import {
   MessageType,
   Player,
   PlayerType,
+  Unit,
   UnitType,
   UpgradeType,
 } from "../game/Game";
@@ -14,6 +15,7 @@ import { AttackExecution } from "./AttackExecution";
 
 export class ParatrooperAttackExecution implements Execution {
   private paratrooperUnitID: number | null = null;
+  private paratrooper: Unit | null = null;
   private pathFinder: StraightPathFinder | null = null;
   private currentPathIndex: number = 0;
   private troops: number;
@@ -149,6 +151,7 @@ export class ParatrooperAttackExecution implements Execution {
       { troops: this.troops, targetTile: this.dst },
     );
     this.paratrooperUnitID = paratrooper.id();
+    this.paratrooper = paratrooper;
 
     // Initialize pathfinder
     this.pathFinder = new StraightPathFinder(this.mg.map());
@@ -170,12 +173,11 @@ export class ParatrooperAttackExecution implements Execution {
       return;
     }
 
-    const paratrooper = game
-      .units(UnitType.Paratrooper)
-      .find((u) => u.id() === this.paratrooperUnitID);
+    const paratrooper = this.paratrooper;
 
     if (!paratrooper || !paratrooper.isActive()) {
       this.paratrooperUnitID = null; // Unit was destroyed or became inactive
+      this.paratrooper = null;
       return;
     }
 

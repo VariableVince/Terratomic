@@ -328,7 +328,7 @@ export class UILayer implements Layer {
         COLOR_PROGRESSION,
         this.context,
         this.game.x(unit.tile()) - 4,
-        this.game.y(unit.tile()) - 6,
+        this.game.y(unit.tile()) + 6,
         HEALTHBAR_WIDTH,
         PROGRESSBAR_HEIGHT,
         unit.health() / maxHealth,

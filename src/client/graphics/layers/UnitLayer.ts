@@ -1,8 +1,9 @@
 import type { Colord } from "colord";
 import { colord } from "colord";
+import * as PIXI from "pixi.js";
 import type { EventBus } from "../../../core/EventBus";
 import type { Theme } from "../../../core/configuration/Config";
-import { UnitType } from "../../../core/game/Game";
+import { Cell, UnitType } from "../../../core/game/Game";
 import type { TileRef } from "../../../core/game/GameMap";
 import type { GameView, UnitView } from "../../../core/game/GameView";
 import { BezenhamLine } from "../../../core/utilities/Line";
@@ -33,6 +34,48 @@ import {
   isSpriteReady,
   loadAllSprites,
 } from "../SpriteLoader";
+
+// PIXI unit icons
+import bomberSprite from "../../../../proprietary/images/bomberv3.png";
+import tradeShipIcon from "../../../../proprietary/images/tradeship.png";
+import warshipIcon from "../../../../resources/images/BattleshipIconWhite.svg";
+import fighterJetIcon from "../../../../resources/images/FighterJetIcon.svg";
+import submarineIcon from "../../../../resources/images/submarine.svg";
+
+// PIXI rendering constants
+const ICON_TEXTURE_QUALITY = 4; // Render textures at higher pixel density
+const ICON_DIM = 28;
+const ICON_GROW_ZOOM_THRESHOLD = 2;
+const SIZE_SCALE = 0.8; // Units are 20% smaller than structures
+
+// Unit types that use PIXI rendering (GPU-accelerated)
+const PIXI_UNIT_TYPES = new Set<UnitType>([
+  UnitType.Warship,
+  UnitType.Submarine,
+  UnitType.Bomber,
+  UnitType.FighterJet,
+  UnitType.TradeShip,
+  UnitType.Shell,
+]);
+
+// PIXI render info for tracking sprites
+class UnitRenderInfo {
+  constructor(
+    public unit: UnitView,
+    public pixiSprite: PIXI.Sprite,
+    public lastAngle: number = 0, // For smooth rotation interpolation
+    public facingLeft: boolean = false, // Track horizontal facing direction
+  ) {}
+}
+
+// Ghost sprite for submarine last-known positions
+class GhostRenderInfo {
+  constructor(
+    public ghostId: number,
+    public position: { x: number; y: number },
+    public pixiSprite: PIXI.Sprite,
+  ) {}
+}
 
 enum Relationship {
   Self,
@@ -120,7 +163,29 @@ export class UnitLayer implements Layer {
   private spriteSizeCache = new Map<UnitType, number>();
 
   private renderedGhosts = new Map<number, TileRef>();
+
+  // PIXI rendering infrastructure
+  private pixiCanvas: HTMLCanvasElement;
+  private pixiStage: PIXI.Container;
+  private pixiRenderer: PIXI.Renderer;
+  private pixiRenders: UnitRenderInfo[] = [];
+  private pixiSeenUnits: Set<number> = new Set();
+  private textureCache: Map<string, PIXI.Texture> = new Map();
+  private targetingTextureCache: Map<string, PIXI.Texture> = new Map(); // Red tint for attacking units
+
+  // Icon images for PIXI units
+  private warshipIconImage: HTMLImageElement | null = null;
+  private submarineIconImage: HTMLImageElement | null = null;
+  private fighterJetIconImage: HTMLImageElement | null = null;
+  private bomberIconImage: HTMLImageElement | null = null;
+  private tradeShipIconImage: HTMLImageElement | null = null;
+
+  // Submarine ghost sprites
+  private ghostRenders: GhostRenderInfo[] = [];
   private renderedUnits = new Map<number, UnitView>();
+
+  // Cache bomber visibility at airfield (updated once per tick instead of 60×/sec)
+  private bomberAtAirfield = new Map<number, boolean>();
 
   constructor(
     private game: GameView,
@@ -136,6 +201,286 @@ export class UnitLayer implements Layer {
       .turnIntervalMs();
     this.updateTickInterval();
     this.lastTickTimestamp = this.now();
+    this.loadPixiIcons();
+  }
+
+  private loadPixiIcons() {
+    // Load warship icon
+    const warshipImg = new Image();
+    warshipImg.src = warshipIcon;
+    warshipImg.onload = () => {
+      this.warshipIconImage = warshipImg;
+      this.clearTextureCache(UnitType.Warship);
+    };
+
+    // Load submarine icon
+    const submarineImg = new Image();
+    submarineImg.src = submarineIcon;
+    submarineImg.onload = () => {
+      this.submarineIconImage = submarineImg;
+      this.clearTextureCache(UnitType.Submarine);
+    };
+
+    // Load fighter jet icon
+    const fighterJetImg = new Image();
+    fighterJetImg.src = fighterJetIcon;
+    fighterJetImg.onload = () => {
+      this.fighterJetIconImage = fighterJetImg;
+      this.clearTextureCache(UnitType.FighterJet);
+    };
+
+    // Load bomber sprite
+    const bomberImg = new Image();
+    bomberImg.src = bomberSprite;
+    bomberImg.onload = () => {
+      this.bomberIconImage = bomberImg;
+      this.clearTextureCache(UnitType.Bomber);
+    };
+
+    // Load trade ship icon
+    const tradeShipImg = new Image();
+    tradeShipImg.src = tradeShipIcon;
+    tradeShipImg.onload = () => {
+      this.tradeShipIconImage = tradeShipImg;
+      this.clearTextureCache(UnitType.TradeShip);
+    };
+  }
+
+  private clearTextureCache(unitType: UnitType) {
+    // Clear cached textures for this unit type when icon loads/reloads
+    const keysToDelete: string[] = [];
+    for (const key of this.textureCache.keys()) {
+      if (key.includes(unitType.toString())) {
+        keysToDelete.push(key);
+      }
+    }
+    for (const key of keysToDelete) {
+      this.textureCache.delete(key);
+      this.targetingTextureCache.delete(key);
+    }
+  }
+
+  async setupPixiRenderer() {
+    this.pixiRenderer = new PIXI.WebGLRenderer();
+    this.pixiCanvas = document.createElement("canvas");
+    this.pixiCanvas.width = window.innerWidth;
+    this.pixiCanvas.height = window.innerHeight;
+    this.pixiStage = new PIXI.Container();
+    await this.pixiRenderer.init({
+      canvas: this.pixiCanvas,
+      resolution: 1,
+      width: this.pixiCanvas.width,
+      height: this.pixiCanvas.height,
+      clearBeforeRender: true,
+      backgroundAlpha: 0,
+      backgroundColor: 0x00000000,
+    });
+  }
+
+  resizePixiCanvas() {
+    if (this.pixiRenderer?.view) {
+      this.pixiCanvas.width = window.innerWidth;
+      this.pixiCanvas.height = window.innerHeight;
+      this.pixiRenderer.resize(innerWidth, innerHeight, 1);
+    }
+  }
+
+  private iconScreenScale(): number {
+    const s = this.transformHandler.scale;
+    if (s <= ICON_GROW_ZOOM_THRESHOLD) {
+      return (Math.min(1, s) / ICON_TEXTURE_QUALITY) * SIZE_SCALE;
+    }
+    return (s / ICON_GROW_ZOOM_THRESHOLD / ICON_TEXTURE_QUALITY) * SIZE_SCALE;
+  }
+
+  private getIconImage(unitType: UnitType): HTMLImageElement | null {
+    switch (unitType) {
+      case UnitType.Warship:
+        return this.warshipIconImage;
+      case UnitType.Submarine:
+        return this.submarineIconImage;
+      case UnitType.FighterJet:
+        return this.fighterJetIconImage;
+      case UnitType.Bomber:
+        return this.bomberIconImage;
+      case UnitType.TradeShip:
+        return this.tradeShipIconImage;
+      default:
+        return null;
+    }
+  }
+
+  private createPixiTexture(
+    unit: UnitView,
+    isTargeting: boolean = false,
+  ): PIXI.Texture {
+    const border = this.theme.borderColor(unit.owner());
+    const unitType = unit.type();
+
+    // Naval units use lighter color for contrast with water, air units use darker
+    const isNavalUnit =
+      unitType === UnitType.Warship ||
+      unitType === UnitType.Submarine ||
+      unitType === UnitType.TradeShip;
+    const borderColor = isNavalUnit
+      ? border.lighten(0.1).toRgbString()
+      : border.darken(0.1).toRgbString();
+
+    // Get level, default to 1 if undefined/null, ensure it's a valid number
+    const level = (unit.level && unit.level()) || 1;
+    const cache = isTargeting ? this.targetingTextureCache : this.textureCache;
+    const cacheSuffix = isTargeting ? "-targeting" : "";
+    const cacheKey = `${unitType}-${unit.owner().id()}-${borderColor}-${level}${cacheSuffix}`;
+
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey)!;
+    }
+
+    const iconImage = this.getIconImage(unitType);
+    // If icon not loaded yet, return empty texture and don't cache
+    // It will be recreated once the icon loads
+    if (!iconImage || !iconImage.complete) {
+      return PIXI.Texture.EMPTY;
+    }
+
+    const CANVAS_PX = Math.max(1, Math.round(ICON_DIM * ICON_TEXTURE_QUALITY));
+    const canvas = document.createElement("canvas");
+    canvas.width = CANVAS_PX;
+    canvas.height = CANVAS_PX;
+    const ctx = canvas.getContext("2d")!;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.scale(ICON_TEXTURE_QUALITY, ICON_TEXTURE_QUALITY);
+
+    // Draw icon (NO background, just icon + stars)
+    // Apply player color to icon (targeting shown by marker, not color change)
+    const colored = this.getImageColored(iconImage, borderColor);
+    const padded = 4;
+    const maxW = ICON_DIM - padded * 2;
+    const maxH = ICON_DIM - padded * 2;
+    const iw = Math.max(1, colored.width);
+    const ih = Math.max(1, colored.height);
+    const baseScale = Math.min(maxW / iw, maxH / ih);
+    // Reduce bomber and fighterjet size to match old sprite sizes
+    const factor =
+      unitType === UnitType.Bomber || unitType === UnitType.FighterJet
+        ? 1.0
+        : 1.4;
+    const dw = Math.min(
+      ICON_DIM,
+      Math.max(1, Math.round(iw * baseScale * factor)),
+    );
+    const dh = Math.min(
+      ICON_DIM,
+      Math.max(1, Math.round(ih * baseScale * factor)),
+    );
+    const dx = Math.round((ICON_DIM - dw) / 2);
+    const dy = Math.round((ICON_DIM - dh) / 2);
+
+    // Draw icon with player color
+    ctx.drawImage(colored, dx, dy, dw, dh);
+
+    // Draw level indicator stars (bronze) in top-left corner
+    // FighterJets have 4 levels, others typically have 3
+    // TradeShips don't have levels, so skip stars
+    // Bombers don't show levels (rotation makes badges look bad)
+    if (
+      unitType !== UnitType.TradeShip &&
+      unitType !== UnitType.Bomber &&
+      level &&
+      level >= 1 &&
+      level <= 4
+    ) {
+      const tierColor = "#CD7F32"; // bronze
+      const starSize = 4;
+      const spacing = 0.3;
+      const padding = 1;
+      const startX = padding + starSize / 2;
+      const startY = padding + starSize / 2;
+
+      ctx.fillStyle = tierColor;
+      for (let i = 0; i < level; i++) {
+        const x = startX + i * (starSize + spacing);
+        this.drawStar(ctx, x, startY, starSize);
+      }
+    }
+
+    // Draw small red target marker in top-right when targeting
+    if (isTargeting) {
+      const markerSize = 5;
+      const padding = 1;
+      const centerX = ICON_DIM - padding - markerSize / 2;
+      const centerY = padding + markerSize / 2;
+
+      ctx.strokeStyle = "#FF0000";
+      ctx.lineWidth = 0.8;
+
+      // Draw crosshair
+      ctx.beginPath();
+      // Outer circle
+      ctx.arc(centerX, centerY, markerSize / 2, 0, Math.PI * 2);
+      ctx.stroke();
+      // Horizontal line
+      ctx.moveTo(centerX - markerSize / 2, centerY);
+      ctx.lineTo(centerX + markerSize / 2, centerY);
+      ctx.stroke();
+      // Vertical line
+      ctx.moveTo(centerX, centerY - markerSize / 2);
+      ctx.lineTo(centerX, centerY + markerSize / 2);
+      ctx.stroke();
+      ctx.closePath();
+    }
+
+    const texture = PIXI.Texture.from(canvas);
+    cache.set(cacheKey, texture);
+    return texture;
+  }
+
+  private drawStar(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    size: number,
+  ) {
+    const spikes = 5;
+    const outerRadius = size / 2;
+    const innerRadius = outerRadius * 0.4;
+    let rot = (Math.PI / 2) * 3;
+    const step = Math.PI / spikes;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - outerRadius);
+
+    for (let i = 0; i < spikes; i++) {
+      let x = cx + Math.cos(rot) * outerRadius;
+      let y = cy + Math.sin(rot) * outerRadius;
+      ctx.lineTo(x, y);
+      rot += step;
+
+      x = cx + Math.cos(rot) * innerRadius;
+      y = cy + Math.sin(rot) * innerRadius;
+      ctx.lineTo(x, y);
+      rot += step;
+    }
+
+    ctx.lineTo(cx, cy - outerRadius);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  private getImageColored(
+    image: HTMLImageElement,
+    color: string,
+  ): HTMLCanvasElement {
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.drawImage(image, 0, 0);
+    return canvas;
   }
 
   shouldTransform(): boolean {
@@ -170,7 +515,104 @@ export class UnitLayer implements Layer {
       this.updateUnitsSprites(zombieIds);
     }
 
+    // Clean up inactive PIXI sprites
+    for (let i = this.pixiRenders.length - 1; i >= 0; i--) {
+      const render = this.pixiRenders[i];
+      if (!render.unit.isActive()) {
+        this.removePixiUnit(render.unit.id());
+      }
+    }
+
+    // Update bomber-at-airfield cache for all active bombers
+    for (const render of this.pixiRenders) {
+      if (render.unit.type() === UnitType.Bomber && render.unit.isActive()) {
+        const atAirfield = this.game
+          .units(UnitType.Airfield)
+          .find(
+            (a) =>
+              a.owner() === render.unit.owner() &&
+              a.tile() === render.unit.tile() &&
+              a.isActive(),
+          );
+        this.bomberAtAirfield.set(render.unit.id(), !!atAirfield);
+      }
+    }
+
     this.updateGhosts();
+    this.updatePixiUnits();
+  }
+
+  private updatePixiUnits() {
+    if (!this.pixiRenderer) return;
+
+    const updates = this.game.updatesSinceLastTick();
+    const unitUpdates = updates !== null ? updates[GameUpdateType.Unit] : [];
+
+    const metrics = PerformanceMetrics.getInstance();
+
+    // Track execution activity by counting unit updates per type
+    // This gives us a proxy for server-side execution activity
+    if (metrics.enabled) {
+      for (const u of unitUpdates) {
+        const unitView = this.game.unit(u.id);
+        if (unitView && PIXI_UNIT_TYPES.has(unitView.type())) {
+          // Estimate execution time based on update frequency
+          // Units that update more frequently are doing more server work
+          metrics.recordUnitExecutionTime(unitView.type(), 0.1); // Small constant per update
+        }
+      }
+    }
+
+    for (const u of unitUpdates) {
+      const unitView = this.game.unit(u.id);
+      if (unitView === undefined) continue;
+
+      // Only handle PIXI units
+      if (!PIXI_UNIT_TYPES.has(unitView.type())) {
+        continue;
+      }
+
+      if (unitView.isActive()) {
+        if (!this.pixiSeenUnits.has(unitView.id())) {
+          // New PIXI unit
+          this.pixiSeenUnits.add(unitView.id());
+          const sprite = this.createPixiSprite(unitView);
+          const render = new UnitRenderInfo(unitView, sprite);
+          // All units now use horizontal flip - no rotation needed
+          this.pixiRenders.push(render);
+        }
+        // Note: All units now use horizontal flip - no rotation angle tracking needed
+      } else {
+        // Unit removed
+        this.removePixiUnit(unitView.id());
+        this.bomberAtAirfield.delete(unitView.id());
+      }
+    }
+  }
+
+  private removePixiUnit(unitId: number) {
+    const idx = this.pixiRenders.findIndex((r) => r.unit.id() === unitId);
+    if (idx !== -1) {
+      const render = this.pixiRenders[idx];
+      render.pixiSprite.destroy();
+      this.pixiRenders.splice(idx, 1);
+      this.pixiSeenUnits.delete(unitId);
+    }
+  }
+
+  private createPixiSprite(unit: UnitView): PIXI.Sprite {
+    // Shells use Graphics instead of Sprite textures
+    if (unit.type() === UnitType.Shell) {
+      const graphics = new PIXI.Graphics() as any;
+      this.pixiStage.addChild(graphics);
+      return graphics; // Graphics extends Container like Sprite
+    }
+
+    const texture = this.createPixiTexture(unit, false);
+    const sprite = new PIXI.Sprite(texture);
+    sprite.anchor.set(0.5, 0.5);
+    this.pixiStage.addChild(sprite);
+    return sprite;
   }
 
   init() {
@@ -180,9 +622,18 @@ export class UnitLayer implements Layer {
     this.eventBus.on(ReplaySpeedChangeEvent, (e) =>
       this.onReplaySpeedChange(e.replaySpeedMultiplier),
     );
+
+    window.addEventListener("resize", () => this.resizePixiCanvas());
+
     this.redraw();
 
     loadAllSprites();
+
+    // Setup PIXI renderer for GPU-accelerated units (async but non-blocking)
+    // Once ready, rebuild PIXI sprites for any units that exist
+    this.setupPixiRenderer().then(() => {
+      this.redrawPixiUnits();
+    });
   }
 
   /**
@@ -196,6 +647,9 @@ export class UnitLayer implements Layer {
       return [];
     }
     const clickRef = this.game.ref(cell.x, cell.y);
+
+    // Track query for performance monitoring
+    PerformanceMetrics.getInstance().recordUnitQuery(UnitType.Warship);
 
     // Only select warships owned by the player
     return this.game
@@ -381,8 +835,12 @@ export class UnitLayer implements Layer {
 
   renderLayer(context: CanvasRenderingContext2D) {
     this.updateInterpolatedUnits();
+
+    // Update and render PIXI units
+    this.renderPixiUnits(context);
+
     PerformanceMetrics.getInstance().incrementVisibleEntities(
-      this.renderedUnits.size,
+      this.renderedUnits.size + this.pixiRenders.length,
     );
     context.drawImage(
       this.transportShipTrailCanvas,
@@ -407,6 +865,228 @@ export class UnitLayer implements Layer {
         this.game.height(),
       );
     }
+  }
+
+  private renderPixiUnits(mainContext: CanvasRenderingContext2D) {
+    if (!this.pixiRenderer) return;
+
+    const metrics = PerformanceMetrics.getInstance();
+    const unitCounts = new Map<UnitType, number>();
+    const renderTimes = new Map<UnitType, number>();
+
+    // Get viewport bounds for visibility checking
+    const canvasWidth = this.pixiRenderer.canvas.width;
+    const canvasHeight = this.pixiRenderer.canvas.height;
+
+    // Update all PIXI sprite positions and states
+    for (const render of this.pixiRenders) {
+      const startTime = metrics.enabled ? performance.now() : 0;
+      this.updatePixiSpritePosition(render);
+      if (metrics.enabled) {
+        const duration = performance.now() - startTime;
+        const currentTime = renderTimes.get(render.unit.type()) ?? 0;
+        renderTimes.set(render.unit.type(), currentTime + duration);
+
+        // Track visible count - check if sprite is actually in viewport bounds
+        if (render.pixiSprite.visible) {
+          const sprite = render.pixiSprite;
+          const bounds = sprite.getBounds();
+          const isInViewport =
+            bounds.x + bounds.width >= 0 &&
+            bounds.y + bounds.height >= 0 &&
+            bounds.x <= canvasWidth &&
+            bounds.y <= canvasHeight;
+
+          if (isInViewport) {
+            const count = unitCounts.get(render.unit.type()) ?? 0;
+            unitCounts.set(render.unit.type(), count + 1);
+          }
+        }
+      }
+    }
+
+    // Record accumulated render times and visible counts
+    if (metrics.enabled) {
+      renderTimes.forEach((time, unitType) => {
+        metrics.recordUnitRenderTime(unitType, time);
+      });
+      unitCounts.forEach((count, unitType) => {
+        metrics.recordUnitVisible(unitType, count);
+      });
+    }
+
+    // Update ghost sprite positions
+    this.updatePixiGhosts();
+
+    // Render PIXI stage to its canvas
+    this.pixiRenderer.render(this.pixiStage);
+
+    // Save current transform, reset to identity, draw PIXI canvas, then restore
+    // This prevents the canvas transform from affecting the PIXI canvas positioning
+    mainContext.save();
+    mainContext.setTransform(1, 0, 0, 1, 0, 0); // Reset to identity matrix
+    mainContext.drawImage(this.pixiRenderer.canvas, 0, 0);
+    mainContext.restore();
+  }
+
+  private updatePixiSpritePosition(render: UnitRenderInfo) {
+    const unit = render.unit;
+
+    // Handle Shell projectiles with PIXI Graphics
+    if (unit.type() === UnitType.Shell) {
+      this.updateShellGraphics(render);
+      return;
+    }
+
+    // Hide bombers at their airfield (use cached check from updatePixiUnits)
+    if (unit.type() === UnitType.Bomber) {
+      const atAirfield = this.bomberAtAirfield.get(unit.id()) ?? false;
+      if (atAirfield) {
+        render.pixiSprite.visible = false;
+        return; // Skip rendering this bomber
+      } else {
+        render.pixiSprite.visible = true;
+      }
+
+      // Apply rotation to point bomber in movement direction
+      const angle = this.getUnitAngle(unit);
+      if (angle !== null) {
+        render.pixiSprite.rotation = angle;
+      }
+    }
+
+    // Handle submarine stealth opacity (75% when not detected/attacking/cooldown)
+    if (
+      unit.type() === UnitType.Submarine &&
+      unit.owner() === this.game.myPlayer()
+    ) {
+      const isAttacking = unit.isAttacking();
+      const isDetected = unit.isDetectedByNavalUnit();
+      const isOnCooldown = unit.isCooldown();
+      const isVisibleToEnemies = isAttacking || isDetected || isOnCooldown;
+      render.pixiSprite.alpha = isVisibleToEnemies ? 1.0 : 0.75;
+    } else {
+      render.pixiSprite.alpha = 1.0;
+    }
+
+    // Use interpolated position for smooth movement
+    // Only interpolate if unit is actually moving between tiles
+    const lastTile = unit.lastTile();
+    const currentTile = unit.tile();
+    const isMoving = lastTile !== currentTile;
+
+    let position: { x: number; y: number };
+    if (isMoving) {
+      const alpha = this.computeTickAlpha();
+      position = this.interpolatePosition(unit, alpha);
+    } else {
+      // Unit is stationary - use exact tile position
+      position = {
+        x: this.game.x(currentTile),
+        y: this.game.y(currentTile),
+      };
+    }
+
+    const screenPos = this.transformHandler.worldToScreenCoordinates(
+      new Cell(position.x, position.y),
+    );
+
+    render.pixiSprite.x = Math.floor(screenPos.x + 0.5);
+    render.pixiSprite.y = Math.floor(screenPos.y + 0.5);
+
+    // Set scale (including horizontal flip for all PIXI units based on direction)
+    const baseScale = this.iconScreenScale();
+
+    // All PIXI units except Bomber: flip horizontally based on east/west movement
+    // Bombers use rotation instead of flip to handle all directions
+    if (
+      unit.type() === UnitType.Warship ||
+      unit.type() === UnitType.Submarine ||
+      unit.type() === UnitType.FighterJet ||
+      unit.type() === UnitType.TradeShip
+    ) {
+      if (lastTile && currentTile) {
+        const lastX = this.game.x(lastTile);
+        const currentX = this.game.x(currentTile);
+        const dx = currentX - lastX;
+        // Only update facing direction when moving horizontally
+        if (dx !== 0) {
+          render.facingLeft = dx < 0;
+        }
+        // Use stored facing direction
+        const scaleX = render.facingLeft ? -baseScale : baseScale;
+        render.pixiSprite.scale.set(scaleX, baseScale);
+      } else {
+        render.pixiSprite.scale.set(baseScale, baseScale);
+      }
+    } else {
+      render.pixiSprite.scale.set(baseScale, baseScale);
+    }
+
+    // Handle targeting tint for Warship and FighterJet
+    const isTargeting = this.isUnitTargeting(unit);
+    const texture = this.createPixiTexture(unit, isTargeting);
+    if (render.pixiSprite.texture !== texture) {
+      render.pixiSprite.texture = texture;
+    }
+
+    // All units now use horizontal flip - no rotation needed
+  }
+
+  private updateShellGraphics(render: UnitRenderInfo) {
+    const unit = render.unit;
+    const graphics = render.pixiSprite as any as PIXI.Graphics;
+
+    graphics.clear();
+
+    // Get color
+    const color = this.theme.borderColor(unit.owner());
+    const colorNum = parseInt(color.toHex().substring(1), 16);
+
+    // Interpolate position
+    const alpha = this.computeTickAlpha();
+    const position = this.interpolatePosition(unit, alpha);
+
+    const screenPos = this.transformHandler.worldToScreenCoordinates(
+      new Cell(position.x, position.y),
+    );
+
+    // Draw trail from last position
+    const lastTile = unit.lastTile();
+    const lastWorldPos = { x: this.game.x(lastTile), y: this.game.y(lastTile) };
+
+    if (lastWorldPos.x !== position.x || lastWorldPos.y !== position.y) {
+      const lastScreenPos = this.transformHandler.worldToScreenCoordinates(
+        new Cell(lastWorldPos.x, lastWorldPos.y),
+      );
+
+      // Draw trail line
+      graphics.lineStyle(1, colorNum, 0.7);
+      graphics.moveTo(lastScreenPos.x, lastScreenPos.y);
+      graphics.lineTo(screenPos.x, screenPos.y);
+    }
+
+    // Draw center pixel (1x1)
+    graphics.beginFill(colorNum, 1.0);
+    graphics.drawRect(screenPos.x - 0.5, screenPos.y - 0.5, 1, 1);
+    graphics.endFill();
+
+    // Draw outer glow (2x2)
+    graphics.beginFill(colorNum, 0.4);
+    graphics.drawRect(screenPos.x - 1, screenPos.y - 1, 2, 2);
+    graphics.endFill();
+  }
+
+  private isUnitTargeting(unit: UnitView): boolean {
+    // Warships, Submarines, and FighterJets show target marker when attacking
+    if (
+      unit.type() === UnitType.Warship ||
+      unit.type() === UnitType.Submarine ||
+      unit.type() === UnitType.FighterJet
+    ) {
+      return unit.targetUnitId() !== undefined;
+    }
+    return false;
   }
 
   onAlternativeViewEvent(event: AlternateViewEvent) {
@@ -440,11 +1120,15 @@ export class UnitLayer implements Layer {
     this.renderedUnits.clear();
     const units = this.game.units();
     units.forEach((u) => {
-      if (UNIT_LAYER_TYPES.has(u.type())) {
+      // Only add non-PIXI units to renderedUnits (PIXI units are tracked separately)
+      if (UNIT_LAYER_TYPES.has(u.type()) && !PIXI_UNIT_TYPES.has(u.type())) {
         this.renderedUnits.set(u.id(), u);
       }
     });
     this.updateUnitsSprites(units.map((unit) => unit.id()));
+
+    // Rebuild PIXI sprites
+    this.redrawPixiUnits();
 
     // After redrawing units, render submarine ghosts (last known positions)
     this.renderedGhosts.clear();
@@ -455,7 +1139,7 @@ export class UnitLayer implements Layer {
       expiresAt: number;
       ownerID: number;
     }>) {
-      this.drawGhost(ghost);
+      this.createPixiGhost(ghost);
       this.renderedGhosts.set(ghost.id, ghost.pos);
     }
 
@@ -473,6 +1157,33 @@ export class UnitLayer implements Layer {
     });
   }
 
+  private redrawPixiUnits() {
+    if (!this.pixiRenderer) return;
+
+    // Clear existing PIXI sprites
+    for (const render of this.pixiRenders) {
+      render.pixiSprite.destroy();
+    }
+    this.pixiRenders = [];
+    this.pixiSeenUnits.clear();
+
+    // Clear existing ghost sprites
+    for (const ghost of this.ghostRenders) {
+      ghost.pixiSprite.destroy();
+    }
+    this.ghostRenders = [];
+
+    // Recreate sprites for all active PIXI units
+    const units = this.game.units();
+    for (const unit of units) {
+      if (PIXI_UNIT_TYPES.has(unit.type()) && unit.isActive()) {
+        this.pixiSeenUnits.add(unit.id());
+        const sprite = this.createPixiSprite(unit);
+        this.pixiRenders.push(new UnitRenderInfo(unit, sprite));
+      }
+    }
+  }
+
   private updateUnitsSprites(unitIds: number[]) {
     const unitsToUpdate: UnitView[] = [];
     const unitsToRemove: UnitView[] = [];
@@ -481,7 +1192,11 @@ export class UnitLayer implements Layer {
       for (const id of unitIds) {
         const unit = this.game.unit(id);
         if (unit) {
-          if (UNIT_LAYER_TYPES.has(unit.type())) {
+          // Only handle non-PIXI units (PIXI units tracked separately)
+          if (
+            UNIT_LAYER_TYPES.has(unit.type()) &&
+            !PIXI_UNIT_TYPES.has(unit.type())
+          ) {
             unitsToUpdate.push(unit);
             this.renderedUnits.set(id, unit);
           }
@@ -573,8 +1288,62 @@ export class UnitLayer implements Layer {
   ) {
     // Suppress base-canvas sprites for units that are also drawn via interpolation overlay
     this.drawingBasePass = true;
+
+    const metrics = PerformanceMetrics.getInstance();
+    const canvasUnitCounts = new Map<UnitType, number>();
+    const canvasRenderTimes = new Map<UnitType, number>();
+
+    // Get canvas viewport bounds for visibility checking
+    const canvasWidth = this.context.canvas.width;
+    const canvasHeight = this.context.canvas.height;
+    const halfWidth = this.game.width() / 2;
+    const halfHeight = this.game.height() / 2;
+
     try {
-      unitViews.forEach((unitView) => this.onUnitEvent(unitView, angleByUnit));
+      for (const unitView of unitViews) {
+        if (!PIXI_UNIT_TYPES.has(unitView.type())) {
+          const startTime = metrics.enabled ? performance.now() : 0;
+          this.onUnitEvent(unitView, angleByUnit);
+          if (metrics.enabled) {
+            const duration = performance.now() - startTime;
+            const currentTime = canvasRenderTimes.get(unitView.type()) ?? 0;
+            canvasRenderTimes.set(unitView.type(), currentTime + duration);
+
+            // Check if unit is actually in viewport
+            const worldX = this.game.x(unitView.tile());
+            const worldY = this.game.y(unitView.tile());
+            const screenPos = this.transformHandler.worldToScreenCoordinates(
+              new Cell(worldX, worldY),
+            );
+
+            // Check if position is within canvas bounds (with some margin for sprite size)
+            const margin = 50; // Sprite can be up to 50px
+            const isInViewport =
+              screenPos.x >= -margin &&
+              screenPos.y >= -margin &&
+              screenPos.x <= canvasWidth + margin &&
+              screenPos.y <= canvasHeight + margin;
+
+            if (isInViewport) {
+              const count = canvasUnitCounts.get(unitView.type()) ?? 0;
+              canvasUnitCounts.set(unitView.type(), count + 1);
+            }
+          }
+        } else {
+          // PIXI units still need to be processed for other effects
+          this.onUnitEvent(unitView, angleByUnit);
+        }
+      }
+
+      // Record accumulated times and counts
+      if (metrics.enabled) {
+        canvasRenderTimes.forEach((time, unitType) => {
+          metrics.recordUnitRenderTime(unitType, time);
+        });
+        canvasUnitCounts.forEach((count, unitType) => {
+          metrics.recordUnitVisible(unitType, count);
+        });
+      }
     } finally {
       this.drawingBasePass = false;
     }
@@ -612,6 +1381,11 @@ export class UnitLayer implements Layer {
 
     for (const unit of units) {
       if (!unit.isActive()) {
+        continue;
+      }
+
+      // Skip PIXI units - they're rendered by the PIXI renderer
+      if (PIXI_UNIT_TYPES.has(unit.type())) {
         continue;
       }
 
@@ -783,6 +1557,11 @@ export class UnitLayer implements Layer {
   }
 
   onUnitEvent(unit: UnitView, angleByUnit?: Map<UnitView, number | null>) {
+    // Skip PIXI units - they're rendered by the PIXI renderer
+    if (PIXI_UNIT_TYPES.has(unit.type())) {
+      return;
+    }
+
     // Check if unit was deactivated
     if (!unit.isActive()) {
       this.handleUnitDeactivation(unit);
@@ -1415,9 +2194,8 @@ export class UnitLayer implements Layer {
 
       let angle = Math.atan2(dy, dx);
 
-      if (unit.type() === UnitType.FighterJet) {
-        angle += Math.PI / 2;
-      }
+      // Note: FighterJet SVG icon is already oriented correctly (pointing right at 0 degrees)
+      // Old PNG sprites needed +PI/2 adjustment, but new SVG icons don't
 
       if (lastAngle !== undefined) {
         // Determines how quickly the unit realigns its orientation.
@@ -1517,75 +2295,92 @@ export class UnitLayer implements Layer {
     }>) {
       currentGhostIds.add(ghost.id);
       if (!this.renderedGhosts.has(ghost.id)) {
-        this.drawGhost(ghost);
+        this.createPixiGhost(ghost);
         this.renderedGhosts.set(ghost.id, ghost.pos);
       }
     }
 
+    // Remove ghosts that are no longer active
+    const ghostsToRemove: number[] = [];
     for (const [id, pos] of this.renderedGhosts) {
       if (!currentGhostIds.has(id)) {
-        this.clearGhost({ pos, ownerID: 0 }); // ownerID not needed for clearing
-        this.renderedGhosts.delete(id);
-        // If a unit is currently at this position, redraw it so it doesn't disappear
-        const unitAtPos = this.game.units().find((u) => u.tile() === pos);
-        if (unitAtPos) {
-          this.drawSprite(unitAtPos);
-        }
+        ghostsToRemove.push(id);
       }
+    }
+
+    for (const id of ghostsToRemove) {
+      this.removePixiGhost(id);
+      this.renderedGhosts.delete(id);
+    }
+  }
+
+  private createPixiGhost(ghost: { id: number; pos: number; ownerID: number }) {
+    if (!this.pixiRenderer) return;
+
+    // Create a dummy unit view to get the correct texture
+    const owner = this.game.playerBySmallID(ghost.ownerID);
+    if (!owner) return;
+
+    const dummyUnit = {
+      tile: () => ghost.pos,
+      type: () => UnitType.Submarine,
+      owner: () => owner,
+      level: () => 1,
+      target: () => null,
+      isActive: () => true,
+    } as unknown as UnitView;
+
+    const texture = this.createPixiTexture(dummyUnit, false);
+    const sprite = new PIXI.Sprite(texture);
+    sprite.anchor.set(0.5, 0.5);
+    sprite.alpha = 0.3; // Ghosts at 30% opacity
+
+    // Position the ghost
+    const worldX = this.game.x(ghost.pos);
+    const worldY = this.game.y(ghost.pos);
+    const screenPos = this.transformHandler.worldToScreenCoordinates(
+      new Cell(worldX, worldY),
+    );
+    sprite.x = Math.floor(screenPos.x + 0.5);
+    sprite.y = Math.floor(screenPos.y + 0.5);
+    sprite.scale.set(this.iconScreenScale());
+
+    this.pixiStage.addChild(sprite);
+    this.ghostRenders.push(
+      new GhostRenderInfo(ghost.id, { x: worldX, y: worldY }, sprite),
+    );
+  }
+
+  private removePixiGhost(ghostId: number) {
+    // Find ghost sprite by ID
+    const idx = this.ghostRenders.findIndex(
+      (ghost) => ghost.ghostId === ghostId,
+    );
+
+    if (idx !== -1) {
+      const ghostRender = this.ghostRenders[idx];
+      ghostRender.pixiSprite.destroy();
+      this.ghostRenders.splice(idx, 1);
+    }
+  }
+
+  private updatePixiGhosts() {
+    // Update ghost positions on camera transform
+    for (const ghostRender of this.ghostRenders) {
+      const screenPos = this.transformHandler.worldToScreenCoordinates(
+        new Cell(ghostRender.position.x, ghostRender.position.y),
+      );
+      ghostRender.pixiSprite.x = Math.floor(screenPos.x + 0.5);
+      ghostRender.pixiSprite.y = Math.floor(screenPos.y + 0.5);
+      ghostRender.pixiSprite.scale.set(this.iconScreenScale());
     }
   }
 
   private clearGhost(ghost: { pos: number; ownerID: number }) {
-    // Create a dummy unit to get the sprite size
-    // We need a valid owner for getColoredSprite, but for size it doesn't matter much
-    // as long as it returns a sprite.
-    const dummyUnit = {
-      tile: () => ghost.pos,
-      type: () => UnitType.Submarine,
-      owner: () =>
-        this.game.playerBySmallID(ghost.ownerID) || this.game.players()[0],
-      targetable: () => true,
-      isActive: () => true,
-      lastTile: () => ghost.pos,
-    } as unknown as UnitView;
-
-    const spriteSize = this.getSpriteSize(dummyUnit);
-    const newWidth = spriteSize; // Ghosts are drawn at 1.0 scale
-    const newHeight = spriteSize;
-
-    // Badge overlay parameters: badge sits 1px outside top-right
-    // Ghosts default to level 1 (bronze) badge
-    const badgeSize = Math.max(2, Math.min(3, Math.round(newWidth * 0.18)));
-    const offset = 1;
-    const overlayTop = badgeSize + offset; // extend upwards to cover outside badge
-    const extraRight = badgeSize + offset; // full right-side extension beyond sprite
-
-    const padding = 2; // small safety margin around computed bounds
-    const maxHalfWidth = newWidth / 2 + extraRight;
-
-    const cx = Math.round(this.game.x(ghost.pos));
-    const cy = Math.round(this.game.y(ghost.pos));
-
-    const left = cx - maxHalfWidth - padding;
-    const top = cy - newHeight / 2 - overlayTop - padding;
-    const width = maxHalfWidth * 2 + padding * 2;
-    const height = newHeight + overlayTop + padding * 2;
-
-    this.context.clearRect(left, top, width, height);
+    // No longer needed for PIXI rendering - kept for compatibility
   }
 
   private drawGhost(ghost: { id: number; pos: number; ownerID: number }) {
-    this.context.save();
-    this.context.globalAlpha = 0.3;
-    const dummyUnit = {
-      tile: () => ghost.pos,
-      type: () => UnitType.Submarine,
-      owner: () => this.game.playerBySmallID(ghost.ownerID),
-      targetable: () => true,
-      isActive: () => true,
-      lastTile: () => ghost.pos,
-    } as unknown as UnitView;
-    this.drawSprite(dummyUnit as UnitView);
-    this.context.restore();
+    // No longer needed for PIXI rendering - kept for compatibility
   }
 }

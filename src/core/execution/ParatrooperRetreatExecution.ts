@@ -1,7 +1,8 @@
-import { Execution, Game, Player, UnitType } from "../game/Game";
+import { Execution, Game, Player, Unit, UnitType } from "../game/Game";
 
 export class ParatrooperRetreatExecution implements Execution {
   private active = true;
+  private paratrooper: Unit | null = null;
 
   constructor(
     private player: Player,
@@ -9,9 +10,10 @@ export class ParatrooperRetreatExecution implements Execution {
   ) {}
 
   init(mg: Game, ticks: number): void {
-    const unit = this.player.units().find((u) => u.id() === this.unitID);
-    if (unit && unit.type() === UnitType.Paratrooper) {
-      unit.delete();
+    this.paratrooper =
+      this.player.units().find((u) => u.id() === this.unitID) ?? null;
+    if (this.paratrooper && this.paratrooper.type() === UnitType.Paratrooper) {
+      this.paratrooper.delete();
     }
     this.active = false;
   }

@@ -124,24 +124,17 @@ export class ArtilleryExecution implements Execution {
       structureTypes,
     );
 
-    // Also check for nearby enemy artillery
-    const allArtillery = this.mg.units(UnitType.Artillery);
-    const nearbyArtillery = allArtillery.filter((art) => {
-      if (art === this.artillery || art.owner() === this.artillery.owner()) {
-        return false;
-      }
-      if (art.owner().isFriendly(this.artillery.owner())) {
-        return false;
-      }
-      if (!this.artillery.owner().isAtWarWith(art.owner())) {
-        return false;
-      }
-      const distSquared = this.mg.euclideanDistSquared(
-        this.artillery.tile(),
-        art.tile(),
-      );
-      return distSquared <= targetingRange * targetingRange;
-    });
+    // Also check for nearby enemy artillery using spatial lookup
+    const nearbyArtillery = this.mg
+      .nearbyUnits(this.artillery.tile()!, targetingRange, [UnitType.Artillery])
+      .filter(
+        ({ unit }) =>
+          unit !== this.artillery &&
+          unit.owner() !== this.artillery.owner() &&
+          !unit.owner().isFriendly(this.artillery.owner()) &&
+          this.artillery.owner().isAtWarWith(unit.owner()),
+      )
+      .map(({ unit }) => unit);
 
     const enemyArtillery: { unit: Unit; distSquared: number }[] = [];
     const defensePosts: { unit: Unit; distSquared: number }[] = [];

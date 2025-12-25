@@ -64,11 +64,9 @@ export class CityAABulletExecution implements Execution {
       return;
     }
 
-    // Estimate time to intercept (simple approximation)
-    // Time = distance / (bullet speed - closing rate component)
-    const closingRate = (dx * targetVx + dy * targetVy) / dist;
-    const effectiveSpeed = Math.max(1, this.speed - closingRate);
-    const timeToIntercept = dist / effectiveSpeed;
+    // Simplified intercept calculation: time = distance / bullet_speed
+    // This assumes bullet is much faster than target (15 vs 2-4)
+    const timeToIntercept = dist / this.speed;
 
     // Predict where target will be
     const predictedX = Math.round(targetX + targetVx * timeToIntercept);
@@ -96,11 +94,9 @@ export class CityAABulletExecution implements Execution {
       !this.target.isActive() ||
       targetOwner === this.bullet.owner() ||
       this._owner.isFriendly(targetOwner) ||
-      !this.canEngageTarget(targetOwner, this.target)
+      !this.canEngageTarget(targetOwner, this.target) ||
+      this.target.isAtSourceAirfield()
     ) {
-      console.log(
-        `AA bullet missed: target ${!this.target.isActive() ? "destroyed" : "became friendly"}`,
-      );
       this.bullet.delete(false);
       this.active = false;
       return;

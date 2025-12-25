@@ -1302,5 +1302,17 @@
       "title": "Betrayal",
       "description": "Betrayal weakens your defenses temporarily. Choose your moment carefully."
     }
+  },
+  "hardware_warning": {
+    "title": "⚠️ Hardware Acceleration Disabled",
+    "message": "Hardware acceleration is disabled or unavailable. This game requires GPU acceleration for playable performance.",
+    "learn_more": "How to fix",
+    "dismiss": "Dismiss"
+  },
+  "browser_warning": {
+    "title": "⚠️ Browser Not Optimized",
+    "message": "For best performance, use Chrome or Edge. Other browsers may experience significantly reduced performance.",
+    "learn_more": "How to fix",
+    "dismiss": "Dismiss"
   }
 }

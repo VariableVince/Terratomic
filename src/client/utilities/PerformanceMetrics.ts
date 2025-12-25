@@ -37,6 +37,20 @@ export class PerformanceMetrics {
   public unitComposition: Map<UnitType, number> = new Map();
   public visibleEntities: number = 0;
 
+  // Per-unit-type performance metrics
+  public unitRenderTime: Map<UnitType, number> = new Map();
+  public unitExecutionTime: Map<UnitType, number> = new Map();
+  public unitQueryCount: Map<UnitType, number> = new Map();
+  public unitVisibleCount: Map<UnitType, number> = new Map();
+  private unitRenderBuffers: Map<UnitType, SmoothingBuffer> = new Map();
+  private unitExecBuffers: Map<UnitType, SmoothingBuffer> = new Map();
+
+  // Per-execution-type performance metrics
+  private executionTime = new Map<string, number>(); // Total time per type this tick
+  private executionCount = new Map<string, number>(); // Count per type this tick
+  private executionTimeSmoothed = new Map<string, SmoothingBuffer>();
+  private executionCountSmoothed = new Map<string, SmoothingBuffer>();
+
   public updateUnitComposition(composition: Map<UnitType, number>) {
     this.unitComposition = composition;
   }
@@ -169,6 +183,114 @@ export class PerformanceMetrics {
       this.memory = Math.round(
         (performance as any).memory.usedJSHeapSize / 1024 / 1024,
       );
+    }
+  }
+
+  // Per-unit-type tracking methods
+  public recordUnitRenderTime(unitType: UnitType, duration: number) {
+    if (!this.enabled) return;
+    let buffer = this.unitRenderBuffers.get(unitType);
+    if (!buffer) {
+      buffer = new SmoothingBuffer(2000);
+      this.unitRenderBuffers.set(unitType, buffer);
+    }
+    buffer.push(duration);
+    this.unitRenderTime.set(unitType, buffer.getAverage());
+  }
+
+  public recordUnitExecutionTime(unitType: UnitType, duration: number) {
+    if (!this.enabled) return;
+    let buffer = this.unitExecBuffers.get(unitType);
+    if (!buffer) {
+      buffer = new SmoothingBuffer(2000);
+      this.unitExecBuffers.set(unitType, buffer);
+    }
+    buffer.push(duration);
+    this.unitExecutionTime.set(unitType, buffer.getAverage());
+  }
+
+  public recordUnitQuery(unitType: UnitType) {
+    if (!this.enabled) return;
+    const current = this.unitQueryCount.get(unitType) ?? 0;
+    this.unitQueryCount.set(unitType, current + 1);
+  }
+
+  public recordUnitVisible(unitType: UnitType, count: number) {
+    if (!this.enabled) return;
+    this.unitVisibleCount.set(unitType, count);
+  }
+
+  public resetUnitQueryCounts() {
+    if (!this.enabled) return;
+    this.unitQueryCount.clear();
+  }
+
+  // Execution performance tracking
+  public recordExecutionTime(typeName: string, milliseconds: number): void {
+    if (!this.enabled) return;
+
+    this.executionTime.set(
+      typeName,
+      (this.executionTime.get(typeName) ?? 0) + milliseconds,
+    );
+    this.executionCount.set(
+      typeName,
+      (this.executionCount.get(typeName) ?? 0) + 1,
+    );
+  }
+
+  public commitExecutionMetrics(): void {
+    if (!this.enabled) return;
+
+    for (const [typeName, time] of this.executionTime) {
+      if (!this.executionTimeSmoothed.has(typeName)) {
+        this.executionTimeSmoothed.set(typeName, new SmoothingBuffer(2000));
+        this.executionCountSmoothed.set(typeName, new SmoothingBuffer(2000));
+      }
+
+      this.executionTimeSmoothed.get(typeName)!.push(time);
+      this.executionCountSmoothed
+        .get(typeName)!
+        .push(this.executionCount.get(typeName)!);
+    }
+
+    this.executionTime.clear();
+    this.executionCount.clear();
+  }
+
+  public getExecutionMetrics(): Array<{
+    type: string;
+    time: number;
+    count: number;
+  }> {
+    const result: Array<{ type: string; time: number; count: number }> = [];
+
+    for (const [typeName, buffer] of this.executionTimeSmoothed) {
+      result.push({
+        type: typeName.replace("Execution", ""), // Remove suffix for display
+        time: buffer.getAverage(),
+        count: this.executionCountSmoothed.get(typeName)!.getAverage(),
+      });
+    }
+
+    return result.sort((a, b) => b.time - a.time); // Sort by time descending
+  }
+
+  // Receive execution metrics from worker thread
+  public setExecutionMetrics(
+    metrics: Array<{ type: string; time: number; count: number }>,
+  ): void {
+    // Update smoothed buffers with data from worker
+    for (const metric of metrics) {
+      const typeName = metric.type + "Execution"; // Restore suffix
+
+      if (!this.executionTimeSmoothed.has(typeName)) {
+        this.executionTimeSmoothed.set(typeName, new SmoothingBuffer(2000));
+        this.executionCountSmoothed.set(typeName, new SmoothingBuffer(2000));
+      }
+
+      this.executionTimeSmoothed.get(typeName)!.push(metric.time);
+      this.executionCountSmoothed.get(typeName)!.push(metric.count);
     }
   }
 }

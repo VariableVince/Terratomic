@@ -28,6 +28,11 @@ export class WarshipExecution implements Execution {
   private nextAAMissileFireTick = 0;
   private pseudoRandom: PseudoRandom;
 
+  // Target caching to reduce nearbyUnits() calls
+  private cachedTarget: Unit | undefined = undefined;
+  private cachedTargetTick = -999; // Start old so first scan happens
+  private readonly TARGET_CACHE_DURATION = 10; // ticks
+
   constructor(
     private input: (UnitParams<UnitType.Warship> & OwnerComp) | Unit,
     private desiredLevel: number = 1,
@@ -96,6 +101,26 @@ export class WarshipExecution implements Execution {
   }
 
   private findTargetUnit(): Unit | undefined {
+    const currentTick = this.mg.ticks();
+
+    // Check if cache is still valid (even if result was "no target")
+    if (currentTick - this.cachedTargetTick < this.TARGET_CACHE_DURATION) {
+      // If we cached a target, verify it's still valid
+      if (this.cachedTarget !== undefined) {
+        if (
+          this.cachedTarget.isActive() &&
+          this.isValidTarget(this.cachedTarget)
+        ) {
+          return this.cachedTarget;
+        }
+        // Cached target became invalid, fall through to rescan
+      } else {
+        // We cached "no target found" - return that result without rescanning
+        return undefined;
+      }
+    }
+
+    // Cache expired or cached target invalid - do full scan
     const hasPort = this.warship.owner().unitCount(UnitType.Port) > 0;
     const patrolRangeSquared = this.mg.config().warshipPatrolRange() ** 2;
 
@@ -177,7 +202,7 @@ export class WarshipExecution implements Execution {
       potentialTargets.push({ unit: unit, distSquared });
     }
 
-    return potentialTargets.sort((a, b) => {
+    const bestTarget = potentialTargets.sort((a, b) => {
       const { unit: unitA, distSquared: distA } = a;
       const { unit: unitB, distSquared: distB } = b;
 
@@ -232,6 +257,46 @@ export class WarshipExecution implements Execution {
       // If both are the same type, sort by distance (lower `distSquared` means closer)
       return distA - distB;
     })[0]?.unit;
+
+    // Update cache
+    this.cachedTarget = bestTarget;
+    this.cachedTargetTick = currentTick;
+
+    return bestTarget;
+  }
+
+  private isValidTarget(target: Unit): boolean {
+    if (!target.isActive()) return false;
+    if (target.health() <= 0) return false;
+    if (target.owner() === this.warship.owner()) return false;
+    if (target.owner().isFriendly(this.warship.owner())) return false;
+    if (this.alreadySentShell.has(target)) return false;
+
+    // Check if at war (for non-trade ships)
+    if (target.type() !== UnitType.TradeShip) {
+      if (!this.warship.owner().isAtWarWith(target.owner())) {
+        return false;
+      }
+    }
+
+    // Check submarine visibility
+    if (target.type() === UnitType.Submarine) {
+      const isVisible =
+        (target.isAttacking ?? false) ||
+        (target.isDetectedByNavalUnit ?? false) ||
+        this.mg.ticks() - (target.lastVisibleTick ?? -Infinity) < 30;
+      if (!isVisible) return false;
+    }
+
+    // Check range
+    const dist = this.mg.euclideanDistSquared(
+      this.warship.tile()!,
+      target.tile(),
+    );
+    const maxRange = this.mg.config().warshipTargettingRange();
+    if (dist > maxRange * maxRange) return false;
+
+    return true;
   }
 
   private shootTarget() {
@@ -445,7 +510,8 @@ export class WarshipExecution implements Execution {
       ({ unit, distSquared }) =>
         !unit.owner().isFriendly(this.warship.owner()) &&
         !unit.targetedBySAM() &&
-        distSquared <= rangeSq,
+        distSquared <= rangeSq &&
+        this.canEngageAircraft(unit.owner() as Player, unit as Unit),
     );
 
     if (nearbyAircraft.length === 0) {
@@ -498,6 +564,27 @@ export class WarshipExecution implements Execution {
       this.nextAAMissileFireTick =
         this.mg.ticks() + this.mg.config().warshipAACooldown();
     }
+  }
+
+  private canEngageAircraft(aircraftOwner: Player, aircraft: Unit): boolean {
+    if (this.warship.owner().isAtWarWith(aircraftOwner)) {
+      return true;
+    }
+
+    // Neutral behavior: only defend against incoming bomber/paratrooper attacks.
+    if (
+      aircraft.type() !== UnitType.Bomber &&
+      aircraft.type() !== UnitType.Paratrooper
+    ) {
+      return false;
+    }
+
+    const targetTile = aircraft.targetTile();
+    if (targetTile === undefined) {
+      return false;
+    }
+
+    return this.mg.owner(targetTile) === this.warship.owner();
   }
 }
 
