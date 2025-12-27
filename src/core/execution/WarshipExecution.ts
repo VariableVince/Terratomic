@@ -170,7 +170,17 @@ export class WarshipExecution implements Execution {
         }
       } else {
         // Non-trade ships: only target if at war with owner
-        if (!this.warship.owner().isAtWarWith(unit.owner())) {
+        const atWar = this.warship.owner().isAtWarWith(unit.owner());
+        let allow = atWar;
+        if (!allow && unit.type() === UnitType.TransportShip) {
+          // Treat incoming transport headed to us as hostile even if not formally at war
+          const targetPID = (unit as any).boatTargetPlayerID?.();
+          const incomingToMe =
+            targetPID === this.warship.owner().id() &&
+            !this.warship.owner().isFriendly(unit.owner());
+          allow = incomingToMe;
+        }
+        if (!allow) {
           continue;
         }
       }
@@ -272,10 +282,18 @@ export class WarshipExecution implements Execution {
     if (target.owner().isFriendly(this.warship.owner())) return false;
     if (this.alreadySentShell.has(target)) return false;
 
-    // Check if at war (for non-trade ships)
+    // Check if at war (for non-trade ships), with exception for incoming transport ships
     if (target.type() !== UnitType.TradeShip) {
       if (!this.warship.owner().isAtWarWith(target.owner())) {
-        return false;
+        if (target.type() === UnitType.TransportShip) {
+          const targetPID = (target as any).boatTargetPlayerID?.();
+          const incomingToMe =
+            targetPID === this.warship.owner().id() &&
+            !this.warship.owner().isFriendly(target.owner());
+          if (!incomingToMe) return false;
+        } else {
+          return false;
+        }
       }
     }
 
