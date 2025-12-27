@@ -344,6 +344,10 @@ export class RadialMenu implements Layer {
     if (!this.isVisible || this.clickedCell === null) return;
     const myPlayer = this.g.myPlayer();
     if (myPlayer === null || !myPlayer.isAlive()) return;
+    if (!this.g.isValidCoord(this.clickedCell.x, this.clickedCell.y)) {
+      this.closeMenu();
+      return;
+    }
     const tile = this.g.ref(this.clickedCell.x, this.clickedCell.y);
     if (this.originalTileOwner.isPlayer()) {
       if (this.g.owner(tile) !== this.originalTileOwner) {
@@ -474,6 +478,8 @@ export class RadialMenu implements Layer {
           }
 
           if (this.clickedCell === null) return;
+          if (!this.g.isValidCoord(this.clickedCell.x, this.clickedCell.y))
+            return;
 
           const dst = this.g.ref(this.clickedCell.x, this.clickedCell.y);
           const src = spawnTile ? this.g.ref(spawnTile.x, spawnTile.y) : null;
@@ -495,6 +501,8 @@ export class RadialMenu implements Layer {
     if (this.shouldShowAirAttack(myPlayer, tile)) {
       this.activateMenuElement(Slot.AirAttack, "#8B0000", airAttackIcon, () => {
         if (this.clickedCell === null) return;
+        if (!this.g.isValidCoord(this.clickedCell.x, this.clickedCell.y))
+          return;
         const dst = this.g.ref(this.clickedCell.x, this.clickedCell.y);
         this.eventBus.emit(
           new SendParatrooperAttackIntentEvent(
@@ -661,6 +669,7 @@ export class RadialMenu implements Layer {
     }
     console.log("Center button clicked");
     if (this.clickedCell === null) return;
+    if (!this.g.isValidCoord(this.clickedCell.x, this.clickedCell.y)) return;
     const clicked = this.g.ref(this.clickedCell.x, this.clickedCell.y);
     if (this.g.inSpawnPhase()) {
       this.eventBus.emit(new SendSpawnIntentEvent(clicked));
