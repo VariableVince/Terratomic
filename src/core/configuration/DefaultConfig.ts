@@ -904,6 +904,10 @@ export class DefaultConfig implements Config {
       : this.pastelTheme;
   }
 
+  showBotPersonalityNames(): boolean {
+    return false;
+  }
+
   attackLogic(
     gm: Game,
     attackTroops: number,
@@ -1232,6 +1236,7 @@ export class DefaultConfig implements Config {
 
   nukeMagnitudes(unitType: UnitType): NukeMagnitude {
     switch (unitType) {
+      case UnitType.MIRV:
       case UnitType.MIRVWarhead:
         return { inner: 12, outer: 18 };
       case UnitType.AtomBomb:
