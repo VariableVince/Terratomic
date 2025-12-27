@@ -506,7 +506,7 @@ export class UnitImpl implements Unit {
     }
     this.mg.addUpdate(this.toUpdate());
     (this.owner() as PlayerImpl).invalidateEffectiveUnitsCache(this.type());
-    if (this._health === 0n) {
+    if (this._health === 0n && this.isActive()) {
       this.delete(true, attacker);
     }
   }

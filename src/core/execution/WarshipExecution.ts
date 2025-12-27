@@ -76,7 +76,9 @@ export class WarshipExecution implements Execution {
 
   tick(ticks: number): void {
     if (this.warship.health() <= 0) {
-      this.warship.delete();
+      if (this.warship.isActive()) {
+        this.warship.delete();
+      }
       return;
     }
     const hasPort = this.warship.owner().unitCount(UnitType.Port) > 0;

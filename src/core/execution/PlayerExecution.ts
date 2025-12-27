@@ -58,7 +58,9 @@ export class PlayerExecution implements Execution {
             this.mg!.player(tileOwner.id()).captureUnit(u);
           }
         } else {
-          u.delete();
+          if (u.isActive()) {
+            u.delete();
+          }
         }
       }
     });
@@ -74,7 +76,9 @@ export class PlayerExecution implements Execution {
           u.type() !== UnitType.MIRVWarhead &&
           u.type() !== UnitType.MIRV
         ) {
-          u.delete();
+          if (u.isActive()) {
+            u.delete();
+          }
         }
       });
       this.active = false;

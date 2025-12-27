@@ -65,7 +65,9 @@ export class FighterJetExecution implements Execution {
 
   tick(): void {
     if (this.fighterJet.health() <= 0) {
-      this.fighterJet.delete();
+      if (this.fighterJet.isActive()) {
+        this.fighterJet.delete();
+      }
       return;
     }
 

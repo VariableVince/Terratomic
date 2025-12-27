@@ -369,7 +369,9 @@ export class SAMLauncherExecution implements Execution {
 
         mirvWarheadTargets.forEach(({ unit: u }) => {
           // Delete warheads
-          u.delete();
+          if (u.isActive()) {
+            u.delete();
+          }
         });
 
         // Record stats

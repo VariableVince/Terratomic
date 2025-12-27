@@ -73,7 +73,9 @@ export class ArtilleryExecution implements Execution {
 
   tick(ticks: number): void {
     if (this.artillery.health() <= 0) {
-      this.artillery.delete();
+      if (this.artillery.isActive()) {
+        this.artillery.delete();
+      }
       return;
     }
 

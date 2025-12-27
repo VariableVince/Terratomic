@@ -13,7 +13,9 @@ export class ParatrooperRetreatExecution implements Execution {
     this.paratrooper =
       this.player.units().find((u) => u.id() === this.unitID) ?? null;
     if (this.paratrooper && this.paratrooper.type() === UnitType.Paratrooper) {
-      this.paratrooper.delete();
+      if (this.paratrooper.isActive()) {
+        this.paratrooper.delete();
+      }
     }
     this.active = false;
   }
