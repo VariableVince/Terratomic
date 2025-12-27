@@ -15,6 +15,7 @@ export class CityAABulletExecution implements Execution {
   private speed: number = 0;
   private damage: number = 0;
   private predictedTile: TileRef | null = null;
+  private maxRangeSquared: number = 0;
 
   constructor(
     private spawn: TileRef,
@@ -28,6 +29,9 @@ export class CityAABulletExecution implements Execution {
     this.pathFinder = new StraightPathFinder(mg.map());
     this.speed = mg.config().cityAABulletSpeed();
     this.damage = mg.config().cityAABulletDamage();
+    // Max range slightly larger than scan range to allow bullets to reach edge targets
+    const maxRange = 100;
+    this.maxRangeSquared = maxRange * maxRange;
 
     // Calculate initial predicted intercept point
     this.updatePredictedTile(this.spawn);
@@ -102,49 +106,68 @@ export class CityAABulletExecution implements Execution {
       return;
     }
 
-    // Update predicted intercept point each tick
-    this.updatePredictedTile(this.bullet.tile());
+    // Check if bullet has exceeded max range from source city
+    if (!this.sourceCity.isActive() || this.isOutOfRange()) {
+      this.bullet.delete(false);
+      this.active = false;
+      return;
+    }
 
-    // Move bullet toward predicted position
+    // Move bullet toward target's ACTUAL position
+    // Direct pursuit is more reliable than predictive targeting for direction-changing targets
     for (let i = 0; i < this.speed; i++) {
-      // Check if we've reached the actual target (not just predicted position)
       const bulletTile = this.bullet.tile();
       const targetTile = this.target.tile();
 
+      // Check for hit BEFORE moving
       if (bulletTile === targetTile) {
-        // Hit the target!
         this.applyDamage();
         return;
       }
 
-      // Move toward predicted position
-      const result = this.pathFinder.nextTile(
-        bulletTile,
-        this.predictedTile!,
-        1,
-      );
+      // Check if we're adjacent (within 1 Manhattan distance) before moving
+      const map = this.mg.map();
+      let bx = map.x(bulletTile);
+      let by = map.y(bulletTile);
+      const tx = map.x(targetTile);
+      const ty = map.y(targetTile);
+      let distToTarget = Math.abs(bx - tx) + Math.abs(by - ty);
+
+      if (distToTarget <= 1) {
+        // Adjacent - move to target and hit!
+        this.bullet.move(targetTile);
+        this.applyDamage();
+        return;
+      }
+
+      // Move toward target's ACTUAL current position (not predicted)
+      const result = this.pathFinder.nextTile(bulletTile, targetTile, 1);
 
       if (result === true) {
-        // Reached predicted position but target might have moved
-        // Check if target is adjacent or at this position
-        const map = this.mg.map();
-        const bx = map.x(bulletTile);
-        const by = map.y(bulletTile);
-        const tx = map.x(targetTile);
-        const ty = map.y(targetTile);
-        const distToTarget = Math.abs(bx - tx) + Math.abs(by - ty);
-
-        if (distToTarget <= 1) {
-          // Close enough - hit!
-          this.bullet.move(targetTile);
-          this.applyDamage();
-          return;
-        }
-
-        // Target moved away from predicted position, recalculate
-        this.updatePredictedTile(bulletTile);
+        // Reached target!
+        this.applyDamage();
+        return;
       } else {
         this.bullet.move(result);
+      }
+
+      // Check for hit AFTER moving
+      const newBulletTile = this.bullet.tile();
+      if (newBulletTile === targetTile) {
+        this.applyDamage();
+        return;
+      }
+
+      // Check if adjacent after moving
+      bx = map.x(newBulletTile);
+      by = map.y(newBulletTile);
+      distToTarget = Math.abs(bx - tx) + Math.abs(by - ty);
+
+      if (distToTarget <= 1) {
+        // Adjacent after move - hit!
+        this.bullet.move(targetTile);
+        this.applyDamage();
+        return;
       }
     }
   }
@@ -194,6 +217,20 @@ export class CityAABulletExecution implements Execution {
 
   private isAtWarEffective(other: Player): boolean {
     return this._owner.isAtWarWith(other);
+  }
+
+  private isOutOfRange(): boolean {
+    const map = this.mg.map();
+    const bulletX = map.x(this.bullet!.tile());
+    const bulletY = map.y(this.bullet!.tile());
+    const cityX = map.x(this.sourceCity.tile());
+    const cityY = map.y(this.sourceCity.tile());
+
+    const dx = bulletX - cityX;
+    const dy = bulletY - cityY;
+    const distSquared = dx * dx + dy * dy;
+
+    return distSquared > this.maxRangeSquared;
   }
 
   isActive(): boolean {

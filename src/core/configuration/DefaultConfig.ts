@@ -838,6 +838,7 @@ export class DefaultConfig implements Config {
         return {
           cost: () => 0n,
           territoryBound: false,
+          maxHealth: 200, // Fragile air unit - dies in ~20 AA bullets
         };
       case UnitType.DoomsdayDevice:
         return {
