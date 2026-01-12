@@ -2,6 +2,8 @@ import { EventBus } from "../../../core/EventBus";
 import { PlayerType, UnitType } from "../../../core/game/Game";
 import { GameUpdateType, PlayerUpdate } from "../../../core/game/GameUpdates";
 import { GameView } from "../../../core/game/GameView";
+import "../../ResearchPriorityModal";
+import type { ResearchPriorityModal } from "../../ResearchPriorityModal";
 import { tutorialManager } from "../../TutorialManager";
 import { ToggleBuildPanelEvent } from "./ControlPanel";
 import { Layer } from "./Layer";
@@ -28,6 +30,7 @@ export class TutorialTriggers implements Layer {
   private spawnEndTime = 0;
   private shownTips = new Set<string>();
   private hadPvPThisTick = false;
+  private researchPriorityModalShown = false;
 
   constructor(game: GameView, eventBus: EventBus) {
     this.game = game;
@@ -65,6 +68,9 @@ export class TutorialTriggers implements Layer {
       if (player) {
         this.lastTileCount = player.numTilesOwned();
       }
+
+      // Show research priority modal (if not in All Techs mode)
+      this.showResearchPriorityModal();
     }
 
     // Only check player-specific tips if player exists and is alive
@@ -282,6 +288,30 @@ export class TutorialTriggers implements Layer {
     } catch {
       return false;
     }
+  }
+
+  private showResearchPriorityModal(): void {
+    // Skip if already shown, in All Techs mode, or player has no tiles
+    if (this.researchPriorityModalShown) return;
+    if (this.isAllTechMode()) return;
+
+    const player = this.game.myPlayer();
+    if (!player || !player.isAlive()) return;
+
+    this.researchPriorityModalShown = true;
+
+    // Small delay to let the game UI settle after spawn phase transition
+    setTimeout(() => {
+      const modal = document.querySelector(
+        "research-priority-modal",
+      ) as ResearchPriorityModal | null;
+
+      if (modal) {
+        modal.game = this.game;
+        modal.eventBus = this.eventBus;
+        modal.open();
+      }
+    }, 500);
   }
 
   render() {

@@ -732,6 +732,24 @@
       "research_goal": "Increase research investment to unlock technologies faster."
     }
   },
+  "research_priority": {
+    "title": "Choose Your Research Focus",
+    "intro_title": "Welcome to Research!",
+    "intro_text": "Research unlocks powerful upgrades for your nation. Click on individual technologies to prioritize them, or use \"Prioritize All\" to focus on an entire category. Prioritized research progresses faster!",
+    "intro_text_simple": "Research unlocks powerful upgrades for your nation. Choose a category to focus your research efforts. You can select individual technologies later via the RESEARCH button.",
+    "category_land": "Roads, hospitals, ground defenses, SAM systems",
+    "category_sea": "Warships, submarines, naval dominance",
+    "category_air": "Paratroopers, jets, bombers, air superiority",
+    "category_nuclear": "Atomic bombs, hydrogen bombs, MIRVs",
+    "investment_label": "Investment:",
+    "investment_explanation": "Set how much of your gold income to invest in research. Higher investment = faster technology unlocks, but less gold for buildings.",
+    "prioritize_category": "Prioritize all",
+    "selection_hint": "Click a category to prioritize all its technologies. You can fine-tune individual tech priorities later using the RESEARCH button.",
+    "footer_hint": "You can change your priorities anytime using the RESEARCH button on the left side of the screen.",
+    "footer_hint_simple": "Change priorities anytime via the RESEARCH button (left side). Adjust research investment in the Economy tab (bottom).",
+    "warning_no_priority": "Please select at least one research priority to continue.",
+    "confirm_button": "Confirm & Start Game"
+  },
   "unit_upgrade_settings": {
     "title": "Unit Upgrade Settings",
     "decrease": "Decrease",
@@ -900,7 +918,6 @@
       "command_center_trade_title": "Trade Tab",
       "command_center_trade_desc": "Monitor your international trade network and manage trade ships. Trade ships automatically travel between your ports and other players' ports to generate passive gold income. This tab displays active trade routes, trade ship counts, and allows you to manage your maritime commerce. Trade ships are vulnerable to enemy warships and submarines during wartime.",
       "command_center_trade_alt": "Trade Tab",
-
       "radial_title": "Radial Menu",
       "radial_intro": "Right-click on tiles to access context-sensitive actions:",
       "radial_info": "'<strong>'Info:'</strong>' View detailed player information and statistics",
