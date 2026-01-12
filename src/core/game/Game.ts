@@ -681,6 +681,8 @@ export interface Player {
     spawnTile: TileRef,
     params: UnitParams<T>,
   ): Unit;
+  // Phase 1 Optimization: Cached airfield check
+  hasAirfield(): boolean;
 
   // Upgrades
   hasUpgrade(upgrade: UpgradeType): boolean;

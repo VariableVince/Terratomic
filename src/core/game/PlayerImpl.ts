@@ -95,6 +95,11 @@ export class PlayerImpl implements Player {
 
   public _units: Unit[] = [];
   private _effectiveUnitsCache: Map<UnitType, number> = new Map();
+
+  // Phase 1 Optimization: Cache airfield existence
+  private _hasAirfieldCache: boolean = false;
+  private _hasAirfieldCacheDirty: boolean = true;
+
   public _tiles: Set<TileRef> = new Set();
   private _upgrades: Set<UpgradeType> = new Set();
   // Per-match research tree selections (IDs are client-defined strings)
@@ -610,6 +615,23 @@ export class PlayerImpl implements Player {
 
   invalidateEffectiveUnitsCache(type: UnitType): void {
     this._effectiveUnitsCache.delete(type);
+
+    // Phase 1 Optimization: Invalidate airfield cache when airfield count changes
+    if (type === UnitType.Airfield) {
+      this._hasAirfieldCacheDirty = true;
+    }
+  }
+
+  /**
+   * Phase 1 Optimization: Cached check for airfield existence
+   * Avoids iterating through units array every tick for every fighter
+   */
+  hasAirfield(): boolean {
+    if (this._hasAirfieldCacheDirty) {
+      this._hasAirfieldCache = this.units(UnitType.Airfield).length > 0;
+      this._hasAirfieldCacheDirty = false;
+    }
+    return this._hasAirfieldCache;
   }
 
   /**

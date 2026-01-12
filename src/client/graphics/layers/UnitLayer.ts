@@ -172,6 +172,7 @@ export class UnitLayer implements Layer {
   private pixiSeenUnits: Set<number> = new Set();
   private textureCache: Map<string, PIXI.Texture> = new Map();
   private targetingTextureCache: Map<string, PIXI.Texture> = new Map(); // Red tint for attacking units
+  private starTextureCache: Map<number, PIXI.Texture> = new Map(); // Star level indicators (Phase 1 optimization)
 
   // Icon images for PIXI units
   private warshipIconImage: HTMLImageElement | null = null;
@@ -378,12 +379,13 @@ export class UnitLayer implements Layer {
     ctx.drawImage(colored, dx, dy, dw, dh);
 
     // Draw level indicator stars (bronze) in top-left corner
-    // FighterJets have 4 levels, others typically have 3
+    // FighterJets have stars drawn separately (not in texture) to keep horizontal while sprite rotates
     // TradeShips don't have levels, so skip stars
     // Bombers don't show levels (rotation makes badges look bad)
     if (
       unitType !== UnitType.TradeShip &&
       unitType !== UnitType.Bomber &&
+      unitType !== UnitType.FighterJet &&
       level &&
       level >= 1 &&
       level <= 4
@@ -463,6 +465,72 @@ export class UnitLayer implements Layer {
     ctx.lineTo(cx, cy - outerRadius);
     ctx.closePath();
     ctx.fill();
+  }
+
+  private drawPixiStar(
+    graphics: PIXI.Graphics,
+    cx: number,
+    cy: number,
+    size: number,
+  ) {
+    const spikes = 5;
+    const outerRadius = size / 2;
+    const innerRadius = outerRadius * 0.4;
+    let rot = (Math.PI / 2) * 3;
+    const step = Math.PI / spikes;
+
+    const points: number[] = [];
+    points.push(cx, cy - outerRadius);
+
+    for (let i = 0; i < spikes; i++) {
+      let x = cx + Math.cos(rot) * outerRadius;
+      let y = cy + Math.sin(rot) * outerRadius;
+      points.push(x, y);
+      rot += step;
+
+      x = cx + Math.cos(rot) * innerRadius;
+      y = cy + Math.sin(rot) * innerRadius;
+      points.push(x, y);
+      rot += step;
+    }
+
+    points.push(cx, cy - outerRadius);
+    graphics.drawPolygon(points);
+  }
+
+  /**
+   * Phase 1 Optimization: Get or create cached star texture for a given level
+   * Pre-renders stars to reusable textures instead of redrawing graphics every frame
+   */
+  private getStarTexture(level: number): PIXI.Texture {
+    if (this.starTextureCache.has(level)) {
+      return this.starTextureCache.get(level)!;
+    }
+
+    // Create canvas to render stars
+    const canvas = document.createElement("canvas");
+    const starSize = 8;
+    const spacing = 0.6;
+    const padding = 1;
+
+    // Calculate canvas size based on number of stars
+    canvas.width = Math.ceil(padding * 2 + level * (starSize + spacing));
+    canvas.height = starSize + padding * 2;
+
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#cd7f32"; // bronze color
+
+    // Draw stars to canvas
+    for (let i = 0; i < level; i++) {
+      const x = padding + starSize / 2 + i * (starSize + spacing);
+      const y = padding + starSize / 2;
+      this.drawStar(ctx, x, y, starSize);
+    }
+
+    // Create and cache texture
+    const texture = PIXI.Texture.from(canvas);
+    this.starTextureCache.set(level, texture);
+    return texture;
   }
 
   private getImageColored(
@@ -587,6 +655,27 @@ export class UnitLayer implements Layer {
       const graphics = new PIXI.Graphics() as any;
       this.pixiStage.addChild(graphics);
       return graphics; // Graphics extends Container like Sprite
+    }
+
+    // Fighter jets use Container with sprite + horizontal star overlay
+    if (unit.type() === UnitType.FighterJet) {
+      const container = new PIXI.Container() as any as PIXI.Sprite;
+      const texture = this.createPixiTexture(unit, false);
+      const sprite = new PIXI.Sprite(texture);
+      sprite.anchor.set(0.5, 0.5);
+      container.addChild(sprite);
+
+      // Phase 1 Optimization: Use sprite with cached texture instead of Graphics
+      const level = unit.level ? unit.level() : 1;
+      const starTexture = this.getStarTexture(level);
+      const starSprite = new PIXI.Sprite(starTexture);
+      starSprite.anchor.set(0, 0); // Top-left anchor
+      container.addChild(starSprite);
+      (container as any)._jetSprite = sprite;
+      (container as any)._starSprite = starSprite;
+
+      this.pixiStage.addChild(container);
+      return container;
     }
 
     const texture = this.createPixiTexture(unit, false);
@@ -919,11 +1008,41 @@ export class UnitLayer implements Layer {
       return;
     }
 
-    // Apply rotation to bombers to point them in movement direction
+    // Apply rotation to bombers and fighter jets to point them in movement direction
     if (unit.type() === UnitType.Bomber) {
       const angle = this.getUnitAngle(unit);
       if (angle !== null) {
         render.pixiSprite.rotation = angle;
+      }
+    }
+
+    // Fighter jets: rotate sprite child, keep stars horizontal
+    if (unit.type() === UnitType.FighterJet) {
+      const angle = this.getUnitAngle(unit);
+      const jetSprite = (render.pixiSprite as any)._jetSprite;
+      const starSprite = (render.pixiSprite as any)._starSprite;
+
+      if (angle !== null && jetSprite) {
+        jetSprite.rotation = angle;
+      }
+
+      // Phase 1 Optimization: Update star sprite texture only if level changed
+      if (starSprite && jetSprite) {
+        const level = unit.level ? unit.level() : 1;
+        const starTexture = this.getStarTexture(level);
+
+        // Only update texture if it changed (level up/down)
+        if (starSprite.texture !== starTexture) {
+          starSprite.texture = starTexture;
+        }
+
+        // Position stars at top-left of jet sprite
+        const spriteWidth = jetSprite.texture.width;
+        const spriteHeight = jetSprite.texture.height;
+        const padding = 1;
+
+        starSprite.x = -spriteWidth / 2 + padding;
+        starSprite.y = -spriteHeight / 2 + padding;
       }
     }
 
@@ -969,12 +1088,11 @@ export class UnitLayer implements Layer {
     // Set scale (including horizontal flip for all PIXI units based on direction)
     const baseScale = this.iconScreenScale();
 
-    // All PIXI units except Bomber: flip horizontally based on east/west movement
-    // Bombers use rotation instead of flip to handle all directions
+    // PIXI units with horizontal flip based on east/west movement
+    // Bombers and FighterJets use rotation instead of flip
     if (
       unit.type() === UnitType.Warship ||
       unit.type() === UnitType.Submarine ||
-      unit.type() === UnitType.FighterJet ||
       unit.type() === UnitType.TradeShip
     ) {
       if (lastTile && currentTile) {
