@@ -1,1 +1,17 @@
-*.bin binary
+# Prevent line-ending conversion for binary map files
+*.bin binary -diff -merge -text
+resources/maps/*.bin binary -diff -merge -text
+
+# Ensure all binary assets are handled correctly
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.mp3 binary
+*.ogg binary
+*.wav binary
+*.ttf binary
+*.woff binary
+*.woff2 binary

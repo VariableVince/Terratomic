@@ -29,6 +29,8 @@ npm install
 npm run dev
 ```
 
+> **Note for Windows users:** If you encounter map loading errors like "invalid data, buffer size incorrect", run `git add --renormalize .` and then `git checkout -- .` to fix binary file line-ending issues.
+
 You're now ready to start developing locally. A formal contribution guide will be published soon.
 
 Until then, open issues, submit pull requests, or join the discussion [on Discord](https://discord.gg/JNZbp4pg5y) — we're listening.
