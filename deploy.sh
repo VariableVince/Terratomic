@@ -31,21 +31,21 @@ set -- "${POSITIONAL_ARGS[@]}"
 # Check command line arguments
 if [ $# -lt 2 ] || [ $# -gt 3 ]; then
     echo "Error: Please specify environment and host, with optional subdomain"
-    echo "Usage: $0 [prod|staging] [eu|nbg1|staging|masters] [subdomain] [--enable_basic_auth]"
+    echo "Usage: $0 [prod|staging] [blue|green] [subdomain] [--enable_basic_auth]"
     exit 1
 fi
 
 # Validate first argument (environment)
 if [ "$1" != "prod" ] && [ "$1" != "staging" ]; then
     echo "Error: First argument must be either 'prod' or 'staging'"
-    echo "Usage: $0 [prod|staging] [eu|nbg1|staging|masters] [subdomain] [--enable_basic_auth]"
+    echo "Usage: $0 [prod|staging] [blue|green] [subdomain] [--enable_basic_auth]"
     exit 1
 fi
 
 # Validate second argument (host)
-if [ "$2" != "eu" ] && [ "$2" != "nbg1" ] && [ "$2" != "staging" ] && [ "$2" != "masters" ]; then
-    echo "Error: Second argument must be either 'eu', 'nbg1', 'staging', or 'masters'"
-    echo "Usage: $0 [prod|staging] [eu|nbg1|staging|masters] [subdomain] [--enable_basic_auth]"
+if [ "$2" != "blue" ] && [ "$2" != "green" ]; then
+    echo "Error: Second argument must be either 'blue' or 'green'"
+    echo "Usage: $0 [prod|staging] [blue|green] [subdomain] [--enable_basic_auth]"
     exit 1
 fi
 
@@ -80,18 +80,12 @@ if [ -f .env.$ENV ]; then
     export $(grep -v '^#' .env.$ENV | xargs)
 fi
 
-if [ "$HOST" == "staging" ]; then
-    print_header "DEPLOYING TO STAGING HOST"
-    SERVER_HOST=$SERVER_HOST_STAGING
-elif [ "$HOST" == "nbg1" ]; then
-    print_header "DEPLOYING TO NBG1 HOST"
-    SERVER_HOST=$SERVER_HOST_NBG1
-elif [ "$HOST" == "masters" ]; then
-    print_header "DEPLOYING TO MASTERS HOST"
-    SERVER_HOST=$SERVER_HOST_MASTERS
+if [ "$HOST" == "blue" ]; then
+    print_header "DEPLOYING TO BLUE HOST"
+    SERVER_HOST=$SERVER_HOST_BLUE
 else
-    print_header "DEPLOYING TO EU HOST"
-    SERVER_HOST=$SERVER_HOST_EU
+    print_header "DEPLOYING TO GREEN HOST"
+    SERVER_HOST=$SERVER_HOST_GREEN
 fi
 
 # Check required environment variables
